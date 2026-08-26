@@ -126,8 +126,8 @@ muncul dan CI gagal), dan sourcemap dipastikan tidak ikut terbit.
 | US-06 Rekap event | Selesai — statistik dihitung server, ekspor CSV |
 | US-07 Placeholder kanal lain | Selesai — Outlet (v1.1) & Home Service (v1.2) |
 | §4.3 Resolusi konflik | Selesai — server tidak menimpa; kedua record disimpan, satu `needs_review`, Koordinator memilih |
-| §4.5.1 Enkripsi lokal | Selesai — AES-256-GCM, kunci PBKDF2 dari PIN, tidak pernah ke disk |
-| §4.5.2 PIN + auto-lock | Selesai — auto-lock 5 menit idle |
+| §4.5.1 Enkripsi lokal | **Sebagian** — AES-256-GCM tetap jalan, tetapi kuncinya kini kunci perangkat yang tersimpan lokal (lihat di bawah) |
+| §4.5.2 PIN + auto-lock | **Dimatikan sementara** — kodenya utuh, tinggal dinyalakan (lihat di bawah) |
 | §4.5.3 Auto-purge | Selesai — identitas & hasil dihapus dari perangkat setelah server konfirmasi + masa retensi |
 | §4.5.4 Remote wipe | Selesai — cabut sesi dari Pengaturan → Perangkat; sesi mati seketika, data lokal dihapus saat online |
 | §4.5.5 Tenant isolation | Selesai — RLS Postgres, app connect sebagai role non-superuser |
@@ -135,6 +135,32 @@ muncul dan CI gagal), dan sourcemap dipastikan tidak ikut terbit.
 | §4.5.7 Penghapusan data peserta | Selesai — `POST /participants/:id/erase`, identitas dibersihkan, jejak di audit_log |
 | §4.5.8 Audit log | Selesai — termasuk **akses baca** Admin Pusat ke data peserta (`participant.read`, `conflict.read`, `participant.pull`), bukan hanya operasi tulis |
 | R1 Storage eviction | Selesai — peringatan bila persistent storage ditolak, ajakan pasang ke home screen, dan sync dipaksa saat antrean lewat 50 record |
+
+## PIN lock sedang dimatikan
+
+`REQUIRE_PIN` di [`apps/web/src/lib/store.ts`](apps/web/src/lib/store.ts) bernilai
+`false`, atas permintaan, supaya aplikasi bisa dipakai dan didemokan tanpa
+hambatan. Seluruh alur PIN, verifier, dan auto-lock masih utuh di bawahnya —
+menyalakannya kembali cukup mengubah satu nilai itu jadi `true`.
+
+Yang berubah selama dimatikan, dan perlu disadari sebelum membawa data peserta
+sungguhan ke lapangan:
+
+- Data peserta **tetap dienkripsi** AES-256-GCM, tetapi kuncinya dibuat acak per
+  perangkat dan disimpan di perangkat itu juga. Siapa pun yang bisa membuka
+  aplikasi bisa membaca isinya. §4.5.1 mensyaratkan kunci yang tidak tersimpan
+  plaintext di perangkat — dan syarat itu belum terpenuhi.
+- §4.5.2 (PIN/biometrik + auto-lock) belum terpenuhi sama sekali.
+- Untuk risiko R6 (perangkat hilang atau berganti tangan), yang tersisa hanya
+  remote wipe dan auto-purge. Lapisan PIN-nya tidak ada.
+
+Layar Pengaturan menyatakan kondisi ini apa adanya, supaya tidak ada yang
+mengira datanya terkunci padahal tidak.
+
+Perangkat yang sebelumnya sudah memakai PIN akan dibersihkan otomatis saat
+aplikasi dibuka — datanya terenkripsi dengan kunci turunan PIN yang tidak akan
+pernah diminta lagi, jadi meninggalkannya hanya menyisakan baris yang tak
+terbaca selamanya.
 
 ## Angka yang harus diisi cabang, bukan ditebak kode
 

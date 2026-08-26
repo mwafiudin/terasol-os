@@ -21,6 +21,23 @@ export function randomBytes(n: number): Uint8Array {
   return crypto.getRandomValues(new Uint8Array(n));
 }
 
+/**
+ * Kunci perangkat untuk mode tanpa PIN.
+ *
+ * PENTING — ini BUKAN pengganti setara PIN. Kuncinya tersimpan di perangkat,
+ * tepat di sebelah ciphertext-nya, jadi siapa pun yang bisa membaca IndexedDB
+ * juga bisa membuka isinya. §4.5.1 mensyaratkan kunci yang TIDAK tersimpan
+ * plaintext di perangkat, dan mode ini tidak memenuhinya.
+ *
+ * Gunanya menjaga bentuk data tetap sama, sehingga PIN bisa dinyalakan lagi
+ * hanya dengan mengubah REQUIRE_PIN — bukan membongkar ulang penyimpanan.
+ */
+export async function deviceKeyFrom(bytes: Uint8Array): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
+    'raw', bytes as BufferSource, 'AES-GCM', false, ['encrypt', 'decrypt'],
+  );
+}
+
 export async function deriveKey(pin: string, salt: Uint8Array): Promise<CryptoKey> {
   const base = await crypto.subtle.importKey('raw', enc.encode(pin), 'PBKDF2', false, ['deriveKey']);
   return crypto.subtle.deriveKey(
