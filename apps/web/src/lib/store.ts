@@ -1,11 +1,34 @@
 import { create } from 'zustand';
 import { api, getSession, onWipeRequired, setSession, WipeRequired } from './api';
-import { checkVerifier, deriveKey, encryptJson, decryptJson, makeVerifier, randomBytes, type Envelope } from './crypto';
+import {
+  checkVerifier, deriveKey, deviceKeyFrom, encryptJson, decryptJson,
+  makeVerifier, randomBytes, type Envelope,
+} from './crypto';
 import { db, deviceId, getMeta, setMeta, wipeAll } from './db';
 import { refreshPending, setSimulatedOffline, syncNow } from './sync';
 import type { User } from './types';
 
-/** Auto-lock setelah idle (§4.5.2). */
+/**
+ * Saklar PIN lock (§4.5.2).
+ *
+ * Saat ini DIMATIKAN atas permintaan, supaya aplikasi bisa dipakai dan
+ * didemokan tanpa hambatan. Konsekuensinya nyata dan perlu disadari:
+ *
+ *  - Data peserta tetap dienkripsi AES-256-GCM, tetapi kuncinya dibuat acak
+ *    per perangkat dan disimpan di perangkat itu juga. Siapa pun yang bisa
+ *    membuka aplikasi ini bisa membaca isinya.
+ *  - §4.5.1 mensyaratkan kunci yang tidak tersimpan plaintext di perangkat,
+ *    dan §4.5.2 mensyaratkan PIN/biometrik dengan auto-lock. Selama saklar ini
+ *    `false`, KEDUANYA belum terpenuhi.
+ *  - Mitigasi risiko R6 (perangkat hilang) tinggal remote wipe dan auto-purge;
+ *    lapisan PIN-nya tidak ada.
+ *
+ * Menyalakannya kembali cukup mengubah nilai ini menjadi `true`. Seluruh alur
+ * PIN, verifier, dan auto-lock masih utuh di bawahnya.
+ */
+export const REQUIRE_PIN = false;
+
+/** Auto-lock setelah idle (§4.5.2). Hanya berlaku bila REQUIRE_PIN menyala. */
 export const IDLE_LOCK_MS = 5 * 60_000;
 
 export type Phase = 'booting' | 'login' | 'setPin' | 'locked' | 'ready';
@@ -58,6 +81,23 @@ export const useApp = create<AppState>((set, get) => ({
     set({ storagePersisted: await requestPersistentStorage() });
     const user = await getMeta<User>('user');
     const salt = await getMeta<number[]>('pinSalt');
+
+    if (!REQUIRE_PIN) {
+      // Perangkat yang sebelumnya memakai PIN menyimpan data terenkripsi dengan
+      // kunci turunan PIN, yang kini tidak pernah diminta lagi — jadi tidak akan
+      // pernah bisa dibuka. Dibersihkan sekalian, daripada meninggalkan baris
+      // yang tampak ada tapi isinya tak terbaca selamanya.
+      if (salt) {
+        await wipeAll();
+        setSession(null, null);
+        return set({ user: null, phase: 'login', toast: 'PIN dinonaktifkan — silakan masuk lagi.' });
+      }
+      if (!user) return set({ phase: 'login' });
+      set({ user, key: await deviceKey(), phase: 'ready' });
+      await refreshPending();
+      return;
+    }
+
     if (!user) return set({ phase: 'login' });
     set({ user });
     set({ phase: salt ? 'locked' : 'setPin' });
@@ -68,6 +108,15 @@ export const useApp = create<AppState>((set, get) => ({
     const res = await api.login(email, password, did, navigator.userAgent.slice(0, 100));
     setSession(res.accessToken, res.refreshToken);
     await setMeta('user', res.user);
+
+    if (!REQUIRE_PIN) {
+      const key = await deviceKey();
+      await saveRefreshToken(key, res.refreshToken);
+      set({ user: res.user, key, phase: 'ready' });
+      await refreshPending();
+      return;
+    }
+
     // Refresh token belum bisa dienkripsi sampai PIN dibuat; disimpan sementara
     // di memori saja, lalu dikunci begitu PIN tersedia.
     set({ user: res.user, phase: 'setPin' });
@@ -107,6 +156,12 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   lock: () => {
+    // Tanpa PIN tidak ada yang bisa membuka kunci lagi, jadi mengunci hanya
+    // akan menjebak pengguna di layar yang tidak punya jalan keluar.
+    if (!REQUIRE_PIN) {
+      get().say('PIN sedang dimatikan, jadi tidak ada yang bisa dikunci.');
+      return;
+    }
     // Kunci dibuang dari memori — data lokal kembali jadi ciphertext.
     setSession(null, null);
     set({ key: null, phase: 'locked' });
@@ -144,6 +199,20 @@ async function requestPersistentStorage(): Promise<boolean | null> {
   }
 }
 
+/**
+ * Kunci enkripsi perangkat untuk mode tanpa PIN. Dibuat sekali lalu dipakai
+ * ulang, supaya data yang sudah tersimpan tetap terbaca antar sesi.
+ * Lihat peringatan di `deviceKeyFrom()` — ini bukan pengganti setara PIN.
+ */
+async function deviceKey(): Promise<CryptoKey> {
+  let bytes = await getMeta<number[]>('deviceKey');
+  if (!bytes || bytes.length !== 32) {
+    bytes = Array.from(randomBytes(32));
+    await setMeta('deviceKey', bytes);
+  }
+  return deviceKeyFrom(new Uint8Array(bytes));
+}
+
 /* --------------------- refresh token terenkripsi --------------------- */
 
 function bufToArr(b: ArrayBuffer): number[] { return Array.from(new Uint8Array(b)); }
@@ -168,6 +237,9 @@ async function loadRefreshToken(key: CryptoKey): Promise<string | null> {
 /* ----------------------------- auto-lock ----------------------------- */
 
 export function installIdleLock() {
+  // Tanpa PIN, auto-lock hanya akan mengunci pintu yang tidak punya kunci.
+  if (!REQUIRE_PIN) return () => {};
+
   let timer: number | undefined;
   const reset = () => {
     clearTimeout(timer);

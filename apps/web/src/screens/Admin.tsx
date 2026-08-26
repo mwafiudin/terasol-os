@@ -3,7 +3,7 @@ import { Badge, Button, Field, Icon, ICONS, PageHead } from '../components/ui';
 import { api, type ConflictGroup } from '../lib/api';
 import { LOCAL_RETENTION_HOURS } from '../lib/db';
 import { PARAM_LABEL, fmtTanggal } from '../lib/domain';
-import { IDLE_LOCK_MS, useApp } from '../lib/store';
+import { IDLE_LOCK_MS, REQUIRE_PIN, useApp } from '../lib/store';
 import { isOnline, MAX_UNSYNCED } from '../lib/sync';
 import type { ParamKey } from '../lib/types';
 
@@ -122,10 +122,14 @@ export function Settings({ go }: { go: Nav }) {
       <div className="card consumable-card">
         <b>Keamanan data di perangkat</b>
         <div className="consumable-row">
-          <span>Enkripsi lokal</span><span>AES-256-GCM, kunci dari PIN</span>
+          <span>Enkripsi lokal</span>
+          <span>{REQUIRE_PIN ? 'AES-256-GCM, kunci dari PIN' : 'AES-256-GCM, kunci perangkat'}</span>
         </div>
         <div className="consumable-row">
-          <span>Auto-lock</span><span>{Math.round(IDLE_LOCK_MS / 60000)} menit idle</span>
+          <span>PIN lock</span>
+          <span className={REQUIRE_PIN ? '' : 'belum'}>
+            {REQUIRE_PIN ? `auto-lock ${Math.round(IDLE_LOCK_MS / 60000)} menit idle` : 'dimatikan'}
+          </span>
         </div>
         <div className="consumable-row">
           <span>Retensi lokal</span><span>{LOCAL_RETENTION_HOURS} jam setelah sync</span>
@@ -133,6 +137,18 @@ export function Settings({ go }: { go: Nav }) {
         <div className="consumable-row">
           <span>Batas antrean</span><span>{MAX_UNSYNCED} record sebelum sync dipaksa</span>
         </div>
+
+        {!REQUIRE_PIN && (
+          <div className="belum-note">
+            PIN sedang dimatikan. Data peserta tetap dienkripsi, tetapi kuncinya
+            tersimpan di perangkat ini juga — siapa pun yang bisa membuka
+            aplikasi bisa membaca isinya. Bila perangkat hilang, yang tersisa
+            hanya remote wipe dan auto-purge. Nyalakan lagi lewat
+            <code> REQUIRE_PIN </code> sebelum dipakai membawa data peserta
+            sungguhan ke lapangan.
+          </div>
+        )}
+
         <small>
           Durasi retensi masih provisional — keputusan D4 menunggu verifikasi
           hukum. Setelah sync terkonfirmasi dan masa retensi lewat, identitas dan
@@ -140,7 +156,9 @@ export function Settings({ go }: { go: Nav }) {
         </small>
       </div>
 
-      <Button variant="secondary" full icon={ICONS.lock} onClick={lock}>Kunci sekarang</Button>
+      {REQUIRE_PIN && (
+        <Button variant="secondary" full icon={ICONS.lock} onClick={lock}>Kunci sekarang</Button>
+      )}
       <Button variant="ghost" full icon={ICONS.logout}
         onClick={() => { void logout().then(() => say('Anda keluar dari perangkat ini.')); }}>
         Keluar
