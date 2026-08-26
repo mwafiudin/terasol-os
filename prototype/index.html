@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Terasol OS</title>
+<meta name="description" content="Aplikasi manajemen mitra Rumah Sehat Terasol — kanal event screening, offline-first.">
+<meta name="theme-color" content="#12545A">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/terasol-mark.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/terasol-mark.svg">
+<link rel="stylesheet" href="styles/tokens.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div id="app" class="app" aria-live="polite">
+  <div class="statusbar">
+    <span id="clock">09.41</span>
+    <span class="statusbar-right">
+      <span id="net-chip" class="chip-offline" hidden>OFFLINE</span>
+      <svg id="net-wifi" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5a11 11 0 0 1 14 0"></path><path d="M8.5 15.8a6 6 0 0 1 7 0"></path><circle cx="12" cy="19" r="1" fill="currentColor"></circle></svg>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><rect x="2" y="8" width="17" height="9" rx="2"></rect><path d="M22 11v3"></path><rect x="4" y="10" width="10" height="5" rx="1" fill="currentColor" stroke="none"></rect></svg>
+    </span>
+  </div>
+  <main id="screen" class="screen"></main>
+  <nav id="tabbar" class="tabbar" aria-label="Navigasi utama"></nav>
+  <div id="toast-slot"></div>
+  <div id="sheet-slot"></div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

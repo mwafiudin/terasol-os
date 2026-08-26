@@ -1,0 +1,6 @@
+# Normalkan akhir baris: repo menyimpan LF, checkout di Windows tetap CRLF.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.woff2 binary

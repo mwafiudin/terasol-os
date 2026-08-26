@@ -1,0 +1,212 @@
+import { useCallback, useEffect, useState } from 'react';
+import { Badge, Button, Field, ICONS, Sheet, TabBar, Toast, type TabId } from './components/ui';
+import { api, type ServerParticipant } from './lib/api';
+import { CONV_LABEL, fmtTanggal, fmtWaktu } from './lib/domain';
+import { useDraft } from './lib/draft';
+import { activeEvent } from './lib/events';
+import { installIdleLock, installNetworkWatch, useApp } from './lib/store';
+import { isOnline, startAutoSync } from './lib/sync';
+import type { ConvStatus, EventRow } from './lib/types';
+import { Conflicts, Placeholder, Settings } from './screens/Admin';
+import { Login, SetPin, Unlock } from './screens/Auth';
+import { EventForm, Events, Recap } from './screens/Events';
+import { Home } from './screens/Home';
+import { Consent, Done, Register, Screening } from './screens/Participant';
+
+type Screen =
+  | 'home' | 'events' | 'outlet' | 'hs'
+  | 'eventForm' | 'register' | 'consent' | 'screening' | 'done'
+  | 'recap' | 'conflicts' | 'settings';
+
+const TOP_SCREENS: Screen[] = ['home', 'events', 'outlet', 'hs'];
+
+export default function App() {
+  const { phase, boot, key, toast, say } = useApp();
+  const [screen, setScreen] = useState<Screen>('home');
+  const [tab, setTab] = useState<TabId>('home');
+  const [recapEvent, setRecapEvent] = useState<EventRow | null>(null);
+  const [consentText, setConsentText] = useState<{ versi: string; isi: string } | null>(null);
+  const [followUp, setFollowUp] = useState<ServerParticipant | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const startDraft = useDraft((s) => s.start);
+  const restoreDraft = useDraft((s) => s.restore);
+
+  useEffect(() => { void boot(); }, [boot]);
+  useEffect(() => installNetworkWatch(), []);
+
+  useEffect(() => {
+    if (phase !== 'ready') return;
+    const stopIdle = installIdleLock();
+    const stopSync = startAutoSync(() => useApp.getState().key);
+    return () => { stopIdle(); stopSync(); };
+  }, [phase]);
+
+  // Draft yang tertinggal dipulihkan begitu kunci tersedia.
+  useEffect(() => { if (key) void restoreDraft(key); }, [key, restoreDraft]);
+
+  // Teks consent + versinya diambil dari server dan dipakai saat merekam persetujuan.
+  useEffect(() => {
+    if (phase !== 'ready' || !isOnline()) return;
+    api.consentText().then((t) => t && setConsentText(t)).catch(() => {});
+  }, [phase]);
+
+  const go = useCallback((next: string) => {
+    const s = next as Screen;
+    setScreen(s);
+    if (TOP_SCREENS.includes(s)) setTab(s as TabId);
+    window.scrollTo(0, 0);
+    document.querySelector('.screen')?.scrollTo(0, 0);
+  }, []);
+
+  // Tombol kembali Android tidak boleh menutup aplikasi di tengah alur.
+  useEffect(() => {
+    history.pushState({ screen }, '');
+    const onPop = () => { if (screen !== 'home') go('home'); else history.pushState({}, ''); };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [screen, go]);
+
+  async function mulaiRegistrasi() {
+    const ev = await activeEvent();
+    if (!ev) { say('Buat event dulu sebelum mencatat peserta.'); go('eventForm'); return; }
+    startDraft(ev.clientId, consentText?.versi ?? 'v1');
+    go('register');
+  }
+
+  if (phase === 'booting') {
+    return <div className="app boot"><img src="/terasol-mark.svg" alt="" width={56} height={56} /></div>;
+  }
+  if (phase === 'login') return <Shell><Login /></Shell>;
+  if (phase === 'setPin') return <Shell><SetPin /></Shell>;
+  if (phase === 'locked') return <Shell><Unlock /></Shell>;
+
+  const showTabs = TOP_SCREENS.includes(screen);
+
+  return (
+    <div className="app">
+      <main className="screen">
+        {screen === 'home' && (
+          <Home go={(s) => (s === 'register' ? void mulaiRegistrasi() : go(s))}
+            onFollowUp={setFollowUp} reloadKey={reloadKey} />
+        )}
+        {screen === 'events' && (
+          <Events go={go} reloadKey={reloadKey}
+            onOpenRecap={(ev) => { setRecapEvent(ev); go('recap'); }} />
+        )}
+        {screen === 'eventForm' && <EventForm go={go} onSaved={() => setReloadKey((k) => k + 1)} />}
+        {screen === 'register' && <Register go={go} />}
+        {screen === 'consent' && <Consent go={go} consentText={consentText} />}
+        {screen === 'screening' && <Screening go={go} />}
+        {screen === 'done' && <Done go={(s) => { setReloadKey((k) => k + 1); go(s); }} />}
+        {screen === 'recap' && recapEvent && (
+          <Recap go={go} event={recapEvent} onArchived={() => setReloadKey((k) => k + 1)} />
+        )}
+        {screen === 'conflicts' && <Conflicts go={go} />}
+        {screen === 'settings' && <Settings go={go} />}
+        {screen === 'outlet' && <Placeholder kind="outlet" />}
+        {screen === 'hs' && <Placeholder kind="hs" />}
+      </main>
+
+      {showTabs && <TabBar active={tab} onSelect={(id) => go(id)} />}
+      {toast && <Toast message={toast} />}
+      {followUp && (
+        <FollowUpSheet participant={followUp}
+          onClose={() => setFollowUp(null)}
+          onDone={() => { setFollowUp(null); setReloadKey((k) => k + 1); }} />
+      )}
+    </div>
+  );
+}
+
+function Shell({ children }: { children: React.ReactNode }) {
+  const toast = useApp((s) => s.toast);
+  return (
+    <div className="app">
+      <main className="screen">{children}</main>
+      {toast && <Toast message={toast} />}
+    </div>
+  );
+}
+
+/** US-04 — Koordinator memperbarui status konversi setelah event. */
+function FollowUpSheet({ participant, onClose, onDone }: {
+  participant: ServerParticipant; onClose: () => void; onDone: () => void;
+}) {
+  const say = useApp((s) => s.say);
+  const [buying, setBuying] = useState(false);
+  const [nilai, setNilai] = useState('');
+  const [produk, setProduk] = useState('');
+  const [busy, setBusy] = useState(false);
+  const conv = CONV_LABEL[participant.convStatus] ?? CONV_LABEL.baru!;
+
+  async function set(status: ConvStatus, nilaiTransaksi = 0, produkNama: string | null = null) {
+    setBusy(true);
+    try {
+      await api.setConversion(participant.id, { status, nilaiTransaksi, produk: produkNama });
+      say(status === 'membeli' ? 'Konversi tercatat.' : 'Status diperbarui.');
+      onDone();
+    } catch {
+      say('Gagal memperbarui status. Periksa koneksi.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Sheet title={`${participant.nama}, ${participant.usia} th`}
+      subtitle={participant.hp} onClose={onClose}>
+
+      {/* US-04 — jejak peserta: event asal → tanggal screening → status terkini. */}
+      <ol className="jejak">
+        <li>
+          <span className="jejak-label">Event asal</span>
+          <span className="jejak-nilai">{participant.eventNama}</span>
+        </li>
+        <li>
+          <span className="jejak-label">Tanggal screening</span>
+          <span className="jejak-nilai">
+            {participant.measuredAt
+              ? fmtWaktu(participant.measuredAt)
+              : fmtTanggal(participant.eventTanggal)}
+          </span>
+        </li>
+        <li>
+          <span className="jejak-label">Status terkini</span>
+          <span className="jejak-nilai">
+            <Badge tone={conv.tone}>{conv.label}</Badge>
+            {participant.convUpdatedAt && (
+              <span className="jejak-waktu">diperbarui {fmtWaktu(participant.convUpdatedAt)}</span>
+            )}
+          </span>
+        </li>
+      </ol>
+
+      {!buying ? (
+        <>
+          <Button variant="secondary" full disabled={busy} onClick={() => void set('dihubungi')}>
+            Tandai sudah dihubungi
+          </Button>
+          <Button full disabled={busy} onClick={() => setBuying(true)}>Membeli — isi transaksi</Button>
+          <Button variant="ghost" full disabled={busy} onClick={() => void set('batal')}>Tidak jadi</Button>
+        </>
+      ) : (
+        <>
+          <Field label="Nilai transaksi" htmlFor="f-nilai">
+            <input id="f-nilai" className="input" inputMode="numeric" value={nilai}
+              onChange={(e) => setNilai(e.target.value.replace(/\D/g, ''))} placeholder="cth. 1400000" />
+          </Field>
+          <Field label="Produk yang dibeli" htmlFor="f-produk">
+            <input id="f-produk" className="input" value={produk}
+              onChange={(e) => setProduk(e.target.value)} placeholder="cth. Paket herbal sendi" />
+          </Field>
+          <Button full disabled={busy || !nilai || !produk.trim()} icon={ICONS.check}
+            onClick={() => void set('membeli', Number(nilai), produk.trim())}>
+            Simpan pembelian
+          </Button>
+          <button className="link-btn" onClick={() => setBuying(false)}>Batal</button>
+        </>
+      )}
+      <span className="hint-subtle">Perubahan status tercatat di audit log. Akses Koordinator.</span>
+    </Sheet>
+  );
+}

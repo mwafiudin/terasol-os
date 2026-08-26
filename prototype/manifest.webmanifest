@@ -1,0 +1,15 @@
+{
+  "name": "Terasol OS",
+  "short_name": "Terasol OS",
+  "description": "Aplikasi manajemen mitra Rumah Sehat Terasol — kanal event screening, offline-first.",
+  "lang": "id",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F8F5EE",
+  "theme_color": "#12545A",
+  "icons": [
+    { "src": "assets/terasol-mark.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "assets/terasol-mark.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

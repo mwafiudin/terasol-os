@@ -1,0 +1,33 @@
+/* Gaya khusus pengembangan lokal — panel "masuk cepat" di layar login.
+   Diimpor dinamis dari main.tsx di balik `import.meta.env.DEV`, jadi berkas
+   ini tidak pernah ikut ke build produksi sama sekali. */
+
+.demo-logins {
+  width: 100%; display: flex; flex-direction: column; gap: 10px;
+  padding: 14px 16px; border-radius: var(--radius-card);
+  background: var(--ivory-200); border: 1px dashed var(--border-default);
+}
+.demo-logins-head {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--text-muted);
+}
+.demo-tag {
+  font-size: 10px; font-weight: var(--fw-bold); letter-spacing: .1em;
+  background: var(--gold-200); color: var(--gold-800);
+  padding: 3px 7px; border-radius: var(--radius-xs);
+}
+.demo-logins-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.demo-btn {
+  flex: 1; min-width: 88px; min-height: 40px; padding: 0 12px;
+  border: 1px solid var(--border-default); border-radius: var(--radius-pill);
+  background: var(--white); color: var(--teal-800);
+  font-size: 13.5px; font-weight: var(--fw-semibold);
+  transition: var(--transition-control);
+}
+.demo-btn:hover:not(:disabled) { background: var(--brand-tint); border-color: var(--teal-700); }
+.demo-btn:disabled { opacity: .5; }
+.demo-hint { font-size: 12px; line-height: 1.55; color: var(--text-subtle); }
+.demo-hint code {
+  font-family: var(--font-mono); font-size: 11.5px;
+  background: var(--ivory-300); padding: 1px 5px; border-radius: var(--radius-xs); margin: 0 3px;
+}

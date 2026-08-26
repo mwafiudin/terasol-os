@@ -1,0 +1,10 @@
+/* Corner radii echo the mark's circle: soft, continuous, never sharp, never pill-everything. */
+:root{
+--radius-xs:4px;--radius-sm:8px;--radius-md:12px;--radius-lg:18px;--radius-xl:26px;--radius-2xl:36px;--radius-pill:999px;--radius-circle:50%;
+--radius-card:var(--radius-lg);
+--radius-card-lg:var(--radius-xl);
+--radius-control:var(--radius-pill);
+--radius-field:var(--radius-md);
+--radius-media:var(--radius-xl);
+--radius-chip:var(--radius-pill);
+}

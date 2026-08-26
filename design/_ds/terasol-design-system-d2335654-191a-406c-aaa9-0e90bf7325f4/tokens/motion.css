@@ -1,0 +1,20 @@
+/* Motion is slow, eased-out and never bouncy. Nothing overshoots; nothing springs. */
+:root{
+--ease-calm:cubic-bezier(.22,.61,.36,1);/* @kind other */
+--ease-out:cubic-bezier(.16,.84,.44,1);/* @kind other */
+--ease-in-out:cubic-bezier(.45,.05,.55,.95);/* @kind other */
+--dur-instant:90ms;/* @kind other */
+--dur-fast:160ms;/* @kind other */
+--dur-base:240ms;/* @kind other */
+--dur-slow:420ms;/* @kind other */
+--dur-ambient:900ms;/* @kind other */
+--transition-control:background-color var(--dur-fast) var(--ease-calm),color var(--dur-fast) var(--ease-calm),border-color var(--dur-fast) var(--ease-calm),box-shadow var(--dur-base) var(--ease-calm),transform var(--dur-fast) var(--ease-calm);/* @kind other */
+--transition-surface:box-shadow var(--dur-base) var(--ease-calm),transform var(--dur-base) var(--ease-calm);/* @kind other */
+}
+@media (prefers-reduced-motion:reduce){:root{
+--dur-instant:0ms;/* @kind other */
+--dur-fast:0ms;/* @kind other */
+--dur-base:0ms;/* @kind other */
+--dur-slow:0ms;/* @kind other */
+--dur-ambient:0ms;/* @kind other */
+}}

@@ -1,0 +1,15 @@
+/* 4px base grid. Generous by default — space is how this brand signals calm. */
+:root{
+--space-0:0;--space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:20px;--space-6:24px;--space-7:32px;--space-8:40px;--space-9:48px;--space-10:64px;--space-11:80px;--space-12:96px;--space-13:128px;--space-14:160px;
+
+--gutter-card:var(--space-7);
+--gutter-card-lg:var(--space-9);
+--section-y:var(--space-13);
+--section-y-tight:var(--space-11);
+--page-max:1200px;
+--page-pad:var(--space-8);
+--stack-tight:var(--space-3);
+--stack:var(--space-5);
+--stack-loose:var(--space-8);
+--tap-min:48px;
+}

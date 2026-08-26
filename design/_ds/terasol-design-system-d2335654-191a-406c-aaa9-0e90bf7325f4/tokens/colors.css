@@ -1,0 +1,53 @@
+/* Terasol colour system — sampled from the supplied logo and brand art. */
+:root{
+/* Teal — the brand's anchor. Sampled from the logo ring (#185454) and the TERASOL wordmark (#004854). */
+--teal-950:#062A30;--teal-900:#093A41;--teal-800:#0D454C;--teal-700:#12545A;--teal-600:#1A666C;--teal-500:#2A7F84;--teal-400:#5AA3A6;--teal-300:#96C6C6;--teal-200:#C4DEDD;--teal-100:#E2EFEE;--teal-050:#F1F7F6;
+/* Sage — the wave inside the mark (#6C8478) and the RUMAH SEHAT descriptor (#76847E). */
+--sage-900:#3B4A42;--sage-800:#4E6157;--sage-700:#5D7268;--sage-600:#6C8478;--sage-500:#84998D;--sage-400:#A3B3A9;--sage-300:#C1CCC5;--sage-200:#DBE2DD;--sage-100:#EBEFEC;--sage-050:#F5F8F6;
+/* Gold — the sun in the mark (#CC9C48). Accent only, never a large field. */
+--gold-800:#8A6520;--gold-700:#A87C2C;--gold-600:#BC8B38;--gold-500:#CC9C48;--gold-400:#DBB474;--gold-300:#E8CFA4;--gold-200:#F2E3C9;--gold-100:#FAF3E4;
+/* Ivory / neutral — the paper of the brand art (#F0F0E4, #E4D8CC). Warm, never grey-blue. */
+--ivory-500:#CFC7B4;--ivory-400:#DED8C8;--ivory-300:#EAE5D8;--ivory-200:#F2EEE4;--ivory-100:#F8F5EE;--ivory-050:#FCFAF6;--white:#FFFFFF;
+/* Ink — warm charcoal, never pure black. */
+--ink-900:#1E2422;--ink-800:#2C3431;--ink-700:#3E4744;--ink-600:#56605C;--ink-500:#6E7975;--ink-400:#8E9793;--ink-300:#B3BAB7;
+/* Semantic hues, tuned to sit beside teal without shouting. */
+--success-700:#2F6B4A;--success-500:#4A8C64;--success-100:#E4F0E8;
+--warning-700:#9A6B18;--warning-500:#C68C22;--warning-100:#FBF0DA;
+--danger-700:#94382E;--danger-500:#B8503F;--danger-100:#F8E7E3;
+--info-700:#2A5F80;--info-500:#3D7EA6;--info-100:#E4EFF5;
+
+/* ---- Semantic aliases: use these in components ---- */
+--brand:var(--teal-700);--brand-strong:var(--teal-900);--brand-soft:var(--teal-100);--brand-tint:var(--teal-050);
+--accent:var(--gold-500);--accent-strong:var(--gold-700);--accent-soft:var(--gold-100);
+--support:var(--sage-600);--support-soft:var(--sage-100);
+
+--surface-page:var(--ivory-100);
+--surface-card:var(--white);
+--surface-raised:var(--white);
+--surface-sunken:var(--ivory-200);
+--surface-brand:var(--teal-800);
+--surface-brand-soft:var(--teal-050);
+--surface-accent-soft:var(--gold-100);
+--surface-overlay:rgba(9,58,65,.52);
+
+--text-heading:var(--teal-900);
+--text-body:var(--ink-800);
+--text-muted:var(--ink-500);
+--text-subtle:var(--ink-400);
+--text-on-brand:var(--ivory-050);
+--text-on-brand-muted:var(--teal-200);
+--text-accent:var(--gold-700);
+--text-link:var(--teal-700);
+--text-link-hover:var(--teal-900);
+
+--border-hairline:var(--sage-200);
+--border-default:var(--sage-300);
+--border-strong:var(--sage-400);
+--border-brand:var(--teal-700);
+--border-accent:var(--gold-400);
+--focus-ring:var(--gold-500);
+
+--gradient-sanctuary:linear-gradient(160deg,var(--teal-900) 0%,var(--teal-700) 58%,var(--teal-600) 100%);/* @kind color */
+--gradient-dawn:linear-gradient(180deg,var(--ivory-100) 0%,var(--teal-050) 100%);/* @kind color */
+--gradient-veil:linear-gradient(180deg,rgba(6,42,48,0) 0%,rgba(6,42,48,.72) 100%);/* @kind color */
+}

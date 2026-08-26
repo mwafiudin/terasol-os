@@ -1,0 +1,242 @@
+import { useCallback, useEffect, useState } from 'react';
+import { Badge, Button, Icon, ICONS } from '../components/ui';
+import { api, type ServerParticipant } from '../lib/api';
+import { CONV_LABEL, fmtTanggal, rp } from '../lib/domain';
+import { activeEvent, countsFor, pullEvents, type EventCounts } from '../lib/events';
+import { useInstall } from '../lib/install';
+import { useApp } from '../lib/store';
+import {
+  isOnline, isSimulatedOffline, MAX_UNSYNCED, setSimulatedOffline,
+  subscribeSync, syncNow, type SyncState,
+} from '../lib/sync';
+import type { EventRow } from '../lib/types';
+
+type Props = {
+  go: (screen: string) => void;
+  onFollowUp: (p: ServerParticipant) => void;
+  reloadKey: number;
+};
+
+export function Home({ go, onFollowUp, reloadKey }: Props) {
+  const { user, key, say, storagePersisted } = useApp();
+  const install = useInstall();
+  const [ev, setEv] = useState<EventRow | null>(null);
+  const [counts, setCounts] = useState<EventCounts>({ peserta: 0, berminat: 0, tally: 0, belumSync: 0 });
+  const [sync, setSync] = useState<SyncState | null>(null);
+  const [followUps, setFollowUps] = useState<ServerParticipant[]>([]);
+  const [conflicts, setConflicts] = useState(0);
+  const [offlineSim, setOfflineSim] = useState(isSimulatedOffline());
+
+  useEffect(() => subscribeSync(setSync), []);
+
+  const load = useCallback(async () => {
+    try { await pullEvents(); } catch { /* offline: pakai data lokal */ }
+    const e = await activeEvent();
+    setEv(e);
+    if (e) setCounts(await countsFor(e));
+
+    if (isOnline()) {
+      try {
+        const [p, c] = await Promise.all([api.participants({ berminat: true }), api.conflicts()]);
+        setFollowUps(
+          p.participants
+            .filter((x) => x.convStatus !== 'membeli' && x.convStatus !== 'batal')
+            .slice(0, 3),
+        );
+        setConflicts(c.conflicts.length);
+      } catch { /* daftar tindak lanjut butuh jaringan — biarkan kosong */ }
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load, reloadKey]);
+
+  const online = isOnline();
+  const pending = sync?.pending ?? 0;
+  const dotCls = sync?.running ? 'sync-dot busy' : pending === 0 ? 'sync-dot ok' : 'sync-dot';
+  const syncTitle = sync?.running ? 'Menyinkronkan…'
+    : pending === 0 ? 'Semua data tersinkron'
+      : `${pending} record belum tersinkron`;
+
+  async function doSync() {
+    const r = await syncNow(key);
+    if (r) {
+      const n = r.accepted.participants.length + r.accepted.events.length + r.accepted.anonTallies.length;
+      say(r.conflicts.length
+        ? `${n} record tersinkron · ${r.conflicts.length} perlu ditinjau.`
+        : 'Sync berhasil. Data sensitif lokal dibersihkan sesuai retensi.');
+    } else if (sync?.lastError) {
+      say(sync.lastError);
+    }
+    await load();
+  }
+
+  return (
+    <div className="page page-home">
+      <div className="home-head">
+        <div className="home-head-brand">
+          <img src="/terasol-mark.svg" alt="Terasol" />
+          <div>
+            <div className="sub">Rumah Sehat Terasol</div>
+            <div className="branch">{user?.tenantNama}</div>
+          </div>
+        </div>
+        <button className="icon-btn" onClick={() => go('settings')} aria-label="Pengaturan">
+          <Icon d={ICONS.gear} size={22} />
+        </button>
+      </div>
+
+      <div className="sync-row">
+        <span className={dotCls} />
+        <span className="sync-title">{syncTitle}</span>
+        <button className="sim-btn" onClick={() => {
+          const next = !offlineSim;
+          setOfflineSim(next);
+          setSimulatedOffline(next);
+          say(next ? 'Mode offline. Semua input tetap tersimpan di perangkat.' : 'Kembali online.');
+          void load();
+        }}>{offlineSim ? 'Kembali online' : 'Uji offline'}</button>
+        <button className="sync-btn" onClick={() => void doSync()} disabled={sync?.running}>
+          <Icon d={ICONS.refresh} size={15} sw={2} />Sync
+        </button>
+      </div>
+
+      {!online && (
+        <div className="offline-note">
+          <span className="dot" />
+          <span>Offline — input tetap berjalan, data aman di perangkat.</span>
+        </div>
+      )}
+
+      {/* R1 — antrean menumpuk. Sync sudah dipicu otomatis; ini memberi tahu
+          petugas kenapa sebaiknya cari sinyal sekarang, tanpa memblokir input. */}
+      {sync?.overQuota && (
+        <div className="warn-card danger">
+          <span className="ic"><Icon d={ICONS.alert} size={19} /></span>
+          <span className="tx">
+            <b>{sync.pending} record menunggu terkirim</b>
+            <span>
+              Sudah lewat batas aman {MAX_UNSYNCED} record. Cari sinyal dan sync
+              sekarang — browser bisa membersihkan penyimpanan saat ruang menipis.
+            </span>
+          </span>
+        </div>
+      )}
+
+      {/* R1 — persistent storage ditolak: data lokal bisa dievict browser. */}
+      {storagePersisted === false && (
+        <div className="warn-card">
+          <span className="ic"><Icon d={ICONS.alert} size={19} /></span>
+          <span className="tx">
+            <b>Penyimpanan permanen ditolak</b>
+            <span>
+              Browser belum menjamin data bertahan. Pasang aplikasi ke home screen
+              dan sync sesering mungkin agar data lapangan tidak hilang.
+            </span>
+          </span>
+        </div>
+      )}
+
+      {/* R1 — PRD mewajibkan aplikasi dipasang ke home screen. */}
+      {!install.standalone && (
+        <div className="warn-card">
+          <span className="ic"><Icon d={ICONS.download} size={19} /></span>
+          <span className="tx">
+            <b>Pasang ke layar utama</b>
+            <span>
+              Dibuka lewat tab browser, data lapangan lebih rentan terhapus
+              sendiri. {install.dapatDipasang
+                ? 'Ketuk Pasang untuk memasangnya sekarang.'
+                : 'Buka menu browser lalu pilih "Tambahkan ke layar utama".'}
+            </span>
+          </span>
+          {install.dapatDipasang && (
+            <Button size="sm" onClick={() => void install.pasang().then((h) => {
+              if (h === 'accepted') say('Aplikasi dipasang ke layar utama.');
+            })}>Pasang</Button>
+          )}
+        </div>
+      )}
+
+      {ev ? (
+        <div className="hero-card">
+          <svg className="deco" viewBox="0 0 200 200" fill="none" aria-hidden="true">
+            <circle cx="100" cy="100" r="82" stroke="rgba(248,245,238,.09)" strokeWidth="9"
+              strokeLinecap="round" strokeDasharray="440 75" transform="rotate(-40 100 100)" />
+            <circle cx="46" cy="152" r="6" fill="rgba(204,156,72,.5)" />
+          </svg>
+          <div className="hero-top">
+            <Badge tone="onbrand" dot>{ev.status === 'active' ? 'Event berlangsung' : 'Event terpilih'}</Badge>
+            <span className="tipe">{ev.tipe === 'berbayar' ? rp(ev.hargaPaket) : 'Gratis'}</span>
+          </div>
+          <div>
+            <div className="hero-title">{ev.nama}</div>
+            <div className="hero-meta">{fmtTanggal(ev.tanggal)} · {ev.lokasi}</div>
+          </div>
+          <div className="hero-stats">
+            <div className="hero-stat"><b>{counts.peserta}</b><span>Peserta</span></div>
+            <div className="hero-stat"><b>{counts.berminat}</b><span>Berminat</span></div>
+            <div className="hero-stat"><b>{counts.tally}</b><span>Tally anonim</span></div>
+          </div>
+          <Button variant="onbrand" size="lg" full icon={ICONS.userPlus} onClick={() => go('register')}>
+            Registrasi peserta baru
+          </Button>
+        </div>
+      ) : (
+        <div className="card empty-card">
+          <div className="ic"><Icon d={ICONS.calPlus} size={26} /></div>
+          <b>Belum ada event</b>
+          <p>Koordinator membuat event dulu, lalu petugas bisa mulai mencatat peserta.</p>
+          <Button size="sm" icon={ICONS.plus} onClick={() => go('eventForm')}>Buat event</Button>
+        </div>
+      )}
+
+      <div className="card menu-card">
+        <button className="menu-item" onClick={() => go('eventForm')}>
+          <span className="ic"><Icon d={ICONS.calPlus} size={19} /></span>
+          <span className="tx"><b>Buat event</b><span>Akses Koordinator</span></span>
+          <Icon d={ICONS.chevR} />
+        </button>
+        <div className="menu-sep" />
+        <button className="menu-item" onClick={() => go('events')}>
+          <span className="ic"><Icon d={ICONS.chart} size={19} /></span>
+          <span className="tx"><b>Rekap event</b><span>Akses Koordinator</span></span>
+          <Icon d={ICONS.chevR} />
+        </button>
+      </div>
+
+      {followUps.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <span className="section-title">Tindak lanjut peserta</span>
+          <div className="card menu-card">
+            {followUps.map((p, i) => {
+              const conv = CONV_LABEL[p.convStatus] ?? CONV_LABEL.baru!;
+              return (
+                <div key={p.id}>
+                  {i > 0 && <div className="menu-sep" />}
+                  <button className="list-item stacked" onClick={() => onFollowUp(p)}>
+                    <span className="tx">
+                      <b>{p.nama}, {p.usia} th</b>
+                      <span>{p.eventNama} · {fmtTanggal(p.eventTanggal, { day: 'numeric', month: 'long' })}</span>
+                    </span>
+                    <Badge tone={conv.tone}>{conv.label}</Badge>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {conflicts > 0 && (
+        <button className="review-card" onClick={() => go('conflicts')}>
+          <span className="ic"><Icon d={ICONS.alert} size={19} /></span>
+          <span className="tx">
+            <b>{conflicts} record perlu ditinjau</b>
+            <span>Duplikat saat sync — pilih record yang dipertahankan</span>
+          </span>
+          <Icon d={ICONS.chevR} />
+        </button>
+      )}
+    </div>
+  );
+}

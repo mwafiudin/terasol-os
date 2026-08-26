@@ -1,0 +1,6 @@
+/* Terasol webfonts — served from Google Fonts.
+   SUBSTITUTION NOTE: no vector logo or licensed font files were supplied.
+   Jost stands in for the geometric wide-tracked caps of the TERASOL wordmark.
+   Source Sans 3 stands in for the humanist sans of the "Sehat Hari Ini" tagline.
+   Replace these @font-face sources with the real foundry files when available. */
+@import url("https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600&family=Source+Sans+3:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap");

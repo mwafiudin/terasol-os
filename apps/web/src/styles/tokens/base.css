@@ -1,0 +1,17 @@
+/* Base element defaults. Every consumer gets warm paper, warm ink, and a readable floor size. */
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--surface-page);color:var(--text-body);font-family:var(--font-body);font-size:var(--text-lg);line-height:var(--lh-relaxed);-webkit-font-smoothing:antialiased;text-wrap:pretty}
+h1,h2,h3,h4,h5{font-family:var(--font-display);color:var(--text-heading);margin:0;line-height:var(--lh-snug);font-weight:var(--fw-regular);text-wrap:balance}
+h1{font-size:var(--text-d1);font-weight:var(--fw-light);line-height:var(--lh-tight)}
+h2{font-size:var(--text-d2);font-weight:var(--fw-light)}
+h3{font-size:var(--text-d3)}
+h4{font-size:var(--text-d4);font-weight:var(--fw-medium)}
+p{margin:0}
+a{color:var(--text-link);text-decoration-color:var(--gold-400);text-decoration-thickness:1px;text-underline-offset:3px;transition:color var(--dur-fast) var(--ease-calm)}
+a:hover{color:var(--text-link-hover);text-decoration-color:var(--gold-600)}
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px}
+img{max-width:100%;display:block}
+button{font-family:inherit}
+hr{border:0;border-top:1px solid var(--border-hairline);margin:var(--space-8) 0}
+::selection{background:var(--gold-200);color:var(--teal-900)}
