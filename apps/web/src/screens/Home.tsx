@@ -69,11 +69,10 @@ function PeringatanKetahanan({ storagePersisted, install, say }: {
       <button className="warn-ringkas" onClick={() => setTerbuka(!terbuka)}
         aria-expanded={terbuka}>
         <span className="ic"><Icon d={ICONS.alert} size={18} /></span>
-        <span className="warn-judul">
-          {masalah.length === 1
-            ? masalah[0]!.judul
-            : `${masalah.length} hal bisa membuat data lapangan hilang`}
-        </span>
+        {/* Ringkas supaya tetap utuh di layar 320px — rinciannya ada saat
+            dibuka. Judul yang terpotong ellipsis justru kehilangan maknanya. */}
+        <span className="warn-judul">Risiko kehilangan data</span>
+        {masalah.length > 1 && <span className="warn-jumlah">{masalah.length}</span>}
         <span className={`warn-chev ${terbuka ? 'putar' : ''}`}>
           <Icon d={ICONS.chevR} size={18} />
         </span>

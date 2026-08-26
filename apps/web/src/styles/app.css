@@ -4,9 +4,25 @@
 html, body { height: 100%; }
 body {
   background: var(--ivory-300);
+  font-size: var(--text-md);
+}
+
+/*
+ * Wadah pemusat aplikasi.
+ *
+ * Sebelumnya `body` yang menjadi flex container sementara `#root` dibiarkan
+ * tanpa gaya. `#root` lalu menjadi flex item yang menyusut ke lebar kontennya,
+ * bukan selebar layar — menyisakan celah beberapa piksel di kanan yang terlihat
+ * seperti tampilan terpotong di ponsel.
+ */
+#root {
+  min-height: 100dvh;
   display: flex;
   justify-content: center;
-  font-size: var(--text-md);
+  /* Area aman kiri/kanan: nol di mode potret, berarti saat lanskap di ponsel
+     berponi atau bersudut membulat. */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 .app {
@@ -402,14 +418,22 @@ button { cursor: pointer; font-family: inherit; }
 }
 .tabbar[hidden] { display: none; }
 .tab {
-  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
   border: none; background: none; padding: 8px 2px 2px;
-  color: var(--text-muted); font-size: 11.5px; font-weight: var(--fw-semibold);
+  color: var(--text-muted); font-weight: var(--fw-semibold);
   border-radius: var(--radius-md);
+  /* "Home Service" adalah label terpanjang dan hampir menyentuh tepi layar di
+     ponsel 320px. Ukurannya menyusut sedikit di layar sempit alih-alih
+     dipendekkan — PRD meminta nama kanalnya tampil utuh di navigasi (US-07). */
+  font-size: clamp(10px, 2.9vw, 11.5px);
 }
 .tab svg { width: 24px; height: 24px; }
 .tab.on { color: var(--teal-700); }
-.tab span { white-space: nowrap; }
+.tab span {
+  white-space: nowrap; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis;
+}
 
 /* ---- Toast ---- */
 .toast-wrap {
@@ -575,8 +599,17 @@ button { cursor: pointer; font-family: inherit; }
 }
 .warn-judul {
   flex: 1; min-width: 0;
-  font-size: 13.5px; font-weight: var(--fw-semibold); color: var(--warning-700);
+  /* Menyusut sedikit di layar sempit agar tetap utuh tanpa ellipsis. */
+  font-size: clamp(12.5px, 3.9vw, 13.5px);
+  font-weight: var(--fw-semibold); color: var(--warning-700);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.warn-jumlah {
+  flex: none; min-width: 20px; height: 20px; padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--warning-700); color: var(--ivory-050);
+  font-size: 11.5px; font-weight: var(--fw-bold);
+  display: grid; place-items: center;
 }
 .warn-chev {
   flex: none; color: var(--warning-700); display: grid; place-items: center;
