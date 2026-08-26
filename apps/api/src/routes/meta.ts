@@ -5,12 +5,23 @@ import { adminPool, audit, withTenant } from '../db.js';
 import { CONSUMABLE_PARAMS, PARAM_RANGE } from '../domain.js';
 
 export default async function metaRoutes(app: FastifyInstance) {
+  /**
+   * Health check sekaligus penanda revisi. Sejak deploy berjalan otomatis dari
+   * GitHub, pertanyaan "commit mana yang sekarang live?" harus bisa dijawab
+   * tanpa menebak dari waktu deploy — Railway menyuntikkan RAILWAY_GIT_* saat
+   * service tersambung ke repo.
+   */
   app.get('/health', async (_req, reply) => {
+    const revisi = {
+      commit: process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 7) ?? null,
+      branch: process.env.RAILWAY_GIT_BRANCH ?? null,
+      lingkungan: process.env.RAILWAY_ENVIRONMENT_NAME ?? 'lokal',
+    };
     try {
       await adminPool.query('select 1');
-      return { ok: true, db: 'up' };
+      return { ok: true, db: 'up', revisi };
     } catch (err) {
-      return reply.code(503).send({ ok: false, db: 'down', message: (err as Error).message });
+      return reply.code(503).send({ ok: false, db: 'down', revisi, message: (err as Error).message });
     }
   });
 
