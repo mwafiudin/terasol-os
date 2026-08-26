@@ -11,8 +11,11 @@ type Nav = (screen: string) => void;
 
 /* ============================ Daftar event ============================ */
 
-export function Events({ go, onOpenRecap, reloadKey }: {
-  go: Nav; onOpenRecap: (ev: EventRow) => void; reloadKey: number;
+export function Events({ go, onOpenRecap, onOpenPeserta, reloadKey }: {
+  go: Nav;
+  onOpenRecap: (ev: EventRow) => void;
+  onOpenPeserta: (ev: EventRow) => void;
+  reloadKey: number;
 }) {
   const [events, setEvents] = useState<EventRow[]>([]);
 
@@ -45,9 +48,12 @@ export function Events({ go, onOpenRecap, reloadKey }: {
           : ev.status === 'planned'
             ? <Badge tone="brand">Terjadwal</Badge>
             : <Badge tone="sage">Selesai</Badge>;
+        // Event berlangsung dibuka ke daftar pesertanya — itu tempat kerja
+        // petugas. Event selesai langsung ke rekapnya.
+        const berlangsung = ev.status === 'active';
         return (
           <button key={ev.clientId} className="card event-card"
-            onClick={() => (ev.serverId ? onOpenRecap(ev) : go('home'))}>
+            onClick={() => (berlangsung ? onOpenPeserta(ev) : ev.serverId ? onOpenRecap(ev) : onOpenPeserta(ev))}>
             <div className="top">
               {badge}
               <span>{ev.tipe === 'berbayar' ? `Berbayar · ${rp(ev.hargaPaket)}` : 'Gratis'}</span>
@@ -56,6 +62,7 @@ export function Events({ go, onOpenRecap, reloadKey }: {
             <span className="meta">
               {fmtTanggal(ev.tanggal)} · {ev.lokasi}
               {ev.synced === 0 ? ' · menunggu sync' : ` · ${ev.peserta} peserta`}
+              {berlangsung ? ' · lihat peserta' : ' · lihat rekap'}
             </span>
           </button>
         );
@@ -152,8 +159,8 @@ export function EventForm({ go, onSaved }: { go: Nav; onSaved: () => void }) {
 
 /* ============================== Rekap ============================== */
 
-export function Recap({ go, event, onArchived }: {
-  go: Nav; event: EventRow; onArchived: () => void;
+export function Recap({ go, event, onArchived, onOpenPeserta }: {
+  go: Nav; event: EventRow; onArchived: () => void; onOpenPeserta: () => void;
 }) {
   const { say, user } = useApp();
   const [data, setData] = useState<RecapData | null>(null);
@@ -288,6 +295,10 @@ export function Recap({ go, event, onArchived }: {
               {data.perluDitinjau > 0 && ` · ${data.perluDitinjau} record menunggu peninjauan`}
             </small>
           </div>
+
+          <Button variant="secondary" full icon={ICONS.users} onClick={onOpenPeserta}>
+            Lihat daftar peserta
+          </Button>
 
           <Button variant="secondary" full icon={ICONS.download} onClick={() => void unduh()}>
             Unduh CSV
