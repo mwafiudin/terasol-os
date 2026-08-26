@@ -15,6 +15,7 @@ const session: Session = { accessToken: null, refreshToken: null };
 
 let onSessionChange: ((s: Session) => void) | null = null;
 let onWipe: (() => void) | null = null;
+let onAuthLost: (() => void) | null = null;
 
 export function setSession(accessToken: string | null, refreshToken: string | null) {
   session.accessToken = accessToken;
@@ -23,6 +24,13 @@ export function setSession(accessToken: string | null, refreshToken: string | nu
 export function getSession(): Readonly<Session> { return session; }
 export function onSession(cb: (s: Session) => void) { onSessionChange = cb; }
 export function onWipeRequired(cb: () => void) { onWipe = cb; }
+/**
+ * Sesi tidak lagi diterima server dan tidak bisa diperbarui — bukan permintaan
+ * wipe, sekadar kedaluwarsa atau tidak dikenal. Tanpa ini aplikasi tetap
+ * tampak "masuk" tetapi setiap permintaan gagal diam-diam, dan petugas hanya
+ * melihat layar yang tidak pernah memuat apa pun.
+ */
+export function onSessionInvalid(cb: () => void) { onAuthLost = cb; }
 
 async function parse(res: Response) {
   const text = await res.text();
@@ -30,7 +38,24 @@ async function parse(res: Response) {
   try { return JSON.parse(text); } catch { return text; }
 }
 
-async function refreshTokens(): Promise<boolean> {
+/**
+ * Refresh dijalankan single-flight.
+ *
+ * Saat aplikasi dibuka, beberapa permintaan berangkat bersamaan dan semuanya
+ * kena 401. Tanpa penguncian ini, masing-masing akan memanggil /auth/refresh
+ * dengan token yang sama: yang pertama berhasil dan MEROTASI token, sisanya
+ * memakai token yang sudah dibatalkan lalu gagal — dan petugas terlempar ke
+ * layar login padahal sesinya sehat.
+ */
+let refreshBerjalan: Promise<boolean> | null = null;
+
+function refreshTokens(): Promise<boolean> {
+  if (refreshBerjalan) return refreshBerjalan;
+  refreshBerjalan = jalankanRefresh().finally(() => { refreshBerjalan = null; });
+  return refreshBerjalan;
+}
+
+async function jalankanRefresh(): Promise<boolean> {
   if (!session.refreshToken) return false;
   const res = await fetch(`${BASE}/auth/refresh`, {
     method: 'POST',
@@ -60,10 +85,13 @@ async function request<T>(path: string, opts: RequestInit = {}, retry = true): P
     if (body?.wipe) { onWipe?.(); throw new WipeRequired(); }
     throw new ApiError(409, body?.error ?? 'conflict', body?.message ?? 'Konflik.', body?.detail);
   }
-  if (res.status === 401 && retry) {
+  if (res.status === 401) {
     const body = await parse(res);
     if (body?.wipe) { onWipe?.(); throw new WipeRequired(); }
-    if (await refreshTokens()) return request<T>(path, opts, false);
+    if (retry && await refreshTokens()) return request<T>(path, opts, false);
+    // Sudah dicoba refresh dan tetap ditolak: sesi ini benar-benar mati.
+    setSession(null, null);
+    onAuthLost?.();
     throw new ApiError(401, body?.error ?? 'unauthorized', body?.message ?? 'Sesi berakhir.');
   }
   const body = await parse(res);

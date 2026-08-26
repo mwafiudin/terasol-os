@@ -38,6 +38,7 @@ export const ICONS = {
   wifi: ['M5 12.5a11 11 0 0 1 14 0', 'M8.5 15.8a6 6 0 0 1 7 0', [12, 19, 1] as [number, number, number]],
   users: ['M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2', [9, 7, 4] as [number, number, number], 'M22 21v-2a4 4 0 0 0-3-3.9'],
   archive: ['M3 4h18v4H3z', 'M5 8v12h14V8', 'M10 12h4'],
+  cari: [[11, 11, 7] as [number, number, number], 'm20 20-3.5-3.5'],
   tag: ['M20.6 13.4 12 22l-9-9V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z', [7.5, 7.5, 1.2] as [number, number, number]],
   phone: ['M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z'],
 } satisfies Record<string, (string | [number, number, number])[]>;

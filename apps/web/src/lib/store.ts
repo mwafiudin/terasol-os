@@ -1,5 +1,7 @@
 import { create } from 'zustand';
-import { api, getSession, onWipeRequired, setSession, WipeRequired } from './api';
+import {
+  api, getSession, onSession, onSessionInvalid, onWipeRequired, setSession, WipeRequired,
+} from './api';
 import {
   checkVerifier, deriveKey, deviceKeyFrom, encryptJson, decryptJson,
   makeVerifier, randomBytes, type Envelope,
@@ -78,6 +80,24 @@ export const useApp = create<AppState>((set, get) => ({
 
   boot: async () => {
     onWipeRequired(() => { void get().wipe('Perangkat ini dicabut aksesnya oleh Koordinator.'); });
+
+    // Server merotasi refresh token setiap kali dipakai dan langsung
+    // membatalkan yang lama. Versi barunya harus ikut ditulis ke perangkat —
+    // kalau tidak, yang tersimpan sudah kedaluwarsa dan aplikasi memaksa
+    // login ulang setiap kali dibuka.
+    onSession((s) => {
+      const k = get().key;
+      if (k && s.refreshToken) void saveRefreshToken(k, s.refreshToken);
+    });
+    onSessionInvalid(() => {
+      // Data lokal TIDAK dihapus: record yang belum tersinkron masih milik
+      // petugas dan akan terkirim setelah login ulang.
+      if (get().phase === 'login') return;
+      setSession(null, null);
+      void setMeta('user', null);
+      set({ user: null, phase: 'login' });
+      get().say('Sesi berakhir. Silakan masuk lagi — data yang belum terkirim tetap aman.');
+    });
     set({ storagePersisted: await requestPersistentStorage() });
     const user = await getMeta<User>('user');
     const salt = await getMeta<number[]>('pinSalt');
@@ -93,7 +113,13 @@ export const useApp = create<AppState>((set, get) => ({
         return set({ user: null, phase: 'login', toast: 'PIN dinonaktifkan — silakan masuk lagi.' });
       }
       if (!user) return set({ phase: 'login' });
-      set({ user, key: await deviceKey(), phase: 'ready' });
+      const key = await deviceKey();
+      // Refresh token WAJIB dipulihkan di sini. Tanpa PIN tidak ada layar
+      // unlock yang biasanya melakukannya, sehingga membuka ulang aplikasi
+      // akan memaksa petugas login lagi setiap kali — dan di lapangan itu
+      // berarti tidak bisa masuk sama sekali saat sinyal buruk.
+      setSession(null, await loadRefreshToken(key));
+      set({ user, key, phase: 'ready' });
       await refreshPending();
       return;
     }
