@@ -7,7 +7,7 @@ PWA offline-first dengan backend multi-tenant, dibangun dari [PRD MVP dan desain
 
 | | URL |
 |---|---|
-| Aplikasi | https://web-production-6d0787.up.railway.app |
+| Aplikasi | https://terasol.up.railway.app |
 | API | https://api-production-21af.up.railway.app |
 | Railway | project `terasol-os` — service `web`, `api`, `Postgres` |
 
