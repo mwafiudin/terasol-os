@@ -1,5 +1,7 @@
 # Terasol OS
 
+[![CI](https://github.com/mwafiudin/terasol-os/actions/workflows/ci.yml/badge.svg)](https://github.com/mwafiudin/terasol-os/actions/workflows/ci.yml)
+
 Aplikasi manajemen mitra Rumah Sehat Terasol — kanal event screening.
 PWA offline-first dengan backend multi-tenant, dibangun dari [PRD MVP dan desain Terasol OS](docs/README.md) (opsi 1a).
 
@@ -102,6 +104,15 @@ cd apps/api && npm test
   dengan bentrok dedup → rekap → resolusi konflik → konversi → ekspor CSV →
   replay batch. Perlu server jalan (`npm start` di terminal lain).
 - **`test/password.test.js`** — hashing scrypt.
+
+Semuanya jalan otomatis di GitHub Actions ([`ci.yml`](.github/workflows/ci.yml))
+pada tiap push dan pull request, memakai Postgres service container — bukan mock,
+karena yang diuji justru jaminan yang hidup di basis data.
+
+Job `web` menutup dua regresi keamanan yang sebelumnya hanya diperiksa manual:
+build produksi dijalankan **dengan** kredensial demo palsu di environment lalu
+bundle-nya digeledah (kalau pengaman `import.meta.env.DEV` rusak, kredensialnya
+muncul dan CI gagal), dan sourcemap dipastikan tidak ikut terbit.
 
 ## Yang sudah jalan
 
