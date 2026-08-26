@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Badge, Button, Icon, ICONS } from '../components/ui';
 import { api, type ServerParticipant } from '../lib/api';
+import { getMeta, setMeta } from '../lib/db';
 import { CONV_LABEL, fmtTanggal, rp } from '../lib/domain';
 import { activeEvent, countsFor, pullEvents, type EventCounts } from '../lib/events';
 import { useInstall } from '../lib/install';
@@ -16,6 +17,96 @@ type Props = {
   onFollowUp: (p: ServerParticipant) => void;
   reloadKey: number;
 };
+
+/**
+ * Peringatan ketahanan data (mitigasi R1), diringkas jadi satu kartu.
+ *
+ * Sebelumnya dua kartu terbuka penuh dan mendorong tombol "Registrasi peserta
+ * baru" keluar layar — peringatan yang menghalangi pekerjaan justru berakhir
+ * diabaikan. Sekarang: satu baris ringkas, ketuk untuk detail.
+ *
+ * Bisa disembunyikan, tapi pilihan itu dilupakan begitu masalahnya bertambah —
+ * risiko baru berhak diberitahukan sekali lagi, bukan ikut terbungkam.
+ */
+function PeringatanKetahanan({ storagePersisted, install, say }: {
+  storagePersisted: boolean | null;
+  install: ReturnType<typeof useInstall>;
+  say: (m: string) => void;
+}) {
+  const [terbuka, setTerbuka] = useState(false);
+  const [disembunyikanPada, setDisembunyikanPada] = useState<number | null | undefined>(undefined);
+
+  useEffect(() => {
+    void getMeta<number>('peringatanKetahananDisembunyikan')
+      .then((v) => setDisembunyikanPada(v ?? null));
+  }, []);
+
+  const masalah: { judul: string; isi: string; ikon: typeof ICONS.alert }[] = [];
+  if (storagePersisted === false) {
+    masalah.push({
+      judul: 'Penyimpanan permanen ditolak',
+      isi: 'Browser belum menjamin data bertahan. Sebaiknya sync sesering mungkin.',
+      ikon: ICONS.alert,
+    });
+  }
+  if (!install.standalone) {
+    masalah.push({
+      judul: 'Belum dipasang ke layar utama',
+      isi: install.dapatDipasang
+        ? 'Dibuka lewat tab browser, data lapangan lebih rentan terhapus sendiri.'
+        : 'Dibuka lewat tab browser, data lapangan lebih rentan terhapus sendiri. Buka menu browser lalu pilih "Tambahkan ke layar utama".',
+      ikon: ICONS.download,
+    });
+  }
+
+  // undefined = masih memuat; jangan berkedip.
+  if (disembunyikanPada === undefined || masalah.length === 0) return null;
+  // Sembunyikan hanya berlaku selama jumlah masalahnya tidak bertambah.
+  if (disembunyikanPada !== null && masalah.length <= disembunyikanPada) return null;
+
+  return (
+    <div className={`warn-card ringkas ${terbuka ? 'terbuka' : ''}`}>
+      <button className="warn-ringkas" onClick={() => setTerbuka(!terbuka)}
+        aria-expanded={terbuka}>
+        <span className="ic"><Icon d={ICONS.alert} size={18} /></span>
+        <span className="warn-judul">
+          {masalah.length === 1
+            ? masalah[0]!.judul
+            : `${masalah.length} hal bisa membuat data lapangan hilang`}
+        </span>
+        <span className={`warn-chev ${terbuka ? 'putar' : ''}`}>
+          <Icon d={ICONS.chevR} size={18} />
+        </span>
+      </button>
+
+      {terbuka && (
+        <div className="warn-detail">
+          {masalah.map((m) => (
+            <div className="warn-item" key={m.judul}>
+              <Icon d={m.ikon} size={17} />
+              <div>
+                <b>{m.judul}</b>
+                <span>{m.isi}</span>
+              </div>
+            </div>
+          ))}
+          <div className="warn-aksi">
+            {install.dapatDipasang && (
+              <Button size="sm" onClick={() => void install.pasang().then((h) => {
+                if (h === 'accepted') say('Aplikasi dipasang ke layar utama.');
+              })}>Pasang sekarang</Button>
+            )}
+            <button className="link-btn sm" onClick={() => {
+              void setMeta('peringatanKetahananDisembunyikan', masalah.length);
+              setDisembunyikanPada(masalah.length);
+              say('Peringatan disembunyikan. Muncul lagi bila ada masalah baru.');
+            }}>Sembunyikan</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function Home({ go, onFollowUp, reloadKey }: Props) {
   const { user, key, say, storagePersisted } = useApp();
@@ -122,40 +213,10 @@ export function Home({ go, onFollowUp, reloadKey }: Props) {
         </div>
       )}
 
-      {/* R1 — persistent storage ditolak: data lokal bisa dievict browser. */}
-      {storagePersisted === false && (
-        <div className="warn-card">
-          <span className="ic"><Icon d={ICONS.alert} size={19} /></span>
-          <span className="tx">
-            <b>Penyimpanan permanen ditolak</b>
-            <span>
-              Browser belum menjamin data bertahan. Pasang aplikasi ke home screen
-              dan sync sesering mungkin agar data lapangan tidak hilang.
-            </span>
-          </span>
-        </div>
-      )}
-
-      {/* R1 — PRD mewajibkan aplikasi dipasang ke home screen. */}
-      {!install.standalone && (
-        <div className="warn-card">
-          <span className="ic"><Icon d={ICONS.download} size={19} /></span>
-          <span className="tx">
-            <b>Pasang ke layar utama</b>
-            <span>
-              Dibuka lewat tab browser, data lapangan lebih rentan terhapus
-              sendiri. {install.dapatDipasang
-                ? 'Ketuk Pasang untuk memasangnya sekarang.'
-                : 'Buka menu browser lalu pilih "Tambahkan ke layar utama".'}
-            </span>
-          </span>
-          {install.dapatDipasang && (
-            <Button size="sm" onClick={() => void install.pasang().then((h) => {
-              if (h === 'accepted') say('Aplikasi dipasang ke layar utama.');
-            })}>Pasang</Button>
-          )}
-        </div>
-      )}
+      {/* R1 — keduanya risiko yang sama (data lapangan bisa hilang sebelum
+          sync), jadi disatukan dan diringkas agar tidak mendorong aksi utama
+          petugas keluar layar. */}
+      <PeringatanKetahanan storagePersisted={storagePersisted} install={install} say={say} />
 
       {ev ? (
         <div className="hero-card">
