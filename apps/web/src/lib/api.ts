@@ -1,4 +1,4 @@
-import type { ConvStatus, EventRow, ParamKey, Role, User } from './types';
+import type { ConvStatus, EventRow, EventStatus, EventTipe, ParamKey, Role, User } from './types';
 
 const BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
 
@@ -139,9 +139,32 @@ export type ServerParticipant = {
   needsReview: boolean; eventId: string; eventNama: string; eventTanggal: string;
   eventStatus: string; imt: number | null; berminat: boolean; convStatus: ConvStatus;
   nilaiTransaksi: number; produk: string | null; createdAt: string;
+  /** Parameter yang benar-benar diambil — dasar hitung biaya consumable. */
+  paramsDiambil: ParamKey[] | null;
   /** Jejak peserta (US-04): kapan diukur, kapan status terakhir berubah. */
   measuredAt: string | null;
   convUpdatedAt: string | null;
+};
+
+/** Rekap satu peserta — lengkap dengan nilai tiap parameter. */
+export type ParticipantDetail = {
+  id: string; clientId: string; nama: string; gender: 'P' | 'L'; usia: number; hp: string;
+  needsReview: boolean; erasedAt: string | null; createdAt: string; deviceId: string | null;
+  event: {
+    id: string; nama: string; lokasi: string; tanggal: string;
+    tipe: EventTipe; hargaPaket: number; status: EventStatus;
+  };
+  consent: { granted: boolean; versiTeks: string; ts: string } | null;
+  screening: {
+    tinggi: number | null; berat: number | null; imt: number | null;
+    sistolik: number | null; diastolik: number | null; gula: number | null;
+    kolesterol: number | null; asamUrat: number | null;
+    paramsDiambil: ParamKey[]; outOfRange: boolean; measuredAt: string;
+  } | null;
+  conversion: {
+    berminat: boolean; status: ConvStatus; nilaiTransaksi: number;
+    produk: string | null; updatedAt: string;
+  } | null;
 };
 
 /* ------------------------------ endpoint ------------------------------ */
@@ -182,6 +205,7 @@ export const api = {
     if (q.berminat) s.set('berminat', 'true');
     return request<{ participants: ServerParticipant[] }>(`/participants?${s}`);
   },
+  participantDetail: (id: string) => request<ParticipantDetail>(`/participants/${id}`),
   setConversion: (id: string, body: { status: ConvStatus; nilaiTransaksi: number; produk?: string | null; berminat?: boolean }) =>
     patch<unknown>(`/participants/${id}/conversion`, body),
   eraseParticipant: (id: string, alasan: string) => post<{ ok: true }>(`/participants/${id}/erase`, { alasan }),

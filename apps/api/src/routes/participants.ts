@@ -59,6 +59,60 @@ export default async function participantRoutes(app: FastifyInstance) {
   });
 
   /**
+   * Rekap satu peserta — identitas, persetujuan, seluruh nilai pengukuran,
+   * dan status konversinya. Daftar peserta hanya membawa ringkasan; detail
+   * per orang butuh nilai tiap parameter, bukan sekadar IMT-nya.
+   */
+  app.get('/participants/:id', { preHandler: requireAuth }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const ctx = ctxOf(req);
+
+    return withTenant(ctx, async (tx) => {
+      const { rows } = await tx.query<{ tenantId: string }>(
+        `select p.id, p.client_id as "clientId", p.nama, p.gender, p.usia, p.hp,
+                p.needs_review as "needsReview", p.erased_at as "erasedAt",
+                p.created_at as "createdAt", p.device_id as "deviceId",
+                p.tenant_id as "tenantId",
+                json_build_object(
+                  'id', e.id, 'nama', e.nama, 'lokasi', e.lokasi,
+                  'tanggal', to_char(e.tanggal,'YYYY-MM-DD'),
+                  'tipe', e.tipe, 'hargaPaket', e.harga_paket, 'status', e.status
+                ) as event,
+                case when c.id is null then null else json_build_object(
+                  'granted', c.granted, 'versiTeks', c.versi_teks, 'ts', c.ts
+                ) end as consent,
+                case when s.id is null then null else json_build_object(
+                  'tinggi', s.tinggi, 'berat', s.berat, 'imt', s.imt,
+                  'sistolik', s.sistolik, 'diastolik', s.diastolik,
+                  'gula', s.gula, 'kolesterol', s.kolesterol, 'asamUrat', s.asam_urat,
+                  'paramsDiambil', s.params_diambil, 'outOfRange', s.out_of_range,
+                  'measuredAt', s.measured_at
+                ) end as screening,
+                case when cv.id is null then null else json_build_object(
+                  'berminat', cv.berminat, 'status', cv.status,
+                  'nilaiTransaksi', cv.nilai_transaksi, 'produk', cv.produk,
+                  'updatedAt', cv.updated_at
+                ) end as conversion
+           from participants p
+           join events e on e.id = p.event_id
+           left join lateral (
+             select * from consents where participant_id = p.id order by ts desc limit 1
+           ) c on true
+           left join screenings s on s.participant_id = p.id
+           left join conversions cv on cv.participant_id = p.id
+          where p.id = $1 and p.deleted_at is null`,
+        [id],
+      );
+      if (!rows[0]) return reply.code(404).send({ error: 'not_found' });
+
+      await auditAdminRead(tx, ctx, 'participant.read_detail', {
+        jumlah: 1, tenantIds: [rows[0].tenantId], participantId: id,
+      });
+      return rows[0];
+    });
+  });
+
+  /**
    * US-04: perubahan status konversi oleh Koordinator setelah event.
    * Aturan "membeli wajib nilai + produk" ditegakkan CHECK constraint di DB,
    * jadi tidak bisa ditembus lewat jalur lain.

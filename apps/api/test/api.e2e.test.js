@@ -291,6 +291,37 @@ describe('Alur API end-to-end', () => {
     assert.ok(actions.includes('event.export_csv'), 'ekspor CSV tercatat');
   });
 
+  it('rekap satu peserta memuat nilai tiap parameter, bukan hanya IMT', async () => {
+    const list = await call(`/participants?eventId=${eventId}`);
+    const p = list.body.participants[0];
+
+    const r = await call(`/participants/${p.id}`);
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    const d = r.body;
+
+    assert.equal(d.id, p.id);
+    assert.equal(d.event.id, eventId);
+    assert.ok(d.consent, 'record persetujuan ikut');
+    assert.equal(d.consent.granted, true);
+    assert.equal(d.consent.versiTeks, 'v1');
+
+    assert.ok(d.screening, 'hasil pengukuran ikut');
+    assert.equal(Number(d.screening.tinggi), 156);
+    assert.equal(Number(d.screening.berat), 61);
+    assert.equal(Number(d.screening.imt), 25.1);
+    assert.equal(d.screening.sistolik, 128);
+    assert.equal(d.screening.gula, 112);
+    assert.equal(d.screening.kolesterol, null, 'parameter yang dilewati tetap null');
+    assert.ok(d.screening.paramsDiambil.includes('gula'));
+
+    assert.ok(d.conversion, 'status konversi ikut');
+  });
+
+  it('rekap peserta yang tidak ada mengembalikan 404', async () => {
+    const r = await call('/participants/00000000-0000-0000-0000-000000000000');
+    assert.equal(r.status, 404);
+  });
+
   it('US-01 — event berpeserta diarsipkan, bukan dihapus, dan hilang dari daftar', async () => {
     // Tidak ada endpoint hapus sama sekali — satu-satunya jalan keluar adalah arsip.
     const sebelum = await call('/events');

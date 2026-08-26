@@ -4,6 +4,7 @@ import { api, type ServerParticipant } from './lib/api';
 import { CONV_LABEL, fmtTanggal, fmtWaktu } from './lib/domain';
 import { useDraft } from './lib/draft';
 import { activeEvent } from './lib/events';
+import type { PesertaRingkas } from './lib/pesertaEvent';
 import { installIdleLock, installNetworkWatch, useApp } from './lib/store';
 import { isOnline, startAutoSync } from './lib/sync';
 import type { ConvStatus, EventRow } from './lib/types';
@@ -12,11 +13,13 @@ import { Login, SetPin, Unlock } from './screens/Auth';
 import { EventForm, Events, Recap } from './screens/Events';
 import { Home } from './screens/Home';
 import { Consent, Done, Register, Screening } from './screens/Participant';
+import { EventPeserta, PesertaDetail } from './screens/Peserta';
 
 type Screen =
   | 'home' | 'events' | 'outlet' | 'hs'
   | 'eventForm' | 'register' | 'consent' | 'screening' | 'done'
-  | 'recap' | 'conflicts' | 'settings';
+  | 'recap' | 'conflicts' | 'settings'
+  | 'eventPeserta' | 'pesertaDetail';
 
 const TOP_SCREENS: Screen[] = ['home', 'events', 'outlet', 'hs'];
 
@@ -25,6 +28,10 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>('home');
   const [tab, setTab] = useState<TabId>('home');
   const [recapEvent, setRecapEvent] = useState<EventRow | null>(null);
+  const [eventPeserta, setEventPeserta] = useState<EventRow | null>(null);
+  const [pesertaTerpilih, setPesertaTerpilih] = useState<PesertaRingkas | null>(null);
+  /** Alur peserta bisa dimulai dari Beranda atau dari daftar peserta event. */
+  const [asalPeserta, setAsalPeserta] = useState<'home' | 'eventPeserta'>('home');
   const [consentText, setConsentText] = useState<{ versi: string; isi: string } | null>(null);
   const [followUp, setFollowUp] = useState<ServerParticipant | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -66,12 +73,27 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPop);
   }, [screen, go]);
 
-  async function mulaiRegistrasi() {
-    const ev = await activeEvent();
-    if (!ev) { say('Buat event dulu sebelum mencatat peserta.'); go('eventForm'); return; }
-    startDraft(ev.clientId, consentText?.versi ?? 'v1');
+  async function mulaiRegistrasi(dari: 'home' | 'eventPeserta' = 'home', ev?: EventRow) {
+    const target = ev ?? await activeEvent();
+    if (!target) { say('Buat event dulu sebelum mencatat peserta.'); go('eventForm'); return; }
+    setAsalPeserta(dari);
+    startDraft(target.clientId, consentText?.versi ?? 'v1');
     go('register');
   }
+
+  /**
+   * Navigasi keluar dari alur peserta. Kalau alurnya dimulai dari daftar
+   * peserta sebuah event, "kembali" berarti kembali ke daftar itu — bukan
+   * melempar petugas ke Beranda dan memaksanya menelusuri ulang.
+   */
+  const goAlurPeserta = useCallback((s: string) => {
+    setReloadKey((k) => k + 1);
+    if (s === 'home' && asalPeserta === 'eventPeserta' && eventPeserta) {
+      go('eventPeserta');
+      return;
+    }
+    go(s);
+  }, [asalPeserta, eventPeserta, go]);
 
   if (phase === 'booting') {
     return <div className="app boot"><img src="/terasol-mark.svg" alt="" width={56} height={56} /></div>;
@@ -86,20 +108,32 @@ export default function App() {
     <div className="app">
       <main className="screen">
         {screen === 'home' && (
-          <Home go={(s) => (s === 'register' ? void mulaiRegistrasi() : go(s))}
+          <Home go={(s) => (s === 'register' ? void mulaiRegistrasi('home') : go(s))}
             onFollowUp={setFollowUp} reloadKey={reloadKey} />
         )}
         {screen === 'events' && (
           <Events go={go} reloadKey={reloadKey}
-            onOpenRecap={(ev) => { setRecapEvent(ev); go('recap'); }} />
+            onOpenRecap={(ev) => { setRecapEvent(ev); go('recap'); }}
+            onOpenPeserta={(ev) => { setEventPeserta(ev); go('eventPeserta'); }} />
+        )}
+        {screen === 'eventPeserta' && eventPeserta && (
+          <EventPeserta go={go} event={eventPeserta} reloadKey={reloadKey}
+            onBuka={(p) => { setPesertaTerpilih(p); go('pesertaDetail'); }}
+            onTambah={() => void mulaiRegistrasi('eventPeserta', eventPeserta)} />
+        )}
+        {screen === 'pesertaDetail' && pesertaTerpilih && (
+          <PesertaDetail go={go} peserta={pesertaTerpilih}
+            onUbah={() => setReloadKey((k) => k + 1)} />
         )}
         {screen === 'eventForm' && <EventForm go={go} onSaved={() => setReloadKey((k) => k + 1)} />}
-        {screen === 'register' && <Register go={go} />}
-        {screen === 'consent' && <Consent go={go} consentText={consentText} />}
-        {screen === 'screening' && <Screening go={go} />}
-        {screen === 'done' && <Done go={(s) => { setReloadKey((k) => k + 1); go(s); }} />}
+        {screen === 'register' && <Register go={goAlurPeserta} />}
+        {screen === 'consent' && <Consent go={goAlurPeserta} consentText={consentText} />}
+        {screen === 'screening' && <Screening go={goAlurPeserta} />}
+        {screen === 'done' && <Done go={goAlurPeserta} />}
         {screen === 'recap' && recapEvent && (
-          <Recap go={go} event={recapEvent} onArchived={() => setReloadKey((k) => k + 1)} />
+          <Recap go={go} event={recapEvent}
+            onArchived={() => setReloadKey((k) => k + 1)}
+            onOpenPeserta={() => { setEventPeserta(recapEvent); go('eventPeserta'); }} />
         )}
         {screen === 'conflicts' && <Conflicts go={go} />}
         {screen === 'settings' && <Settings go={go} />}
