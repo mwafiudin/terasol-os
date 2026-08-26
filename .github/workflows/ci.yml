@@ -1,0 +1,164 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Batalkan run lama pada branch yang sama — tidak ada gunanya menunggu hasil
+# commit yang sudah tertimpa.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: API — migrasi, RLS, dan alur end-to-end
+    runs-on: ubuntu-latest
+
+    # Postgres sungguhan, bukan mock: seluruh jaminan keamanan proyek ini
+    # (Row Level Security, generated column, CHECK constraint) hidup di basis
+    # data. Menggantinya dengan tiruan berarti menguji tiruan itu, bukan
+    # perilaku yang sebenarnya melindungi data peserta.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: terasol_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # Kredensial CI — basis data sementara di dalam runner, dibuang setelah job.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/terasol_test
+      APP_DB_USER: terasol_app
+      APP_DB_PASSWORD: ci-app-role-password-yang-panjang
+      JWT_SECRET: ci-jwt-secret-yang-panjang-sekali-untuk-uji
+      NODE_ENV: test
+      PORT: 3000
+      CORS_ORIGIN: '*'
+      # Dipakai uji e2e untuk login; server membuatnya saat boot pertama.
+      BOOTSTRAP_TENANT: Cabang Uji
+      BOOTSTRAP_EMAIL: admin@terasol.test
+      BOOTSTRAP_NAMA: Admin Uji
+      BOOTSTRAP_PASSWORD: kata-sandi-uji-ci-yang-panjang
+
+    defaults:
+      run:
+        working-directory: apps/api
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/api/package-lock.json
+
+      - name: Pasang dependensi
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Jalankan migrasi
+        run: npm run migrate
+
+      - name: Uji hashing kata sandi
+        run: node --test test/password.test.js
+
+      - name: Uji Row Level Security dan aturan basis data
+        run: node --test test/security.test.js
+
+      - name: Jalankan server
+        run: |
+          nohup npm start > "$RUNNER_TEMP/server.log" 2>&1 &
+          for i in $(seq 1 40); do
+            if curl -sf http://localhost:3000/health > /dev/null; then
+              echo "server siap setelah ${i} detik"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::server tidak siap dalam 40 detik"
+          cat "$RUNNER_TEMP/server.log"
+          exit 1
+
+      - name: Uji alur API end-to-end
+        env:
+          API_URL: http://localhost:3000
+        run: node --test test/api.e2e.test.js
+
+      - name: Log server bila ada yang gagal
+        if: failure()
+        run: cat "$RUNNER_TEMP/server.log" || true
+
+  web:
+    name: Web — typecheck, build, dan pemeriksaan kebocoran kredensial
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Pasang dependensi
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc -b --force
+
+      - name: Build produksi
+        env:
+          VITE_API_URL: https://contoh.invalid
+          # Sengaja diisi kredensial palsu: build produksi HARUS membuangnya.
+          # Kalau langkah berikutnya menemukannya di bundle, berarti pengaman
+          # `import.meta.env.DEV` rusak dan kredensial demo bisa ikut terbit.
+          VITE_DEMO_LOGINS: >-
+            [{"label":"Petugas","role":"petugas","email":"kenari@contoh.invalid","password":"KENARI-TIDAK-BOLEH-TERBIT"}]
+        run: npm run build
+
+      - name: Pastikan kredensial demo tidak ikut ke bundle produksi
+        run: |
+          gagal=0
+          for jejak in \
+            "KENARI-TIDAK-BOLEH-TERBIT" \
+            "kenari@contoh.invalid" \
+            "VITE_DEMO_LOGINS" \
+            "demoLogins" \
+            "demo-btn" \
+            "Masuk cepat sebagai"
+          do
+            if grep -rqF -- "$jejak" dist/; then
+              echo "::error::'$jejak' bocor ke bundle produksi"
+              gagal=1
+            else
+              echo "bersih: $jejak"
+            fi
+          done
+          exit $gagal
+
+      - name: Pastikan sourcemap tidak diterbitkan
+        run: |
+          if find dist -name '*.map' | grep -q .; then
+            echo "::error::sourcemap ikut terbit — kode sumber aplikasi data kesehatan jadi publik"
+            find dist -name '*.map'
+            exit 1
+          fi
+          echo "tidak ada sourcemap di dist/"
