@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Badge, Button, Field, Icon, ICONS, PageHead } from '../components/ui';
 import { api, type ParticipantDetail } from '../lib/api';
 import { readParticipant } from '../lib/db';
@@ -13,6 +13,31 @@ type Nav = (screen: string) => void;
 
 /* ===================== Daftar peserta sebuah event ===================== */
 
+type FilterKey = 'semua' | 'baru' | 'dihubungi' | 'membeli' | 'batal'
+  | 'tanpaMinat' | 'antre' | 'ditinjau';
+
+const FILTER: { k: FilterKey; label: string; cocok: (p: PesertaRingkas) => boolean }[] = [
+  { k: 'semua', label: 'Semua', cocok: () => true },
+  { k: 'baru', label: 'Belum ditindaklanjuti', cocok: (p) => p.berminat && (p.convStatus ?? 'baru') === 'baru' },
+  { k: 'dihubungi', label: 'Sudah dihubungi', cocok: (p) => p.convStatus === 'dihubungi' },
+  { k: 'membeli', label: 'Membeli', cocok: (p) => p.convStatus === 'membeli' },
+  { k: 'batal', label: 'Tidak jadi', cocok: (p) => p.convStatus === 'batal' },
+  { k: 'tanpaMinat', label: 'Tidak berminat', cocok: (p) => !p.berminat },
+  { k: 'antre', label: 'Antre', cocok: (p) => p.belumSync },
+  { k: 'ditinjau', label: 'Perlu ditinjau', cocok: (p) => p.needsReview },
+];
+
+/** Nomor HP dicocokkan tanpa spasi/tanda supaya "0812 3456" tetap ketemu. */
+const angkaSaja = (s: string) => s.replace(/\D/g, '');
+
+function cocokPencarian(p: PesertaRingkas, kata: string): boolean {
+  const q = kata.trim().toLowerCase();
+  if (!q) return true;
+  if (p.nama.toLowerCase().includes(q)) return true;
+  const digit = angkaSaja(q);
+  return digit.length > 0 && angkaSaja(p.hp).includes(digit);
+}
+
 export function EventPeserta({ go, event, onBuka, onTambah, reloadKey }: {
   go: Nav;
   event: EventRow;
@@ -23,6 +48,15 @@ export function EventPeserta({ go, event, onBuka, onTambah, reloadKey }: {
   const { key } = useApp();
   const [daftar, setDaftar] = useState<PesertaRingkas[] | null>(null);
   const [rekap, setRekap] = useState<RekapSementara | null>(null);
+  const [cari, setCari] = useState('');
+  const [filter, setFilter] = useState<FilterKey>('semua');
+  const chipAktif = useRef<HTMLButtonElement>(null);
+
+  // Baris chip bisa lebih panjang dari layar; chip yang sedang aktif digulir
+  // ke tengah supaya selalu terlihat mana yang dipilih.
+  useEffect(() => {
+    chipAktif.current?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+  }, [filter]);
 
   const muat = useCallback(async () => {
     const d = await pesertaEvent(key, event);
@@ -33,6 +67,16 @@ export function EventPeserta({ go, event, onBuka, onTambah, reloadKey }: {
   useEffect(() => { void muat(); }, [muat, reloadKey]);
 
   const berlangsung = event.status === 'active';
+
+  // Hitungan chip mengikuti kata pencarian, supaya angkanya selalu sesuai
+  // dengan apa yang benar-benar akan muncul kalau chip itu diketuk.
+  const terjaring = (daftar ?? []).filter((p) => cocokPencarian(p, cari));
+  const jumlahPerFilter = new Map<FilterKey, number>(
+    FILTER.map((f) => [f.k, terjaring.filter(f.cocok).length]),
+  );
+  const aktif = FILTER.find((f) => f.k === filter) ?? FILTER[0]!;
+  const tampil = terjaring.filter(aktif.cocok);
+  const adaPenyaring = cari.trim() !== '' || filter !== 'semua';
 
   return (
     <div className="page">
@@ -101,6 +145,36 @@ export function EventPeserta({ go, event, onBuka, onTambah, reloadKey }: {
         Daftar peserta{daftar ? ` (${daftar.length})` : ''}
       </span>
 
+      {daftar !== null && daftar.length > 0 && (
+        <>
+          <div className="cari-kotak">
+            <span className="cari-ikon"><Icon d={ICONS.cari} size={18} /></span>
+            <input className="input cari-input" type="search" value={cari}
+              onChange={(e) => setCari(e.target.value)}
+              placeholder="Cari nama atau nomor HP" aria-label="Cari peserta" />
+            {cari && (
+              <button className="cari-hapus" onClick={() => setCari('')} aria-label="Hapus pencarian">
+                <Icon d={ICONS.x} size={16} />
+              </button>
+            )}
+          </div>
+
+          {/* Chip hanya ditampilkan bila memang ada isinya, supaya barisnya
+              tidak penuh pilihan yang pasti kosong. */}
+          <div className="chip-baris">
+            {FILTER.filter((f) => f.k === 'semua' || (jumlahPerFilter.get(f.k) ?? 0) > 0 || f.k === filter)
+              .map((f) => (
+                <button key={f.k} className={`chip ${filter === f.k ? 'on' : ''}`}
+                  ref={filter === f.k ? chipAktif : undefined}
+                  onClick={() => setFilter(f.k)}>
+                  {f.label}
+                  <span className="chip-jumlah">{jumlahPerFilter.get(f.k) ?? 0}</span>
+                </button>
+              ))}
+          </div>
+        </>
+      )}
+
       {daftar === null && <span className="hint">Memuat…</span>}
 
       {daftar?.length === 0 && (
@@ -115,7 +189,29 @@ export function EventPeserta({ go, event, onBuka, onTambah, reloadKey }: {
         </div>
       )}
 
-      {daftar?.map((p) => {
+      {daftar !== null && daftar.length > 0 && tampil.length === 0 && (
+        <div className="card empty-card">
+          <div className="ic"><Icon d={ICONS.cari} size={26} /></div>
+          <b>Tidak ada yang cocok</b>
+          <p>
+            {cari.trim()
+              ? `Tidak ada peserta dengan nama atau nomor "${cari.trim()}"${filter !== 'semua' ? ` pada status ${aktif.label.toLowerCase()}` : ''}.`
+              : `Belum ada peserta berstatus ${aktif.label.toLowerCase()}.`}
+          </p>
+          <Button size="sm" variant="secondary"
+            onClick={() => { setCari(''); setFilter('semua'); }}>
+            Tampilkan semua
+          </Button>
+        </div>
+      )}
+
+      {adaPenyaring && tampil.length > 0 && (
+        <span className="hint" style={{ textAlign: 'left' }}>
+          Menampilkan {tampil.length} dari {daftar!.length} peserta.
+        </span>
+      )}
+
+      {tampil.map((p) => {
         const conv = CONV_LABEL[p.convStatus ?? 'baru']!;
         return (
           <button key={p.clientId} className="card peserta-card" onClick={() => onBuka(p)}>

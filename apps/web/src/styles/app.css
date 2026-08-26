@@ -363,6 +363,52 @@ button { cursor: pointer; font-family: inherit; }
 .event-card .name { font-size: 17px; font-weight: var(--fw-semibold); color: var(--ink-800); }
 .event-card .meta { font-size: 13.5px; color: var(--text-muted); }
 
+/* ---- Pencarian & filter daftar peserta ---- */
+.cari-kotak { position: relative; display: flex; align-items: center; }
+.cari-ikon {
+  position: absolute; left: 14px; display: grid; place-items: center;
+  color: var(--text-subtle); pointer-events: none;
+}
+.cari-input { padding-left: 42px; padding-right: 40px; }
+/* Tombol clear bawaan Safari/Chrome disembunyikan — kita punya sendiri yang
+   ukurannya memenuhi target sentuh. */
+.cari-input::-webkit-search-cancel-button { display: none; }
+.cari-hapus {
+  position: absolute; right: 6px;
+  width: 34px; height: 34px; border: none; background: none;
+  color: var(--text-muted); display: grid; place-items: center;
+  border-radius: 50%;
+}
+.cari-hapus:hover { background: var(--ivory-200); color: var(--ink-800); }
+
+.chip-baris {
+  display: flex; gap: 8px;
+  overflow-x: auto; scrollbar-width: none;
+  /* Melebar sampai tepi layar supaya chip terakhir tidak terlihat terpotong
+     rapi di tengah, lalu dipadding balik agar tetap sejajar konten lain. */
+  margin: 0 -20px; padding: 2px 20px 4px;
+}
+.chip-baris::-webkit-scrollbar { display: none; }
+.chip {
+  flex: none; display: inline-flex; align-items: center; gap: 6px;
+  min-height: 36px; padding: 0 12px;
+  border: 1px solid var(--border-default); border-radius: var(--radius-pill);
+  background: var(--white); color: var(--ink-700);
+  font-size: 13px; font-weight: var(--fw-semibold); white-space: nowrap;
+  transition: var(--transition-control);
+}
+.chip:hover { border-color: var(--teal-400); }
+.chip.on {
+  background: var(--teal-700); color: var(--ivory-050); border-color: var(--teal-700);
+}
+.chip-jumlah {
+  min-width: 18px; padding: 0 5px; border-radius: var(--radius-pill);
+  background: var(--ivory-200); color: var(--ink-600);
+  font-size: 11.5px; font-weight: var(--fw-bold);
+  display: grid; place-items: center;
+}
+.chip.on .chip-jumlah { background: rgba(248, 245, 238, .22); color: var(--ivory-050); }
+
 /* ---- Kartu peserta di daftar event ---- */
 .peserta-card {
   padding: 14px 16px; text-align: left; width: 100%;
