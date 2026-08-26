@@ -187,7 +187,44 @@ RETENTION_DAYS=365 npm run purge -- --dry-run
 npm run seed
 ```
 
-Deploy:
+## Alur kerja & deploy
+
+**`main` terkunci.** Push langsung ditolak — termasuk oleh pemilik repo. Tanpa
+itu proteksinya cuma hiasan, karena satu-satunya admin bisa melewatinya kapan
+saja. Alurnya sekarang:
+
+```bash
+git switch -c nama-branch
+# ... kerjakan perubahan ...
+git push -u origin nama-branch
+```
+
+Lalu buka pull request. Merge terbuka setelah **kedua job CI hijau** dan branch
+sudah up-to-date dengan `main`. Review tidak diwajibkan (repo satu orang, tidak
+ada yang bisa menyetujui), tapi force-push dan penghapusan `main` diblokir.
+
+Kalau benar-benar terjepit, proteksi bisa dimatikan sementara di
+Settings → Branches — dan itu memang harus terasa seperti keputusan sadar.
+
+**Deploy berjalan otomatis dari `main`.** Kedua service tersambung ke repo ini:
+
+| Service | Root directory | Deploy dipicu oleh |
+|---|---|---|
+| `api` | `/apps/api` | perubahan di `apps/api/**` |
+| `web` | `/apps/web` | perubahan di `apps/web/**` |
+
+Watch pattern memastikan perubahan di satu app tidak ikut men-deploy app lain,
+dan perubahan di akar repo (README, workflow) tidak men-deploy apa pun.
+`source.checkSuites` menyala, jadi Railway menunggu CI GitHub selesai sebelum
+mulai membangun — commit yang gagal uji tidak pernah sampai produksi.
+
+Cek commit mana yang sedang live:
+
+```bash
+curl -s https://api-production-21af.up.railway.app/health
+```
+
+Deploy manual masih bisa dipakai untuk keadaan darurat, dan **melewati CI**:
 
 ```bash
 railway up ./apps/api --path-as-root --service api --environment production --detach
