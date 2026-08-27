@@ -1296,8 +1296,17 @@ button { cursor: pointer; font-family: inherit; }
   .screen > .page > .hero-card,
   .screen > .page > .hint,
   .screen > .page > .btn-full { grid-column: 1 / -1; }
-  /* Tombol utama tidak perlu selebar 1040px untuk bisa diketuk tetikus. */
-  .screen > .page > .btn-full { justify-self: start; min-width: 300px; }
+  /* Tombol utama tidak perlu selebar 1040px untuk bisa diketuk tetikus.
+     `width: auto` wajib: `.btn-full` membawa `width: 100%`, yang membuat
+     `justify-self: start` tidak berpengaruh apa-apa. */
+  .screen > .page > .btn-full {
+    justify-self: start; width: auto; min-width: 300px;
+  }
+
+  /* Daftar yang panjang dibaca sebagai satu kolom penuh, bukan diperas ke
+     separuh lebar sementara separuh lainnya menganggur. */
+  .screen > .page > .master-grup,
+  .screen > .page > .ukur-grup { grid-column: 1 / -1; }
 
   .screen > .page.page-home { max-width: 1040px; display: grid; }
   .stat-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
