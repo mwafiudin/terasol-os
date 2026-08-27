@@ -1305,6 +1305,7 @@ button { cursor: pointer; font-family: inherit; }
   .screen > .page > .segtabs,
   .screen > .page > .cari-kotak,
   .screen > .page > .chip-baris,
+  .screen > .page > .toolbar,
   .screen > .page > .warn-card,
   .screen > .page > .belum-note,
   .screen > .page > .empty-card,
@@ -1372,3 +1373,24 @@ button { cursor: pointer; font-family: inherit; }
   padding-left: 44px;
   font-variant-numeric: tabular-nums;
 }
+
+/* Baris alat: keterangan atau penyaring di kiri, aksi di kanan.
+   Bentuk ini yang membedakan layar KELOLA dari layar TUGAS. Layar tugas punya
+   satu aksi utama dan berhak atas tombol pil selebar layar; layar kelola punya
+   daftar, dan tombol sebesar itu di atasnya menindih pekerjaan sebenarnya. */
+.toolbar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  min-height: 40px;
+}
+.toolbar > .chip-baris { flex: 1 1 auto; min-width: 0; margin: 0; }
+/* Di layar sempit keduanya tidak muat berdampingan, dan penyaring yang
+   terpotong separuh kata lebih buruk daripada dua baris. */
+@media (max-width: 559px) {
+  .toolbar > .chip-baris { flex-basis: 100%; }
+}
+.toolbar-judul {
+  flex: 1; min-width: 0;
+  font-size: 12px; font-weight: var(--fw-semibold); letter-spacing: .06em;
+  text-transform: uppercase; color: var(--text-muted);
+}
+.toolbar > .btn { flex: 0 0 auto; margin-left: auto; }
