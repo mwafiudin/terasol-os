@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Badge, Button, Field, Icon, ICONS, PageHead } from '../components/ui';
 import { api, type ConflictGroup, type PusatRingkasan } from '../lib/api';
 import { LOCAL_RETENTION_HOURS } from '../lib/db';
-import { PARAM_LABEL, fmtTanggal, rp } from '../lib/domain';
+import { PARAM_LABEL, ROLE_LABEL, fmtTanggal, rp } from '../lib/domain';
 import { IDLE_LOCK_MS, REQUIRE_PIN, useApp } from '../lib/store';
 import { isOnline, MAX_UNSYNCED } from '../lib/sync';
 import type { ParamKey } from '../lib/types';
@@ -102,7 +102,10 @@ export function Settings({ go }: { go: Nav }) {
       <div className="card summary-card">
         <div className="summary-row"><span>Nama</span><span>{user?.nama}</span></div>
         <div className="summary-row"><span>Email</span><span>{user?.email}</span></div>
-        <div className="summary-row"><span>Peran</span><span>{user?.role}</span></div>
+        <div className="summary-row">
+          <span>Peran</span>
+          <span>{user ? ROLE_LABEL[user.role] ?? user.role : '—'}</span>
+        </div>
         <div className="summary-row"><span>Cabang</span><span>{user?.tenantNama}</span></div>
       </div>
 

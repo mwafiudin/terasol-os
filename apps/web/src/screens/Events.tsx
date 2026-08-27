@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Badge, Button, Field, Icon, ICONS, PageHead } from '../components/ui';
 import { api, type Recap as RecapData } from '../lib/api';
-import { PARAM_LABEL, fmtTanggal, pct, rp } from '../lib/domain';
+import { PARAM_LABEL, ROLE_LABEL, fmtTanggal, pct, rp } from '../lib/domain';
 import { localEvents, muatRekan, pullEvents, rekanTersimpan, saveLocalEvent, type Rekan } from '../lib/events';
 import { useApp } from '../lib/store';
 import { isOnline, refreshPending, syncNow } from '../lib/sync';
@@ -168,7 +168,7 @@ export function EventForm({ go, onSaved }: { go: Nav; onSaved: () => void }) {
                     return n;
                   })} />
                 <span className="orang-nama">{r.nama}</span>
-                <span className="orang-role">{r.role === 'koordinator' ? 'Koordinator' : 'Petugas'}</span>
+                <span className="orang-role">{ROLE_LABEL[r.role] ?? r.role}</span>
               </label>
             ))}
           </div>
