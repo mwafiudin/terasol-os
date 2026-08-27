@@ -36,6 +36,12 @@ export default async function participantRoutes(app: FastifyInstance) {
                 e.id as "eventId", e.nama as "eventNama",
                 to_char(e.tanggal,'YYYY-MM-DD') as "eventTanggal", e.status as "eventStatus",
                 s.imt, s.params_diambil as "paramsDiambil",
+                -- Nilai pemeriksaan ikut dikirim supaya penyaring temuan pada
+                -- daftar peserta bisa dihitung di perangkat, termasuk saat
+                -- offline dari salinan lokal.
+                s.sistolik, s.diastolik, s.gula, s.kolesterol,
+                s.asam_urat as "asamUrat", s.lingkar_perut as "lingkarPerut",
+                s.konteks_gula as "konteksGula",
                 -- US-04: jejak peserta — tanggal screening sesungguhnya, bukan
                 -- tanggal event, agar event multi-hari tetap terbaca benar.
                 s.measured_at as "measuredAt",
@@ -88,6 +94,7 @@ export default async function participantRoutes(app: FastifyInstance) {
                 case when s.id is null then null else json_build_object(
                   'tinggi', s.tinggi, 'berat', s.berat, 'imt', s.imt,
                   'lingkarPerut', s.lingkar_perut, 'nadi', s.nadi,
+                  'konteksGula', s.konteks_gula,
                   'sistolik', s.sistolik, 'diastolik', s.diastolik,
                   'gula', s.gula, 'kolesterol', s.kolesterol, 'asamUrat', s.asam_urat,
                   'paramsDiambil', s.params_diambil, 'outOfRange', s.out_of_range,
@@ -178,6 +185,7 @@ export default async function participantRoutes(app: FastifyInstance) {
                   'screening', case when s.id is null then null else json_build_object(
                     'tinggi', s.tinggi, 'berat', s.berat, 'imt', s.imt,
                   'lingkarPerut', s.lingkar_perut, 'nadi', s.nadi,
+                  'konteksGula', s.konteks_gula,
                     'sistolik', s.sistolik, 'diastolik', s.diastolik,
                     'gula', s.gula, 'kolesterol', s.kolesterol, 'asamUrat', s.asam_urat,
                     'paramsDiambil', s.params_diambil) end

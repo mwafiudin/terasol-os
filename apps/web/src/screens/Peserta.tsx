@@ -3,6 +3,9 @@ import {
   Badge, Button, Field, Icon, ICONS, InputRupiah, PageHead, Paginasi, SegTabs, Sheet,
   usePaginasi,
 } from '../components/ui';
+import {
+  TEMUAN_LABEL, adaYangDinilai, temuanPeserta, type KodeTemuan,
+} from '../lib/analisis';
 import { api, type ParticipantDetail } from '../lib/api';
 import { readParticipant } from '../lib/db';
 import {
@@ -21,16 +24,34 @@ type Nav = (screen: string) => void;
 
 /* ===================== Daftar peserta sebuah event ===================== */
 
-type FilterKey = 'semua' | 'baru' | 'dihubungi' | 'membeli' | 'batal'
-  | 'tanpaMinat' | 'antre' | 'ditinjau';
+type FilterKey = 'semua' | KodeTemuan | 'bersih' | 'antre' | 'ditinjau';
 
+/**
+ * Penyaring daftar peserta, berdasarkan HASIL PEMERIKSAAN.
+ *
+ * Sebelumnya barisnya berisi status tindak lanjut — belum dihubungi, membeli,
+ * tidak jadi. Itu pertanyaan yang datang berhari-hari sesudahnya, dan tempatnya
+ * memang ada: daftar "Tindak lanjut peserta" di Beranda. Yang dicari orang
+ * SAAT event masih berjalan adalah siapa yang angkanya di luar rentang rujukan,
+ * karena merekalah yang perlu diajak bicara sebelum pulang.
+ *
+ * Dua penyaring operasional tetap tinggal: antrean sync dan record yang perlu
+ * ditinjau. Keduanya bukan keputusan CRM, melainkan keadaan data itu sendiri.
+ */
 const FILTER: { k: FilterKey; label: string; cocok: (p: PesertaRingkas) => boolean }[] = [
   { k: 'semua', label: 'Semua', cocok: () => true },
-  { k: 'baru', label: 'Belum ditindaklanjuti', cocok: (p) => p.berminat && (p.convStatus ?? 'baru') === 'baru' },
-  { k: 'dihubungi', label: 'Sudah dihubungi', cocok: (p) => p.convStatus === 'dihubungi' },
-  { k: 'membeli', label: 'Membeli', cocok: (p) => p.convStatus === 'membeli' },
-  { k: 'batal', label: 'Tidak jadi', cocok: (p) => p.convStatus === 'batal' },
-  { k: 'tanpaMinat', label: 'Tidak berminat', cocok: (p) => !p.berminat },
+  ...(Object.keys(TEMUAN_LABEL) as KodeTemuan[]).map((kode) => ({
+    k: kode as FilterKey,
+    label: TEMUAN_LABEL[kode],
+    cocok: (p: PesertaRingkas) => temuanPeserta(p.nilai, p.gender).has(kode),
+  })),
+  {
+    k: 'bersih',
+    label: 'Dalam rujukan',
+    // Hanya bagi yang memang punya angka untuk dinilai. Peserta yang belum
+    // diukur sama sekali bukan "dalam rujukan" — ia belum diperiksa.
+    cocok: (p) => adaYangDinilai(p.nilai) && temuanPeserta(p.nilai, p.gender).size === 0,
+  },
   { k: 'antre', label: 'Antre', cocok: (p) => p.belumSync },
   { k: 'ditinjau', label: 'Perlu ditinjau', cocok: (p) => p.needsReview },
 ];
@@ -244,6 +265,7 @@ export function EventPeserta({ go, event, onBuka, onTambah, reloadKey }: {
 
       {halaman.potong.map((p) => {
         const conv = CONV_LABEL[p.convStatus ?? 'baru']!;
+        const temuan = [...temuanPeserta(p.nilai, p.gender)];
         return (
           <button key={p.clientId} className="card peserta-card" onClick={() => onBuka(p)}>
             <div className="peserta-atas">
@@ -257,6 +279,18 @@ export function EventPeserta({ go, event, onBuka, onTambah, reloadKey }: {
               {p.imt != null ? `IMT ${dec(p.imt)}` : 'IMT belum ada'}
               {' · '}{p.paramsDiambil.length} dari {PARAMS.length} parameter
             </span>
+
+            {/* Temuan ikut di kartu, bukan hanya jadi penyaring: daftar yang
+                bisa disaring menurut temuan tetapi tidak menampilkannya memaksa
+                petugas membuka satu per satu untuk tahu apa yang ditemukan. */}
+            {temuan.length > 0 && (
+              <span className="peserta-temuan">
+                {temuan.map((t) => (
+                  <span key={t} className="temuan-tag">{TEMUAN_LABEL[t]}</span>
+                ))}
+              </span>
+            )}
+
             {p.berminat && <Badge tone={conv.tone}>{conv.label}</Badge>}
           </button>
         );

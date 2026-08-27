@@ -14,8 +14,9 @@
 import type { Deret, Titik } from './deret';
 import { angka } from './deret';
 import {
-  SASARAN_IMT, UKUR, hitungImt, jarakKeSasaran, nilaiImt, rentangSasaran,
-  type Gender, type JenisUkur, type Nada, type Penilaian,
+  SASARAN_IMT, UKUR, hitungImt, jarakKeSasaran, nilaiAsamUrat, nilaiGula, nilaiImt,
+  nilaiKolesterol, nilaiLingkarPerut, nilaiTensi, rentangSasaran,
+  type Gender, type JenisUkur, type KonteksGula, type Nada, type Penilaian,
 } from './rujukan';
 
 /* ================================= arah ================================= */
@@ -179,6 +180,68 @@ function hitungImtDari(deret: Deret[]): Analisis['imt'] {
       max: Math.round(SASARAN_IMT.max * m * m * 10) / 10,
     },
   };
+}
+
+/* ====================== temuan ringkas satu peserta ====================== */
+
+/** Nilai pemeriksaan seorang peserta, apa adanya. Null berarti belum diukur. */
+export type NilaiRingkas = {
+  sistolik: number | null; diastolik: number | null;
+  gula: number | null; kolesterol: number | null; asamUrat: number | null;
+  lingkarPerut: number | null; imt: number | null;
+  /** Null berarti tidak diketahui — lihat catatan di `temuanPeserta`. */
+  konteksGula: KonteksGula | null;
+};
+
+export type KodeTemuan =
+  | 'gula' | 'tensi' | 'kolesterol' | 'asam_urat' | 'imt' | 'lingkar_perut';
+
+export const TEMUAN_LABEL: Record<KodeTemuan, string> = {
+  gula: 'Gula darah',
+  tensi: 'Tekanan darah',
+  kolesterol: 'Kolesterol',
+  asam_urat: 'Asam urat',
+  imt: 'IMT',
+  lingkar_perut: 'Lingkar perut',
+};
+
+/**
+ * Penanda yang berada DI LUAR rentang rujukan pada seorang peserta.
+ *
+ * "Di luar" mencakup rentang perantara — prediabetes, prahipertensi, kolesterol
+ * batas tinggi. Justru merekalah orang yang paling layak diajak bicara di
+ * sebuah event screening; menyaring hanya yang sudah jauh melewati ambang akan
+ * melewatkan kelompok yang masih bisa berubah arah.
+ *
+ * KETERBATASAN yang disengaja: bila konteks gula darah tidak diketahui — baris
+ * lama, sebelum konteksnya ikut disimpan — angkanya dinilai sebagai gula darah
+ * sewaktu, sama seperti `nilaiUkur` di seluruh aplikasi. Itu bisa menyatakan
+ * wajar sebuah pembacaan puasa yang sebenarnya prediabetes. Memilih ambang
+ * lain di sini akan membuat daftar peserta tidak sepakat dengan layar rincian
+ * tentang orang yang sama, dan dua jawaban berbeda lebih membingungkan
+ * daripada satu jawaban yang keterbatasannya diketahui.
+ */
+export function temuanPeserta(n: NilaiRingkas, gender: Gender): Set<KodeTemuan> {
+  const keluar = new Set<KodeTemuan>();
+  const diLuar = (p: Penilaian | null) =>
+    !!p && p.nada !== 'normal' && p.nada !== 'netral';
+
+  if (n.gula != null && diLuar(nilaiGula(n.gula, n.konteksGula ?? 'sewaktu'))) keluar.add('gula');
+  if (n.kolesterol != null && diLuar(nilaiKolesterol(n.kolesterol))) keluar.add('kolesterol');
+  if (n.asamUrat != null && diLuar(nilaiAsamUrat(n.asamUrat, gender))) keluar.add('asam_urat');
+  if (n.lingkarPerut != null && diLuar(nilaiLingkarPerut(n.lingkarPerut, gender))) keluar.add('lingkar_perut');
+  if (n.sistolik != null && n.diastolik != null
+    && diLuar(nilaiTensi(n.sistolik, n.diastolik))) keluar.add('tensi');
+  if (n.imt != null && diLuar(nilaiImt(n.imt))) keluar.add('imt');
+
+  return keluar;
+}
+
+/** Ada angka yang bisa dinilai sama sekali. */
+export function adaYangDinilai(n: NilaiRingkas): boolean {
+  return n.gula != null || n.kolesterol != null || n.asamUrat != null
+    || n.lingkarPerut != null || n.imt != null
+    || (n.sistolik != null && n.diastolik != null);
 }
 
 /* ============================ untuk tampilan ============================ */

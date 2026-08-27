@@ -2041,3 +2041,14 @@ button { cursor: pointer; font-family: inherit; }
   flex: 0 0 auto; font-size: 12px; font-weight: var(--fw-semibold);
   color: var(--text-muted); font-variant-numeric: tabular-nums;
 }
+
+/* Temuan pada kartu peserta. Ditandai sebagai perhatian, bukan bahaya: yang
+   dinyatakan adalah "di luar rentang rujukan", dan itu perbandingan — bukan
+   vonis yang pantas dicetak merah. */
+.peserta-temuan { display: flex; flex-wrap: wrap; gap: 5px; }
+.temuan-tag {
+  font-size: 11px; padding: 2px 8px; border-radius: 999px;
+  background: var(--accent-tint, var(--surface-sunken));
+  color: var(--accent-700, var(--text-body));
+  font-weight: var(--fw-medium); white-space: nowrap;
+}

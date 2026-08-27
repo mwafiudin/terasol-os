@@ -263,6 +263,15 @@ export type ServerParticipant = {
   pelangganId: string | null;
   /** Parameter yang benar-benar diambil — dasar hitung biaya consumable. */
   paramsDiambil: ParamKey[] | null;
+  /**
+   * Nilai pemeriksaan, untuk menghitung temuan di perangkat. Null berarti
+   * belum diukur — BUKAN nol.
+   */
+  sistolik: number | null; diastolik: number | null;
+  gula: number | null; kolesterol: number | null; asamUrat: number | null;
+  lingkarPerut: number | null;
+  /** Null berarti tidak diketahui; jangan ditebak sebagai 'sewaktu'. */
+  konteksGula: KonteksGula | null;
   /** Jejak peserta (US-04): kapan diukur, kapan status terakhir berubah. */
   measuredAt: string | null;
   convUpdatedAt: string | null;
@@ -281,6 +290,7 @@ export type ParticipantDetail = {
   screening: {
     tinggi: number | null; berat: number | null; imt: number | null;
     lingkarPerut: number | null; nadi: number | null;
+    konteksGula: KonteksGula | null;
     sistolik: number | null; diastolik: number | null; gula: number | null;
     kolesterol: number | null; asamUrat: number | null;
     paramsDiambil: ParamKey[]; outOfRange: boolean; measuredAt: string;
