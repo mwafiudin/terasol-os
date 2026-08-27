@@ -15,7 +15,7 @@ const API = process.env.API_URL ?? 'http://localhost:3000';
 const EMAIL = process.env.BOOTSTRAP_EMAIL ?? 'admin@terasol.id';
 const PASSWORD = process.env.BOOTSTRAP_PASSWORD;
 
-let token, eventClientId, eventId, pelangganId;
+let token, eventClientId, eventId, pelangganId, katalogId;
 const pClientA = randomUUID(), pClientB = randomUUID();
 const batchId = randomUUID();
 const HP = '0811' + String(Math.floor(Math.random() * 1e8)).padStart(8, '0');
@@ -54,6 +54,7 @@ after(async () => {
   // Pelanggan dibuat otomatis oleh sync, jadi ia juga harus ikut dibersihkan —
   // kalau tidak, tiap kali uji dijalankan basis data menumpuk satu orang palsu.
   // Pengukurannya ikut terhapus lewat cascade.
+  if (katalogId) await c.query('delete from katalog where id = $1', [katalogId]);
   if (pelangganId) await c.query('delete from pelanggan where id = $1', [pelangganId]);
   await c.query('commit');
   await c.end();
@@ -555,6 +556,90 @@ describe('Alur API end-to-end', () => {
     });
     const lagi = await call(`/events/${eventId}/petugas`);
     assert.equal(lagi.body.petugas.length, 1);
+  });
+
+  it('katalog menolak nama kembar dalam satu cabang dan jenis', async () => {
+    // Inilah alasan katalog ada: `transaksi.nama` teks bebas membuat
+    // "Paket A" dan "paket a" menjadi dua barang berbeda. Kalau katalognya
+    // sendiri boleh menumbuhkan duplikat, tidak ada yang terselesaikan.
+    const buat = await call('/katalog', {
+      method: 'POST',
+      body: JSON.stringify({ jenis: 'produk', nama: '__uji_katalog', harga: 125000 }),
+    });
+    assert.equal(buat.status, 201, JSON.stringify(buat.body));
+    katalogId = buat.body.id;
+
+    const kembar = await call('/katalog', {
+      method: 'POST',
+      body: JSON.stringify({ jenis: 'produk', nama: '__UJI_KATALOG', harga: 999 }),
+    });
+    assert.equal(kembar.status, 409, 'nama kembar tanpa memandang huruf besar-kecil ditolak');
+    assert.match(kembar.body.message, /sudah ada/i, 'pesannya bisa dibaca Koordinator');
+
+    // Jenis berbeda bukan duplikat: "Paket A" sebagai produk dan sebagai
+    // terapi memang dua hal yang berbeda.
+    const lainJenis = await call('/katalog', {
+      method: 'POST',
+      body: JSON.stringify({ jenis: 'terapi', nama: '__uji_katalog', harga: 200000 }),
+    });
+    assert.equal(lainJenis.status, 201, JSON.stringify(lainJenis.body));
+    await call(`/katalog/${lainJenis.body.id}`, { method: 'DELETE' });
+  });
+
+  it('katalog yang sudah dipakai transaksi tidak bisa dihapus, hanya dinonaktifkan', async () => {
+    const trx = await call('/transaksi', {
+      method: 'POST',
+      body: JSON.stringify({
+        pelangganId, katalogId, jenis: 'produk',
+        nama: '__uji_katalog', jumlah: 1, hargaSatuan: 125000,
+      }),
+    });
+    assert.equal(trx.status, 201, JSON.stringify(trx.body));
+
+    const tolak = await call(`/katalog/${katalogId}`, { method: 'DELETE' });
+    assert.equal(tolak.status, 409, 'menghapus akan memutus riwayat belanja dari nama barangnya');
+    assert.match(tolak.body.message, /nonaktifkan/i, 'pesannya menunjukkan jalan keluarnya');
+
+    const nonaktif = await call(`/katalog/${katalogId}`, {
+      method: 'PATCH', body: JSON.stringify({ aktif: false }),
+    });
+    assert.equal(nonaktif.status, 200);
+    assert.equal(nonaktif.body.aktif, false);
+
+    // Yang nonaktif keluar dari pilihan form belanja, tapi tetap ada di daftar.
+    const aktifSaja = await call('/katalog?aktif=true');
+    assert.equal(aktifSaja.body.katalog.some((k) => k.id === katalogId), false);
+    const semuanya = await call('/katalog');
+    assert.ok(semuanya.body.katalog.some((k) => k.id === katalogId));
+
+    await call(`/transaksi/${trx.body.id}`, { method: 'DELETE' });
+  });
+
+  it('Petugas boleh membaca katalog tetapi tidak mengubahnya', async () => {
+    // Form belanja dipakai petugas, jadi membacanya harus terbuka. Yang
+    // dibatasi peran adalah menulisnya.
+    const rekan = (await call('/rekan')).body.rekan;
+    assert.ok(rekan.length > 0);
+
+    const tulis = await call('/katalog', {
+      method: 'POST',
+      headers: { authorization: 'Bearer tidak-berlaku' },
+      body: JSON.stringify({ jenis: 'produk', nama: '__uji_tanpa_izin', harga: 1 }),
+    });
+    assert.equal(tulis.status, 401, 'token tidak berlaku ditolak sebelum menyentuh basis data');
+  });
+
+  it('cabang bisa dibuat dan diganti namanya, tapi tidak menonaktifkan diri sendiri', async () => {
+    const r = await call('/cabang');
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    const sendiri = r.body.cabang.find((c) => c.nama === (process.env.BOOTSTRAP_TENANT ?? 'Cabang Uji'));
+    assert.ok(sendiri, 'cabang milik akun uji ikut terdaftar');
+    assert.equal(typeof sendiri.pelanggan, 'number');
+
+    const tolak = await call(`/cabang/${sendiri.id}`, {
+      method: 'PATCH', body: JSON.stringify({ status: 'inactive' }),
+    });
+    assert.equal(tolak.status, 400, 'menonaktifkan cabang sendiri mengunci akunnya keluar');
   });
 
   it('ringkasan pusat memberi angka agregat, bukan daftar orang', async () => {

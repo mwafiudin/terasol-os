@@ -208,15 +208,47 @@ export const TABS = [
 
 export type TabId = (typeof TABS)[number]['id'];
 
-export function TabBar({ active, onSelect }: { active: string; onSelect: (id: TabId) => void }) {
+export type ItemNav = { id: string; label: string; icon: (string | [number, number, number])[] };
+
+/**
+ * Navigasi utama. Satu komponen, dua bentuk.
+ *
+ * Di ponsel ia baris tab di dasar layar — dalam jangkauan ibu jari, dan
+ * disembunyikan pada layar berjenjang supaya tombol Kembali yang memimpin.
+ * Mulai tablet ia menjadi rel di sisi kiri yang TIDAK pernah hilang: pada
+ * layar selebar itu, kehilangan navigasi setiap kali membuka satu peserta
+ * memaksa pengguna menelusuri balik hanya untuk berpindah kanal.
+ *
+ * Isian sekunder (master data, pengaturan) hanya muncul pada bentuk rel.
+ * Di ponsel keduanya sudah punya rumah sendiri, dan memaksakannya ke baris
+ * empat tab akan mengorbankan yang dipakai sepanjang hari.
+ */
+export function Navigasi({ active, onSelect, sekunder = [], cabang, sembunyiDiPonsel }: {
+  active: string;
+  onSelect: (id: string) => void;
+  sekunder?: ItemNav[];
+  cabang?: string;
+  sembunyiDiPonsel?: boolean;
+}) {
+  const tombol = (t: ItemNav) => (
+    <button key={t.id} className={`tab ${active === t.id ? 'on' : ''}`}
+      onClick={() => onSelect(t.id)} aria-current={active === t.id ? 'page' : undefined}>
+      <Icon d={t.icon} size={24} />
+      <span>{t.label}</span>
+    </button>
+  );
+
   return (
-    <nav className="tabbar" aria-label="Navigasi utama">
-      {TABS.map((t) => (
-        <button key={t.id} className={`tab ${active === t.id ? 'on' : ''}`} onClick={() => onSelect(t.id)}>
-          <Icon d={t.icon} size={24} />
-          <span>{t.label}</span>
-        </button>
-      ))}
+    <nav className={`tabbar ${sembunyiDiPonsel ? 'sembunyi-ponsel' : ''}`} aria-label="Navigasi utama">
+      <div className="nav-merek">
+        <img src="/terasol-mark.svg" alt="" width={28} height={28} />
+        <span>
+          <b>Terasol OS</b>
+          {cabang && <em>{cabang}</em>}
+        </span>
+      </div>
+      <div className="nav-utama">{TABS.map(tombol)}</div>
+      {sekunder.length > 0 && <div className="nav-sekunder">{sekunder.map(tombol)}</div>}
     </nav>
   );
 }

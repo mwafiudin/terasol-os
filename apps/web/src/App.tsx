@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Badge, Button, Field, ICONS, Sheet, TabBar, Toast, type TabId } from './components/ui';
+import { Badge, Button, Field, ICONS, Navigasi, Sheet, Toast, type TabId } from './components/ui';
 import { api, type ServerParticipant } from './lib/api';
 import { CONV_LABEL, fmtTanggal, fmtWaktu } from './lib/domain';
 import { useDraft } from './lib/draft';
@@ -9,6 +9,7 @@ import { installIdleLock, installNetworkWatch, useApp } from './lib/store';
 import { isOnline, startAutoSync } from './lib/sync';
 import type { ConvStatus, EventRow } from './lib/types';
 import { Conflicts, Placeholder, Pusat, Settings } from './screens/Admin';
+import { Master } from './screens/Master';
 import { Login, SetPin, Unlock } from './screens/Auth';
 import { EventForm, Events, Recap } from './screens/Events';
 import { Home } from './screens/Home';
@@ -18,7 +19,7 @@ import { EventPeserta, PesertaDetail } from './screens/Peserta';
 type Screen =
   | 'home' | 'events' | 'outlet' | 'hs'
   | 'eventForm' | 'register' | 'consent' | 'screening' | 'done'
-  | 'recap' | 'conflicts' | 'settings' | 'pusat'
+  | 'recap' | 'conflicts' | 'settings' | 'pusat' | 'master'
   | 'eventPeserta' | 'pesertaDetail';
 
 const TOP_SCREENS: Screen[] = ['home', 'events', 'outlet', 'hs'];
@@ -103,16 +104,20 @@ export default function App() {
   if (phase === 'locked') return <Shell><Unlock /></Shell>;
 
   const showTabs = TOP_SCREENS.includes(screen);
+  const koordinator = user?.role === 'koordinator' || user?.role === 'admin_pusat';
 
-  // Layout lebar untuk Koordinator dan Admin Pusat: mereka bekerja dari meja,
-  // menimbang banyak angka sekaligus. Petugas tetap di layout ponsel — di
-  // lapangan yang dibutuhkan adalah satu hal besar per layar, bukan padat data.
-  // Ini kelas, bukan aplikasi terpisah: lebarnya baru berlaku di layar ≥1024px,
-  // jadi Koordinator yang membuka dari HP tetap dapat tampilan yang sama.
-  const lebar = user?.role === 'koordinator' || user?.role === 'admin_pusat';
+  // Isian sekunder rel navigasi. Hanya muncul mulai tablet; di ponsel keduanya
+  // sudah punya rumah sendiri (ikon gigi di kepala, dan kartu menu Beranda).
+  const navSekunder = [
+    ...(koordinator ? [{ id: 'master', label: 'Master data', icon: ICONS.tag }] : []),
+    { id: 'settings', label: 'Pengaturan', icon: ICONS.gear },
+  ];
 
+  // Lebar layar yang menentukan bentuk, bukan peran. Petugas yang bekerja dari
+  // tablet di meja pendaftaran memerlukan layout yang sama lapangnya dengan
+  // Koordinator, dan Koordinator yang membuka dari HP tetap butuh layout ponsel.
   return (
-    <div className={`app ${lebar ? 'lebar' : ''}`}>
+    <div className="app">
       <main className="screen">
         {screen === 'home' && (
           <Home go={(s) => (s === 'register' ? void mulaiRegistrasi('home') : go(s))}
@@ -145,11 +150,14 @@ export default function App() {
         {screen === 'conflicts' && <Conflicts go={go} />}
         {screen === 'settings' && <Settings go={go} />}
         {screen === 'pusat' && user?.role === 'admin_pusat' && <Pusat go={go} />}
+        {screen === 'master' && koordinator && <Master go={go} />}
         {screen === 'outlet' && <Placeholder kind="outlet" />}
         {screen === 'hs' && <Placeholder kind="hs" />}
       </main>
 
-      {showTabs && <TabBar active={tab} onSelect={(id) => go(id)} />}
+      <Navigasi active={TOP_SCREENS.includes(screen) ? tab : screen}
+        onSelect={(id) => go(id)} sekunder={navSekunder}
+        cabang={user?.tenantNama} sembunyiDiPonsel={!showTabs} />
       {toast && <Toast message={toast} />}
       {followUp && (
         <FollowUpSheet participant={followUp}
