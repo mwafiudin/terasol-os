@@ -762,3 +762,268 @@ button { cursor: pointer; font-family: inherit; }
 .list-item.stacked .tx { width: 100%; }
 
 .seg-btn { padding: 0 4px; }
+
+/* ===================== Tab dalam halaman & riwayat ===================== */
+
+/* Tab digulir mendatar, bukan dipadatkan: tiga label Indonesia tidak muat
+   berdampingan di layar 360px tanpa dipotong jadi singkatan yang tak terbaca. */
+.segtabs {
+  display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none;
+  padding: 4px; background: var(--surface-sunken);
+  border-radius: var(--radius-md); margin-bottom: 4px;
+}
+.segtabs::-webkit-scrollbar { display: none; }
+.segtab {
+  display: inline-flex; align-items: center; gap: 6px; flex: 1 0 auto;
+  justify-content: center; min-height: 40px; padding: 0 14px;
+  border: 0; border-radius: var(--radius-sm); background: transparent;
+  font-family: inherit; font-size: 13.5px; font-weight: var(--fw-medium);
+  color: var(--text-muted); cursor: pointer; white-space: nowrap;
+  transition: background .15s, color .15s;
+}
+.segtab.on {
+  background: var(--surface-card); color: var(--teal-900);
+  font-weight: var(--fw-semibold); box-shadow: 0 1px 3px rgba(0,0,0,.09);
+}
+.segtab-jumlah {
+  font-size: 11.5px; font-variant-numeric: tabular-nums;
+  padding: 1px 6px; border-radius: 999px; background: var(--warning-100);
+  color: var(--warning-700);
+}
+
+/* Sumber rujukan dan disclaimer. Sengaja rendah kontras — ia harus selalu ada
+   dan selalu terbaca, tapi tidak boleh menyaingi angkanya. */
+.rujukan {
+  display: flex; gap: 8px; align-items: flex-start;
+  font-size: 12px; line-height: 1.5; color: var(--text-subtle);
+  padding-top: 8px; margin-top: 2px; border-top: 1px solid var(--border-hairline);
+}
+.rujukan svg { flex: 0 0 auto; margin-top: 1px; opacity: .7; }
+.rujukan-sumber { margin-top: 3px; font-style: italic; }
+
+.ukur-card { display: flex; flex-direction: column; gap: 8px; }
+.ukur-atas {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap;
+}
+.ukur-label {
+  font-size: 14px; font-weight: var(--fw-semibold); color: var(--ink-800);
+  display: inline-flex; align-items: center; gap: 7px; flex-wrap: wrap;
+}
+.ukur-kode {
+  font-size: 10.5px; letter-spacing: .04em; font-weight: var(--fw-semibold);
+  padding: 2px 6px; border-radius: 4px;
+  background: var(--teal-100); color: var(--teal-900);
+}
+.ukur-nilai { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; }
+.ukur-nilai b {
+  font-family: var(--font-display); font-size: 30px; line-height: 1;
+  font-weight: var(--fw-semibold); color: var(--teal-900);
+  font-variant-numeric: tabular-nums;
+}
+.ukur-nilai > span { font-size: 13px; color: var(--text-muted); }
+.ukur-tren {
+  display: inline-flex; align-items: center; gap: 2px;
+  font-size: 12.5px; font-weight: var(--fw-medium);
+  font-variant-numeric: tabular-nums;
+  padding: 2px 7px 2px 5px; border-radius: 999px;
+}
+/* Naik dan turun sengaja TIDAK diberi warna baik/buruk: berat badan turun bisa
+   berarti dua hal yang sangat berbeda, dan menghakiminya adalah interpretasi. */
+.ukur-tren.naik, .ukur-tren.turun {
+  background: var(--surface-sunken); color: var(--text-muted);
+}
+
+.riwayat-list {
+  display: flex; flex-direction: column;
+  border-top: 1px solid var(--border-hairline);
+}
+.riwayat-baris {
+  display: flex; align-items: center; gap: 10px; padding: 9px 0;
+}
+.riwayat-baris:not(:last-child) {
+  border-bottom: 1px solid var(--border-hairline);
+}
+.riwayat-isi { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.riwayat-isi b {
+  font-size: 14px; font-weight: var(--fw-semibold); color: var(--ink-800);
+  font-variant-numeric: tabular-nums;
+}
+.riwayat-isi span { font-size: 12px; color: var(--text-muted); }
+.riwayat-isi em { font-size: 12px; color: var(--text-subtle); }
+.riwayat-aksi { display: flex; gap: 4px; flex: 0 0 auto; }
+
+.ikon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border: 0; border-radius: var(--radius-sm);
+  background: transparent; color: var(--text-muted); cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.ikon-btn:hover { background: var(--surface-sunken); color: var(--ink-800); }
+.ikon-btn.bahaya:hover { background: var(--danger-100); color: var(--danger-700); }
+
+.trx-card { display: flex; flex-direction: column; gap: 6px; position: relative; }
+.trx-atas {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap;
+}
+.trx-nama {
+  font-size: 15px; font-weight: var(--fw-semibold); color: var(--ink-800);
+  flex: 1; min-width: 0;
+}
+.trx-nilai { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.trx-nilai b {
+  font-family: var(--font-display); font-size: 21px; font-weight: var(--fw-semibold);
+  color: var(--teal-900); font-variant-numeric: tabular-nums;
+}
+.trx-nilai span { font-size: 12.5px; color: var(--text-muted); }
+.trx-catatan { font-size: 12.5px; color: var(--text-subtle); }
+.trx-card .riwayat-aksi { align-self: flex-end; margin-top: -6px; }
+
+/* ========================= Form pengukuran ========================= */
+
+.dua-kolom { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.field-bantu {
+  display: block; margin-top: 5px; font-size: 12px;
+  line-height: 1.45; color: var(--text-subtle);
+}
+.input-warn { border-color: var(--warning-500) !important; }
+.warn-note {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 11px 13px; border-radius: var(--radius-sm);
+  background: var(--warning-100); color: var(--warning-700);
+}
+.warn-note b { font-size: 13.5px; font-weight: var(--fw-semibold); }
+.warn-note p { font-size: 12.5px; line-height: 1.5; }
+.cek {
+  display: flex; align-items: center; gap: 8px; margin-top: 2px;
+  font-size: 13px; font-weight: var(--fw-medium); cursor: pointer;
+}
+.cek input { width: 18px; height: 18px; accent-color: var(--teal-900); }
+
+/* ======================== Pemilih petugas ======================== */
+
+.pilih-orang { display: flex; flex-direction: column; gap: 6px; }
+.orang {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border-hairline); background: var(--surface-card);
+  cursor: pointer; transition: border-color .15s, background .15s;
+}
+.orang.on { border-color: var(--border-brand); background: var(--surface-brand-soft); }
+.orang input { width: 18px; height: 18px; accent-color: var(--teal-700); flex: 0 0 auto; }
+.orang-nama {
+  flex: 1; min-width: 0; font-size: 14px; font-weight: var(--fw-medium);
+  color: var(--text-body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.orang-role { font-size: 11.5px; color: var(--text-muted); flex: 0 0 auto; }
+
+/* ========================= Layout meja (≥1024px) =========================
+   Koordinator dan Admin Pusat bekerja dari meja: mereka membandingkan banyak
+   angka sekaligus, bukan mencatat satu peserta per layar. Bingkai ponsel
+   dilepas, navigasi pindah ke samping, dan kartu mengalir dua kolom.
+
+   Ini perluasan dari layout yang sama, bukan aplikasi kedua — di bawah 1024px
+   semuanya kembali persis seperti tampilan ponsel, termasuk untuk Koordinator
+   yang sedang memakai HP di lapangan. */
+
+@media (min-width: 1024px) {
+  .app.lebar {
+    max-width: 1240px;
+    height: calc(100dvh - 32px);
+    margin: 16px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-hairline);
+    box-shadow: var(--shadow-xl);
+    flex-direction: row;
+  }
+
+  /* Navigasi jadi rel kiri: selalu terlihat, tidak memakan tinggi layar. */
+  .app.lebar .tabbar {
+    flex-direction: column;
+    width: 216px; flex: 0 0 216px; height: 100%;
+    justify-content: flex-start; align-items: stretch;
+    gap: 4px; padding: 20px 12px;
+    border-top: 0; border-right: 1px solid var(--border-hairline);
+    order: -1;
+  }
+  .app.lebar .tab {
+    flex-direction: row; justify-content: flex-start;
+    gap: 12px; height: 44px; padding: 0 14px;
+    border-radius: var(--radius-sm);
+  }
+  .app.lebar .tab span { font-size: 14px; }
+  .app.lebar .tab.on { background: var(--surface-brand-soft); }
+
+  .app.lebar .screen { padding-top: 0; }
+
+  /* Kolom konten dibatasi lebarnya. Baris teks selebar 1200px tidak lebih
+     informatif — hanya lebih sulit dibaca. */
+  .app.lebar .screen > .page {
+    max-width: 1000px; width: 100%; margin: 0 auto;
+    padding: 28px 32px 40px;
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start; gap: 16px 20px;
+  }
+
+  /* Elemen yang memang harus melintang penuh. */
+  .app.lebar .screen > .page > .page-head,
+  .app.lebar .screen > .page > .recap-sub,
+  .app.lebar .screen > .page > .section-title,
+  .app.lebar .screen > .page > .segtabs,
+  .app.lebar .screen > .page > .cari-kotak,
+  .app.lebar .screen > .page > .chip-baris,
+  .app.lebar .screen > .page > .warn-card,
+  .app.lebar .screen > .page > .belum-note,
+  .app.lebar .screen > .page > .empty-card,
+  .app.lebar .screen > .page > .hint,
+  .app.lebar .screen > .page > .btn-full { grid-column: 1 / -1; }
+
+  /* Tombol utama tidak perlu selebar 1000px untuk bisa diketuk mouse. */
+  .app.lebar .screen > .page > .btn-full { justify-self: start; min-width: 280px; }
+
+  .app.lebar .stat-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+  /* Sheet jadi dialog tengah: gestur tarik-ke-bawah tidak berarti apa-apa
+     dengan mouse, dan panel yang menempel di dasar layar 1080px terlihat
+     seperti sesuatu yang gagal dimuat. */
+  .app.lebar .sheet-veil { align-items: center; justify-content: center; }
+  .app.lebar .sheet {
+    max-width: 460px; border-radius: var(--radius-lg);
+    max-height: min(84vh, 760px); overflow-y: auto;
+  }
+  .app.lebar .sheet .grab { display: none; }
+
+  .app.lebar ::-webkit-scrollbar { display: block; width: 10px; }
+  .app.lebar ::-webkit-scrollbar-thumb {
+    background: var(--border-default); border-radius: 5px;
+    border: 3px solid var(--ivory-100);
+  }
+}
+
+/* ===================== Kartu cabang (Admin Pusat) ===================== */
+
+.cabang-card { display: flex; flex-direction: column; gap: 8px; }
+.cabang-atas { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cabang-nama {
+  flex: 1; min-width: 0; font-size: 15px; font-weight: var(--fw-semibold);
+  color: var(--text-heading);
+}
+.cabang-nilai { display: flex; align-items: baseline; gap: 8px; }
+.cabang-nilai b {
+  font-family: var(--font-display); font-size: 22px; font-weight: var(--fw-semibold);
+  color: var(--teal-900); font-variant-numeric: tabular-nums;
+}
+.cabang-nilai span { font-size: 12.5px; color: var(--text-muted); }
+.cabang-bar {
+  height: 6px; border-radius: 3px; background: var(--surface-sunken); overflow: hidden;
+}
+.cabang-bar > div { height: 100%; background: var(--teal-500); border-radius: 3px; }
+.cabang-angka {
+  display: flex; flex-wrap: wrap; gap: 4px 16px;
+  font-size: 12.5px; color: var(--text-muted);
+}
+.cabang-angka b {
+  font-weight: var(--fw-semibold); color: var(--text-body);
+  font-variant-numeric: tabular-nums;
+}

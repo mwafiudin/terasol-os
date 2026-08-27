@@ -7,6 +7,7 @@ import {
   makeVerifier, randomBytes, type Envelope,
 } from './crypto';
 import { db, deviceId, getMeta, setMeta, wipeAll } from './db';
+import { lupakanRekan } from './events';
 import { refreshPending, setSimulatedOffline, syncNow } from './sync';
 import type { User } from './types';
 
@@ -198,11 +199,15 @@ export const useApp = create<AppState>((set, get) => ({
     setSession(null, null);
     set({ key: null, user: null, phase: 'login' });
     await setMeta('user', null);
+    // Daftar rekan adalah data cabang; perangkat yang berpindah pengguna tidak
+    // boleh membawa nama-nama cabang sebelumnya.
+    lupakanRekan();
   },
 
   wipe: async (reason) => {
     try { await api.wipeAck(); } catch { /* tetap hapus walau server tak terjangkau */ }
     await wipeAll();
+    lupakanRekan();
     setSession(null, null);
     set({ key: null, user: null, phase: 'login', toast: reason ?? 'Data lokal dihapus.' });
   },

@@ -262,6 +262,18 @@ export function Home({ go, onFollowUp, reloadKey }: Props) {
           <span className="tx"><b>Rekap event</b><span>Akses Koordinator</span></span>
           <Icon d={ICONS.chevR} />
         </button>
+        {user?.role === 'admin_pusat' && (
+          <>
+            <div className="menu-sep" />
+            <button className="menu-item" onClick={() => go('pusat')}>
+              <span className="ic"><Icon d={ICONS.users} size={19} /></span>
+              <span className="tx">
+                <b>Semua cabang</b><span>Perbandingan angka antarcabang</span>
+              </span>
+              <Icon d={ICONS.chevR} />
+            </button>
+          </>
+        )}
       </div>
 
       {followUps.length > 0 && (

@@ -41,6 +41,15 @@ export const ICONS = {
   cari: [[11, 11, 7] as [number, number, number], 'm20 20-3.5-3.5'],
   tag: ['M20.6 13.4 12 22l-9-9V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z', [7.5, 7.5, 1.2] as [number, number, number]],
   phone: ['M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z'],
+  trash: ['M4 7h16', 'M9 7V4h6v3', 'M6 7l1 13h10l1-13', 'M10 11v6', 'M14 11v6'],
+  pencil: ['M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17v3Z', 'm14.5 6.5 3 3'],
+  cart: ['M3 4h2l2.4 11h9.7L20 7H6', [9, 20, 1.4] as [number, number, number], [17, 20, 1.4] as [number, number, number]],
+  pulse: ['M3 12h4l2.5-7 4 14L16 12h5'],
+  clock: [[12, 12, 9] as [number, number, number], 'M12 7v5l3 2'],
+  user: [[12, 8, 4] as [number, number, number], 'M4 21a8 8 0 0 1 16 0'],
+  naik: ['m5 15 7-7 7 7'],
+  turun: ['m5 9 7 7 7-7'],
+  info: [[12, 12, 9] as [number, number, number], 'M12 11v5', 'M12 8h.01'],
 } satisfies Record<string, (string | [number, number, number])[]>;
 
 /* ----------------------------- primitif ----------------------------- */
@@ -144,6 +153,47 @@ export function Sheet({ title, subtitle, onClose, children }: {
           {subtitle && <span>{subtitle}</span>}
         </div>
         {children}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Tab di dalam halaman (bukan navigasi utama). Dipakai sebagai tablist yang
+ * benar agar pembaca layar mengumumkannya sebagai tab, bukan tumpukan tombol.
+ */
+export function SegTabs<T extends string>({ tabs, active, onSelect }: {
+  tabs: { id: T; label: string; icon?: (string | [number, number, number])[]; jumlah?: number }[];
+  active: T;
+  onSelect: (id: T) => void;
+}) {
+  return (
+    <div className="segtabs" role="tablist">
+      {tabs.map((t) => (
+        <button key={t.id} role="tab" aria-selected={active === t.id}
+          className={`segtab ${active === t.id ? 'on' : ''}`}
+          onClick={() => onSelect(t.id)}>
+          {t.icon && <Icon d={t.icon} size={17} />}
+          <span>{t.label}</span>
+          {t.jumlah != null && t.jumlah > 0 && <span className="segtab-jumlah">{t.jumlah}</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Disclaimer rujukan. Sengaja sebuah komponen, bukan teks yang disalin-tempel:
+ * kalau nanti kalimatnya perlu berubah, ia harus berubah di semua tempat
+ * sekaligus — penilaian tanpa disclaimer adalah hal yang tidak boleh terjadi.
+ */
+export function Rujukan({ sumber, children }: { sumber?: string; children?: ReactNode }) {
+  return (
+    <div className="rujukan">
+      <Icon d={ICONS.info} size={15} />
+      <div>
+        {children}
+        {sumber && <div className="rujukan-sumber">Rujukan: {sumber}</div>}
       </div>
     </div>
   );

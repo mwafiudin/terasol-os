@@ -27,11 +27,18 @@ export async function pullEvents(): Promise<void> {
     .map((e) => e.clientId);
   if (usang.length) await db.events.bulkDelete(usang);
 
+  // Penugasan yang belum sempat terkirim hanya ada di perangkat ini; tarikan
+  // dari server tidak boleh menghapusnya sebelum sempat dikirim.
+  const belumTerkirim = new Map(
+    local.filter((e) => e.petugasIds?.length).map((e) => [e.clientId, e.petugasIds!]),
+  );
+
   const rows: EventRow[] = events
     .filter((e) => !unsynced.has(e.clientId))
     .map((e) => ({
       clientId: e.clientId,
       serverId: (e as unknown as { id: string }).id,
+      petugasIds: belumTerkirim.get(e.clientId) ?? [],
       nama: e.nama,
       lokasi: e.lokasi,
       tanggal: e.tanggal,
@@ -46,6 +53,8 @@ export async function pullEvents(): Promise<void> {
       updatedAt: new Date().toISOString(),
     }));
   if (rows.length) await db.events.bulkPut(rows);
+  // Baru sekarang event punya serverId, jadi penugasan bisa dikirim.
+  await kirimPenugasan();
 }
 
 export async function localEvents(): Promise<EventRow[]> {
@@ -82,6 +91,49 @@ export async function countsFor(ev: EventRow): Promise<EventCounts> {
     tally: ev.tally + belumTally.length,
     belumSync: belum.length,
   };
+}
+
+/**
+ * Daftar rekan satu cabang, disimpan agar dropdown petugas tetap terisi saat
+ * offline. Tanpa cache, Koordinator yang membuat event di lokasi tanpa sinyal
+ * hanya melihat dropdown kosong — dan kembali menulis nama sebagai teks bebas,
+ * yang justru ingin kita tinggalkan.
+ */
+const CACHE_REKAN = 'terasol.rekan';
+export type Rekan = { id: string; nama: string; role: string };
+
+export function rekanTersimpan(): Rekan[] {
+  try { return JSON.parse(localStorage.getItem(CACHE_REKAN) ?? '[]') as Rekan[]; }
+  catch { return []; }
+}
+
+export async function muatRekan(): Promise<Rekan[]> {
+  if (!isOnline()) return rekanTersimpan();
+  try {
+    const { rekan } = await api.rekan();
+    localStorage.setItem(CACHE_REKAN, JSON.stringify(rekan));
+    return rekan;
+  } catch { return rekanTersimpan(); }
+}
+
+export function lupakanRekan() { localStorage.removeItem(CACHE_REKAN); }
+
+/**
+ * Kirim penugasan petugas untuk event yang sudah punya serverId. Dipanggil
+ * setelah sync: sebelum event ada di server, tidak ada yang bisa ditugaskan.
+ */
+export async function kirimPenugasan(): Promise<void> {
+  if (!isOnline()) return;
+  const perlu = (await db.events.toArray()).filter(
+    (e) => e.serverId && e.petugasIds && e.petugasIds.length > 0,
+  );
+  for (const e of perlu) {
+    try {
+      await api.setEventPetugas(e.serverId!, e.petugasIds!);
+      // Dikosongkan setelah diterima server supaya tidak dikirim ulang tiap sync.
+      await db.events.update(e.clientId, { petugasIds: [] });
+    } catch { /* dicoba lagi pada sync berikutnya */ }
+  }
 }
 
 export async function saveLocalEvent(

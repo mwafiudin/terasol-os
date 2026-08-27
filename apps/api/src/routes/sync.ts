@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { claimsOf, ctxOf, requireAuth, touchSession } from '../auth.js';
 import { auditAdminRead, withTenant, type Tx } from '../db.js';
+import { cerminkanScreening, pelangganUntuk } from '../pelanggan-link.js';
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'format tanggal harus YYYY-MM-DD');
 
@@ -26,6 +27,12 @@ const screeningIn = z.object({
   gula: z.number().int().nullish(),
   kolesterol: z.number().int().nullish(),
   asamUrat: z.number().nullish(),
+  // Parameter baru dan konteks gula darah opsional: perangkat versi lama tetap
+  // boleh mengirim payload tanpa field ini.
+  lingkarPerut: z.number().nullish(),
+  nadi: z.number().int().nullish(),
+  konteksGula: z.enum(['puasa', 'sewaktu', '2jam_pp']).nullish(),
+  diukurOleh: z.string().uuid().nullish(),
   paramsDiambil: z.array(z.string()).default([]),
   outOfRange: z.boolean().default(false),
   measuredAt: z.string().datetime(),
@@ -169,6 +176,17 @@ export default async function syncRoutes(app: FastifyInstance) {
           }
         }
 
+        // Setiap peserta event adalah satu kunjungan milik seorang pelanggan
+        // cabang ini. Ditautkan di sini supaya riwayat lintas-event terbentuk
+        // sendiri, tanpa perangkat lapangan perlu tahu soal entitas pelanggan.
+        const pelangganId = await pelangganUntuk(tx, ctx.tenantId, {
+          nama: p.nama, gender: p.gender, usia: p.usia, hp: p.hp,
+        });
+        await tx.query(
+          'update participants set pelanggan_id = $2 where id = $1 and pelanggan_id is distinct from $2',
+          [participantId, pelangganId],
+        );
+
         // consent immutable: hanya insert bila peserta ini belum punya.
         const hasConsent = await tx.query(
           'select 1 from consents where participant_id = $1 limit 1', [participantId],
@@ -196,6 +214,7 @@ export default async function syncRoutes(app: FastifyInstance) {
              s.sistolik ?? null, s.diastolik ?? null, s.gula ?? null, s.kolesterol ?? null,
              s.asamUrat ?? null, s.paramsDiambil, s.outOfRange, s.measuredAt],
           );
+          await cerminkanScreening(tx, ctx.tenantId, pelangganId, participantId, s);
         }
 
         if (p.conversion) {

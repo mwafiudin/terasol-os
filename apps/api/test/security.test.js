@@ -246,3 +246,111 @@ describe('Aturan domain ditegakkan basis data', () => {
     assert.equal(rows[0].n, 2);
   });
 });
+
+describe('Pelanggan, pengukuran, dan transaksi', () => {
+  let pelangganA;
+
+  before(async () => {
+    pelangganA = (await admin.query(
+      `insert into pelanggan (tenant_id, nama, gender, usia, hp)
+       values ($1,'__uji_pelanggan_A','P',60,'081100000001') returning id`,
+      [tenantA],
+    )).rows[0].id;
+  });
+
+  it('konteks gula darah hanya boleh melekat pada pengukuran gula', async () => {
+    // Menyimpan "berat badan puasa" tidak berarti apa-apa; kalau dibiarkan,
+    // angka tanpa makna itu akan muncul di riwayat sebagai deret tersendiri.
+    await assert.rejects(
+      () => admin.query(
+        `insert into pengukuran (tenant_id, pelanggan_id, client_id, jenis, konteks, nilai)
+         values ($1,$2,gen_random_uuid(),'berat','puasa',61)`,
+        [tenantA, pelangganA],
+      ),
+      /pengukuran_konteks_hanya_gula/,
+    );
+    await admin.query(
+      `insert into pengukuran (tenant_id, pelanggan_id, client_id, jenis, konteks, nilai)
+       values ($1,$2,gen_random_uuid(),'gula','puasa',96)`,
+      [tenantA, pelangganA],
+    );
+  });
+
+  it('konteks gula darah hanya menerima nilai yang dikenal', async () => {
+    await assert.rejects(
+      () => admin.query(
+        `insert into pengukuran (tenant_id, pelanggan_id, client_id, jenis, konteks, nilai)
+         values ($1,$2,gen_random_uuid(),'gula','sesudah_ngopi',96)`,
+        [tenantA, pelangganA],
+      ),
+      /pengukuran_konteks_valid/,
+    );
+  });
+
+  it('dua pembacaan gula darah pada hari yang sama boleh hidup berdampingan', async () => {
+    // Justru inilah yang tidak bisa dilakukan model lama: puasa dan 2 jam
+    // setelah makan adalah dua angka berbeda, bukan satu angka yang ditimpa.
+    await admin.query(
+      `insert into pengukuran (tenant_id, pelanggan_id, client_id, jenis, konteks, nilai)
+       values ($1,$2,gen_random_uuid(),'gula','2jam_pp',148)`,
+      [tenantA, pelangganA],
+    );
+    const { rows } = await admin.query(
+      `select konteks, nilai from pengukuran
+        where pelanggan_id = $1 and jenis = 'gula' order by konteks`,
+      [pelangganA],
+    );
+    assert.deepEqual(rows.map((r) => r.konteks), ['2jam_pp', 'puasa']);
+  });
+
+  it('nilai pengukuran di luar batas kewarasan ditolak', async () => {
+    await assert.rejects(
+      () => admin.query(
+        `insert into pengukuran (tenant_id, pelanggan_id, client_id, jenis, nilai)
+         values ($1,$2,gen_random_uuid(),'berat',9999)`,
+        [tenantA, pelangganA],
+      ),
+      /pengukuran_nilai_masuk_akal/,
+    );
+  });
+
+  it('total transaksi dihitung basis data dan tidak bisa diisi manual', async () => {
+    const { rows } = await admin.query(
+      `insert into transaksi (tenant_id, pelanggan_id, client_id, nama, jumlah, harga_satuan)
+       values ($1,$2,gen_random_uuid(),'__uji_produk',3,350000) returning id, total`,
+      [tenantA, pelangganA],
+    );
+    assert.equal(Number(rows[0].total), 1_050_000);
+    await assert.rejects(
+      () => admin.query('update transaksi set total = 1 where id = $1', [rows[0].id]),
+      /can only be updated to DEFAULT/i,
+    );
+  });
+
+  it('pengukuran cabang lain tidak terlihat oleh cabang ini', async () => {
+    const { rows } = await asTenant(tenantB, 'koordinator', (c) =>
+      c.query('select count(*)::int as n from pengukuran'));
+    assert.equal(rows[0].n, 0, 'cabang B tidak boleh melihat pengukuran cabang A');
+
+    const punyaA = await asTenant(tenantA, 'petugas', (c) =>
+      c.query('select count(*)::int as n from pengukuran'));
+    assert.ok(punyaA.rows[0].n > 0, 'cabang A harus melihat pengukurannya sendiri');
+  });
+
+  it('Admin Pusat melihat pengukuran seluruh cabang', async () => {
+    const { rows } = await asTenant(tenantB, 'admin_pusat', (c) =>
+      c.query('select count(*)::int as n from pengukuran where tenant_id = $1', [tenantA]));
+    assert.ok(rows[0].n > 0, 'Admin Pusat harus bisa membaca lintas cabang');
+  });
+
+  it('cabang tidak bisa menuliskan pengukuran atas nama cabang lain', async () => {
+    await assert.rejects(
+      () => asTenant(tenantB, 'koordinator', (c) => c.query(
+        `insert into pengukuran (tenant_id, pelanggan_id, client_id, jenis, nilai)
+         values ($1,$2,gen_random_uuid(),'berat',61)`,
+        [tenantA, pelangganA],
+      )),
+      /row-level security/i,
+    );
+  });
+});

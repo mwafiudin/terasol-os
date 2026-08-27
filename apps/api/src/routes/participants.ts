@@ -72,7 +72,7 @@ export default async function participantRoutes(app: FastifyInstance) {
         `select p.id, p.client_id as "clientId", p.nama, p.gender, p.usia, p.hp,
                 p.needs_review as "needsReview", p.erased_at as "erasedAt",
                 p.created_at as "createdAt", p.device_id as "deviceId",
-                p.tenant_id as "tenantId",
+                p.tenant_id as "tenantId", p.pelanggan_id as "pelangganId",
                 json_build_object(
                   'id', e.id, 'nama', e.nama, 'lokasi', e.lokasi,
                   'tanggal', to_char(e.tanggal,'YYYY-MM-DD'),

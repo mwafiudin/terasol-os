@@ -1,3 +1,4 @@
+import { hitungImt, nilaiImt } from './rujukan';
 import type { ParamKey } from './types';
 
 /**
@@ -32,13 +33,19 @@ export function outOfRange(k: ParamKey, raw: string | undefined): boolean {
   return !!p && n !== null && (n < p.min || n > p.max);
 }
 
-/** IMT ditampilkan di perangkat; nilai resmi dihitung ulang oleh basis data. */
-export function imtOf(values: Partial<Record<ParamKey, string>>): { nilai: number; kategori: string } | null {
-  const t = num(values.tinggi), b = num(values.berat);
-  if (!t || !b || t < 50) return null;
-  const nilai = Math.round((b / (t / 100) ** 2) * 10) / 10;
-  const kategori = nilai < 18.5 ? 'Kurang' : nilai < 25 ? 'Normal' : nilai < 30 ? 'Berlebih' : 'Obesitas';
-  return { nilai, kategori };
+/**
+ * IMT ditampilkan di perangkat; nilai resmi dihitung ulang oleh basis data.
+ * Kategorinya memakai ambang Asia-Pasifik dari `rujukan.ts` — sebelumnya di
+ * sini dipakai ambang WHO global (25/30), yang menyebut "normal" orang yang
+ * menurut standar Indonesia sudah berat badan lebih.
+ */
+export function imtOf(
+  values: Partial<Record<ParamKey, string>>,
+): { nilai: number; kategori: string; nada: string } | null {
+  const nilai = hitungImt(num(values.tinggi), num(values.berat));
+  if (nilai == null) return null;
+  const p = nilaiImt(nilai);
+  return { nilai, kategori: p.label, nada: p.nada };
 }
 
 export const rp = (n: number) => 'Rp ' + Math.round(n).toLocaleString('id-ID');

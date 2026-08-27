@@ -11,6 +11,7 @@ import deviceRoutes from './routes/devices.js';
 import eventRoutes from './routes/events.js';
 import metaRoutes from './routes/meta.js';
 import participantRoutes from './routes/participants.js';
+import pelangganRoutes from './routes/pelanggan.js';
 import syncRoutes from './routes/sync.js';
 import userRoutes from './routes/users.js';
 
@@ -85,6 +86,7 @@ export async function buildServer() {
   await app.register(authRoutes);
   await app.register(eventRoutes);
   await app.register(participantRoutes);
+  await app.register(pelangganRoutes);
   await app.register(syncRoutes);
   await app.register(deviceRoutes);
   await app.register(userRoutes);
