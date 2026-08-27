@@ -1256,8 +1256,27 @@ button { cursor: pointer; font-family: inherit; }
   }
   .sheet .grab { display: none; }
 
-  /* Papan angka tetap selebar tangan walau layarnya lapang. */
-  .papan { max-width: 560px; width: 100%; margin: 0 auto; }
+  /* Papan ukur jadi dialog terpusat, sama seperti sheet.
+     Sebagai pengambilalihan layar penuh ia menyisakan kolom 560px yang
+     mengambang di ruang kosong, dengan jurang tinggi antara ubin dan papan
+     angka — bentuk yang hanya masuk akal saat layarnya memang selebar tangan. */
+  .papan-veil {
+    background: var(--surface-overlay);
+    align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  .papan {
+    max-width: 560px; width: 100%;
+    flex: 0 1 auto; height: auto; max-height: min(90vh, 840px);
+    padding-top: 0;
+    background: var(--surface-page);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    overflow: hidden;
+  }
+  .papan .scr-head { padding: 16px 20px 6px; }
+  .papan-isi { flex: 0 1 auto; padding-bottom: 16px; }
+  .papan-tengah { margin: 0; }
 
   .app ::-webkit-scrollbar { display: block; width: 10px; }
   .app ::-webkit-scrollbar-thumb {
@@ -1464,11 +1483,11 @@ button { cursor: pointer; font-family: inherit; }
 
 .tabel { width: 100%; border-collapse: collapse; }
 
-/* ---- Bentuk kartu (di bawah 1100px) ----
+/* ---- Bentuk kartu (di bawah 900px) ----
    Sel sekunder mengalir jadi SATU kalimat berpemisah titik-tengah, bukan satu
    baris berlabel masing-masing. Empat baris label untuk empat angka pendek
    membuat daftar pendek pun perlu digulir, dan di ponsel itu ongkos nyata. */
-@media (max-width: 1099px) {
+@media (max-width: 899px) {
   .tabel, .tabel tbody, .tabel tr { display: block; width: 100%; }
   .tabel thead { display: none; }
   .tabel tr { position: relative; padding: 11px 16px; }
@@ -1512,10 +1531,14 @@ button { cursor: pointer; font-family: inherit; }
 /* Kata yang hanya masuk akal pada bentuk kartu — di tabel, kolomnya sudah
    menyebutkan hal yang sama di kepala. */
 .hanya-kartu { display: none; }
-@media (max-width: 1099px) { .hanya-kartu { display: inline; } }
+@media (max-width: 899px) { .hanya-kartu { display: inline; } }
 
-/* ---- Bentuk tabel (mulai 1100px) ---- */
-@media (min-width: 1100px) {
+/* ---- Bentuk tabel (mulai 900px) ----
+   Ambangnya diuji, bukan ditebak: pada 768px kolom Nama hanya menyisakan
+   164px, sehingga nama dan catatannya pecah jadi enam baris dan tinggi baris
+   justru melar melampaui bentuk kartu. Sekitar 900px barulah kolom Nama
+   cukup lapang untuk memuat catatan dalam dua baris. */
+@media (min-width: 900px) {
   .tabel th {
     text-align: left; padding: 9px 16px;
     font-size: 11px; font-weight: var(--fw-semibold);
