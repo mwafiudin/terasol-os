@@ -48,6 +48,15 @@ export function imtOf(
   return { nilai, kategori: p.label, nada: p.nada };
 }
 
+/** Nama peran seperti dipakai PRD. Tanpa ini `admin_pusat` mudah jatuh ke
+ *  cabang "else" dan tampil sebagai "Petugas" — salah, dan menyesatkan pada
+ *  layar yang justru dipakai untuk menentukan siapa bertanggung jawab. */
+export const ROLE_LABEL: Record<string, string> = {
+  petugas: 'Petugas',
+  koordinator: 'Koordinator',
+  admin_pusat: 'Admin Pusat',
+};
+
 export const rp = (n: number) => 'Rp ' + Math.round(n).toLocaleString('id-ID');
 export const pct = (n: number) => (Math.round(n * 1000) / 10).toLocaleString('id-ID') + '%';
 export const dec = (n: number) => n.toLocaleString('id-ID', { maximumFractionDigits: 1 });
