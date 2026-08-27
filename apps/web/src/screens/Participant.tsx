@@ -174,8 +174,21 @@ export function Screening({ go }: { go: Nav }) {
     maju();
   }
 
+  /**
+   * Nilai berjalan dibaca dari store, BUKAN dari `draft` hasil render.
+   *
+   * Petugas mengetik tiga angka lebih cepat daripada React sempat merender
+   * ulang. Dengan `draft` dari closure, ketiga ketukan itu membaca isi yang
+   * sama dan hanya yang terakhir tersimpan: "156" menjadi "6", tanpa satu pun
+   * tanda bahwa ada digit yang hilang. `getState()` selalu mengembalikan yang
+   * terbaru karena zustand menulisnya secara sinkron.
+   */
+  function nilaiKini(): string {
+    return useDraft.getState().draft?.values[active] ?? '';
+  }
+
   function ketik(d: string) {
-    const cur = draft!.values[active] ?? '';
+    const cur = nilaiKini();
     if (d === ',' && (!param.dec || !cur || cur.includes(','))) return;
     if (cur.length >= 5) return;
     void setValue(key!, active, cur + d);
@@ -236,7 +249,7 @@ export function Screening({ go }: { go: Nav }) {
           <button className="key" onClick={() => ketik(',')}>,</button>
           <button className="key" onClick={() => ketik('0')}>0</button>
           <button className="key" aria-label="Hapus"
-            onClick={() => void setValue(key, active, (draft.values[active] ?? '').slice(0, -1))}>
+            onClick={() => void setValue(key, active, nilaiKini().slice(0, -1))}>
             <Icon d={ICONS.backspace} size={24} />
           </button>
         </div>

@@ -801,37 +801,111 @@ button { cursor: pointer; font-family: inherit; }
 .rujukan svg { flex: 0 0 auto; margin-top: 1px; opacity: .7; }
 .rujukan-sumber { margin-top: 3px; font-style: italic; }
 
-.ukur-card { display: flex; flex-direction: column; gap: 8px; }
-.ukur-atas {
-  display: flex; align-items: flex-start; justify-content: space-between;
-  gap: 10px; flex-wrap: wrap;
+/* ---- IMT: satu-satunya angka turunan, jadi permukaannya dibedakan ---- */
+.imt-kartu {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 16px 18px 14px; border-radius: var(--radius-card);
+  background: var(--surface-brand-soft); border: 1px solid var(--teal-200);
 }
-.ukur-label {
-  font-size: 14px; font-weight: var(--fw-semibold); color: var(--ink-800);
-  display: inline-flex; align-items: center; gap: 7px; flex-wrap: wrap;
+.imt-atas { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.imt-judul {
+  font-size: 12px; font-weight: var(--fw-semibold); letter-spacing: .06em;
+  text-transform: uppercase; color: var(--teal-700);
+}
+.imt-nilai { display: flex; align-items: baseline; gap: 7px; }
+.imt-nilai b {
+  font-family: var(--font-display); font-size: 40px; line-height: 1;
+  font-weight: var(--fw-semibold); color: var(--teal-900);
+  font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+}
+.imt-nilai span { font-size: 14px; color: var(--teal-700); }
+.imt-asal { font-size: 13px; color: var(--teal-700); }
+.imt-sumber { font-size: 11.5px; font-style: italic; color: var(--teal-600); }
+
+/* ---- Kelompok pengukuran: judul kategori + satu kartu berisi baris ---- */
+.ukur-grup { display: flex; flex-direction: column; gap: 8px; }
+/* Ruang di atas judul lebih besar daripada di bawahnya, supaya judul terbaca
+   melekat pada kelompoknya sendiri, bukan mengambang di antara dua kelompok. */
+.ukur-grup + .ukur-grup, .imt-kartu + .ukur-grup { margin-top: 10px; }
+.ukur-grup-judul {
+  font-family: var(--font-body); font-size: 12px; font-weight: var(--fw-semibold);
+  letter-spacing: .07em; text-transform: uppercase;
+  color: var(--text-muted); padding: 0 2px;
+}
+.ukur-daftar { overflow: hidden; }
+
+.ukur-item + .ukur-item { border-top: 1px solid var(--border-hairline); }
+.ukur-item-head {
+  width: 100%; display: flex; align-items: center; gap: 12px;
+  padding: 13px 16px; border: 0; background: transparent; text-align: left;
+  transition: background var(--dur-fast) var(--ease-calm);
+}
+.ukur-item-head:hover { background: var(--surface-brand-soft); }
+.ukur-item-utama { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.ukur-item-nama {
+  display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  font-size: 14.5px; font-weight: var(--fw-semibold); color: var(--text-body);
+}
+.ukur-item-meta {
+  display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: 12px; color: var(--text-muted);
 }
 .ukur-kode {
-  font-size: 10.5px; letter-spacing: .04em; font-weight: var(--fw-semibold);
+  font-size: 10px; letter-spacing: .05em; font-weight: var(--fw-semibold);
   padding: 2px 6px; border-radius: 4px;
-  background: var(--teal-100); color: var(--teal-900);
+  background: var(--teal-100); color: var(--teal-800);
 }
-.ukur-nilai { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; }
-.ukur-nilai b {
-  font-family: var(--font-display); font-size: 30px; line-height: 1;
+.ukur-item-nilai {
+  display: flex; align-items: baseline; gap: 5px; flex: 0 0 auto;
+  justify-content: flex-end;
+}
+.ukur-item-nilai b {
+  font-family: var(--font-display); font-size: 23px; line-height: 1.1;
   font-weight: var(--fw-semibold); color: var(--teal-900);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
 }
-.ukur-nilai > span { font-size: 13px; color: var(--text-muted); }
-.ukur-tren {
-  display: inline-flex; align-items: center; gap: 2px;
-  font-size: 12.5px; font-weight: var(--fw-medium);
-  font-variant-numeric: tabular-nums;
-  padding: 2px 7px 2px 5px; border-radius: 999px;
+.ukur-item-nilai > span { font-size: 12px; color: var(--text-muted); }
+.ukur-item-chev {
+  display: flex; flex: 0 0 auto; color: var(--text-subtle);
+  transition: transform var(--dur-fast) var(--ease-calm);
 }
+.ukur-item.buka .ukur-item-chev { transform: rotate(90deg); }
+
 /* Naik dan turun sengaja TIDAK diberi warna baik/buruk: berat badan turun bisa
    berarti dua hal yang sangat berbeda, dan menghakiminya adalah interpretasi. */
-.ukur-tren.naik, .ukur-tren.turun {
+.ukur-tren {
+  display: inline-flex; align-items: center; gap: 1px; align-self: center;
+  font-size: 11.5px; font-weight: var(--fw-medium);
+  font-variant-numeric: tabular-nums;
+  padding: 2px 6px 2px 4px; border-radius: var(--radius-pill);
   background: var(--surface-sunken); color: var(--text-muted);
+}
+
+.ukur-item-detail {
+  padding: 0 16px 14px; display: flex; flex-direction: column; gap: 10px;
+}
+.ukur-rujukan { display: flex; flex-direction: column; gap: 2px; }
+.ukur-rujukan b { font-size: 13px; font-weight: var(--fw-semibold); color: var(--text-body); }
+.ukur-rujukan span { font-size: 11.5px; font-style: italic; color: var(--text-subtle); }
+
+/* Chip penilaian. Menggantikan badge penuh: label rujukan terlalu panjang
+   untuk badge, dan pada layar 360px ia menabrak tepi kartu. */
+.vonis {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11.5px; font-weight: var(--fw-semibold);
+  padding: 2px 8px; border-radius: var(--radius-pill); white-space: nowrap;
+}
+.vonis::before {
+  content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor;
+}
+.vonis-normal   { background: var(--success-100); color: var(--success-700); }
+.vonis-perhatian{ background: var(--warning-100); color: var(--warning-700); }
+.vonis-tinggi   { background: var(--danger-100);  color: var(--danger-700); }
+.vonis-rendah   { background: var(--warning-100); color: var(--warning-700); }
+.vonis-netral   { background: var(--sage-100);    color: var(--sage-800); }
+
+.ikon-teks {
+  font-size: 10.5px; font-weight: var(--fw-semibold); letter-spacing: .03em;
 }
 
 .riwayat-list {
@@ -839,8 +913,11 @@ button { cursor: pointer; font-family: inherit; }
   border-top: 1px solid var(--border-hairline);
 }
 .riwayat-baris {
-  display: flex; align-items: center; gap: 10px; padding: 9px 0;
+  display: flex; align-items: center; gap: 10px; padding: 9px 0; flex-wrap: wrap;
 }
+/* Konfirmasi hapus turun ke barisnya sendiri — kalimatnya menyebut nilai dan
+   satuan, yang tidak muat berdampingan dengan waktu dan tombol aksi. */
+.riwayat-baris > .hapus-konfirm { flex-basis: 100%; }
 .riwayat-baris:not(:last-child) {
   border-bottom: 1px solid var(--border-hairline);
 }
@@ -1039,3 +1116,83 @@ button { cursor: pointer; font-family: inherit; }
 }
 .hapus-konfirm > span { flex: 1; min-width: 0; }
 .link-btn.bahaya { color: var(--danger-700); font-weight: var(--fw-semibold); }
+
+/* ==================== Catat pengukuran: pilih kelompok ==================== */
+
+.pilih-grup { display: flex; flex-direction: column; gap: 10px; }
+.pilih-grup-tanya { font-size: 14px; color: var(--text-muted); }
+.grup-kartu {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 14px 16px; text-align: left;
+  border: 1px solid var(--border-hairline); border-radius: var(--radius-card);
+  background: var(--surface-card); color: inherit;
+  transition: border-color var(--dur-fast) var(--ease-calm),
+              background var(--dur-fast) var(--ease-calm);
+}
+.grup-kartu:hover { border-color: var(--border-brand); background: var(--surface-brand-soft); }
+.grup-ikon {
+  display: flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  width: 38px; height: 38px; border-radius: var(--radius-sm);
+  background: var(--surface-brand-soft); color: var(--teal-700);
+}
+.grup-tx { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.grup-tx b { font-size: 15px; font-weight: var(--fw-semibold); color: var(--text-body); }
+.grup-tx span { font-size: 12px; color: var(--text-muted); }
+
+/* ========================= Catat pengukuran: papan ========================= */
+
+/* Papan menutupi layar sepenuhnya: mengetik angka sambil berdiri memerlukan
+   papan angka besar, dan apa pun di belakangnya hanya jadi gangguan. */
+.papan-veil {
+  position: absolute; inset: 0; z-index: 60;
+  background: var(--surface-page);
+  display: flex; flex-direction: column;
+}
+.papan {
+  display: flex; flex-direction: column; flex: 1; min-height: 0;
+  padding-top: env(safe-area-inset-top);
+}
+.papan-isi {
+  flex: 1; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 10px; padding: 8px 20px 12px;
+}
+
+.papan-ubin { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ubin {
+  display: flex; flex-direction: column; gap: 4px; min-height: 84px;
+  padding: 12px 14px; text-align: left;
+  border: 1px solid var(--border-hairline); border-radius: var(--radius-card);
+  background: var(--ivory-050); color: inherit;
+  transition: border-color var(--dur-fast) var(--ease-calm),
+              background var(--dur-fast) var(--ease-calm);
+}
+.ubin.terisi { background: var(--surface-card); }
+.ubin.aktif {
+  background: var(--surface-card); border-color: var(--teal-700);
+  box-shadow: var(--shadow-sm);
+}
+.ubin-label { font-size: 11.5px; color: var(--text-muted); }
+.ubin-nilai {
+  font-family: var(--font-display); font-size: 28px; line-height: 1.1;
+  font-weight: var(--fw-semibold); color: var(--ink-300);
+  font-variant-numeric: tabular-nums;
+}
+.ubin.terisi .ubin-nilai { color: var(--teal-800); }
+.ubin.aktif .ubin-nilai { color: var(--teal-900); }
+/* Kursor hanya pada ubin aktif, supaya jelas ke mana angka berikutnya masuk. */
+.ubin.aktif .ubin-nilai::after { content: "|"; opacity: .35; font-weight: 400; }
+.ukur-keterangan { font-size: 12.5px; color: var(--text-muted); }
+
+/* Blok ubin dipusatkan tegak: kelompok berisi tiga parameter menyisakan rongga
+   besar di atas papan angka, dan rongga yang menganggur di tengah layar
+   terbaca sebagai sesuatu yang gagal dimuat. */
+.papan-tengah { margin: auto 0; display: flex; flex-direction: column; gap: 10px; }
+.papan-rentang { font-size: 12.5px; color: var(--text-muted); text-align: center; }
+
+/* Tombol berlabel teks (SIS/DIA) diberi rangka tipis: tanpa itu ia terbaca
+   sebagai keterangan, bukan sebagai sesuatu yang bisa diketuk. */
+.ikon-btn:has(.ikon-teks) {
+  width: auto; min-width: 38px; padding: 0 9px;
+  border: 1px solid var(--border-hairline);
+}
+.ikon-btn:has(.ikon-teks):hover { border-color: var(--border-brand); }

@@ -59,8 +59,8 @@ export default async function pelangganRoutes(app: FastifyInstance) {
                 p.created_at as "createdAt",
                 (select count(*) from participants k where k.pelanggan_id = p.id
                    and k.deleted_at is null)::int as kunjungan,
-                (select coalesce(sum(t.total),0) from transaksi t where t.pelanggan_id = p.id)::bigint as "totalBelanja",
-                (select max(pg.diukur_pada) from pengukuran pg where pg.pelanggan_id = p.id) as "terakhirDiukur"
+                (select coalesce(sum(t.total),0) from transaksi t where t.pelanggan_id = p.id and t.deleted_at is null)::bigint as "totalBelanja",
+                (select max(pg.diukur_pada) from pengukuran pg where pg.pelanggan_id = p.id and pg.deleted_at is null) as "terakhirDiukur"
            from pelanggan p
           where ${filter}
           order by p.nama
@@ -157,7 +157,7 @@ export default async function pelangganRoutes(app: FastifyInstance) {
            left join users u on u.id = pg.diukur_oleh
            left join participants k on k.id = pg.participant_id
            left join events e on e.id = k.event_id
-          where pg.pelanggan_id = $1
+          where pg.pelanggan_id = $1 and pg.deleted_at is null
           order by pg.diukur_pada desc, pg.jenis`,
         [id],
       );
@@ -231,19 +231,41 @@ export default async function pelangganRoutes(app: FastifyInstance) {
   });
 
   /**
-   * Menghapus pengukuran hanya untuk Koordinator: angka yang salah ketik perlu
-   * bisa dibuang, tapi hasil pengukuran adalah fakta pada satu momen — bukan
-   * sesuatu yang boleh dihapus siapa saja tanpa jejak.
+   * Menghapus pengukuran hanya untuk Koordinator, dan hanya secara lunak.
+   *
+   * Hasil pengukuran adalah fakta pada satu momen dan tidak bisa diulang.
+   * Angka yang salah ketik memang harus bisa dibuang, tapi kalau yang terhapus
+   * ternyata bukan yang dimaksud, harus ada jalan pulang.
    */
   app.delete('/pengukuran/:id', { preHandler: requireRole('koordinator', 'admin_pusat') }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const ctx = ctxOf(req);
     return withTenant(ctx, async (tx) => {
       const { rows } = await tx.query<{ jenis: string; nilai: string }>(
-        'delete from pengukuran where id = $1 returning jenis, nilai', [id],
+        `update pengukuran set deleted_at = now(), deleted_by = $2
+          where id = $1 and deleted_at is null
+          returning jenis, nilai`,
+        [id, ctx.userId],
       );
       if (!rows[0]) return reply.code(404).send({ error: 'not_found' });
       await audit(tx, ctx, 'pengukuran.delete', 'pengukuran', id, rows[0]);
+      return { ok: true };
+    });
+  });
+
+  /** Membatalkan penghapusan. Inilah yang membuat hapus lunak berarti. */
+  app.post('/pengukuran/:id/pulihkan', { preHandler: requireRole('koordinator', 'admin_pusat') }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const ctx = ctxOf(req);
+    return withTenant(ctx, async (tx) => {
+      const { rows } = await tx.query<{ jenis: string; nilai: string }>(
+        `update pengukuran set deleted_at = null, deleted_by = null
+          where id = $1 and deleted_at is not null
+          returning jenis, nilai`,
+        [id],
+      );
+      if (!rows[0]) return reply.code(404).send({ error: 'not_found' });
+      await audit(tx, ctx, 'pengukuran.restore', 'pengukuran', id, rows[0]);
       return { ok: true };
     });
   });
@@ -263,7 +285,7 @@ export default async function pelangganRoutes(app: FastifyInstance) {
            left join users u on u.id = t.dicatat_oleh
            left join participants k on k.id = t.participant_id
            left join events e on e.id = k.event_id
-          where t.pelanggan_id = $1
+          where t.pelanggan_id = $1 and t.deleted_at is null
           order by t.tanggal desc, t.created_at desc`,
         [id],
       );
@@ -336,10 +358,29 @@ export default async function pelangganRoutes(app: FastifyInstance) {
     const ctx = ctxOf(req);
     return withTenant(ctx, async (tx) => {
       const { rows } = await tx.query<{ nama: string; total: string }>(
-        'delete from transaksi where id = $1 returning nama, total', [id],
+        `update transaksi set deleted_at = now(), deleted_by = $2
+          where id = $1 and deleted_at is null
+          returning nama, total`,
+        [id, ctx.userId],
       );
       if (!rows[0]) return reply.code(404).send({ error: 'not_found' });
       await audit(tx, ctx, 'transaksi.delete', 'transaksi', id, rows[0]);
+      return { ok: true };
+    });
+  });
+
+  app.post('/transaksi/:id/pulihkan', { preHandler: requireRole('koordinator', 'admin_pusat') }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const ctx = ctxOf(req);
+    return withTenant(ctx, async (tx) => {
+      const { rows } = await tx.query<{ nama: string; total: string }>(
+        `update transaksi set deleted_at = null, deleted_by = null
+          where id = $1 and deleted_at is not null
+          returning nama, total`,
+        [id],
+      );
+      if (!rows[0]) return reply.code(404).send({ error: 'not_found' });
+      await audit(tx, ctx, 'transaksi.restore', 'transaksi', id, rows[0]);
       return { ok: true };
     });
   });
@@ -363,13 +404,13 @@ export default async function pelangganRoutes(app: FastifyInstance) {
                   where p.tenant_id = t.id and p.erased_at is null)::int as pelanggan,
                 (select count(*) from participants k
                   where k.tenant_id = t.id and k.deleted_at is null)::int as kunjungan,
-                (select count(*) from pengukuran g where g.tenant_id = t.id)::int as pengukuran,
+                (select count(*) from pengukuran g where g.tenant_id = t.id and g.deleted_at is null)::int as pengukuran,
                 (select count(*) from events e
                   where e.tenant_id = t.id and e.status = 'active')::int as "eventAktif",
                 (select count(*) from events e
                   where e.tenant_id = t.id and e.status <> 'archived')::int as event,
-                (select coalesce(sum(x.total),0) from transaksi x where x.tenant_id = t.id)::bigint as "totalBelanja",
-                (select count(*) from transaksi x where x.tenant_id = t.id)::int as transaksi,
+                (select coalesce(sum(x.total),0) from transaksi x where x.tenant_id = t.id and x.deleted_at is null)::bigint as "totalBelanja",
+                (select count(*) from transaksi x where x.tenant_id = t.id and x.deleted_at is null)::int as transaksi,
                 (select count(*) from users u where u.tenant_id = t.id and u.active)::int as petugas,
                 (select count(*) from participants k
                   where k.tenant_id = t.id and k.needs_review and k.deleted_at is null)::int as "perluDitinjau"
