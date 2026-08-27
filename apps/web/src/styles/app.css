@@ -1781,41 +1781,7 @@ button { cursor: pointer; font-family: inherit; }
 .grafik-titik { fill: var(--teal-800); }
 .grafik-titik.tipis { fill: var(--text-subtle); }
 
-/* ======================= aturan cetak ======================= */
 
-@media print {
-  /* Krom aplikasi tidak ikut tercetak. Yang dipegang pelanggan adalah dokumen,
-     bukan tangkapan layar aplikasi. */
-  .tabbar, .page-head, .toast, .sheet-veil, .papan-veil, .btn { display: none !important; }
-
-  .app, .page, .page-analisis {
-    display: block !important; height: auto !important; overflow: visible !important;
-    background: #fff !important; padding: 0 !important; margin: 0 !important;
-  }
-  .lembar { max-width: none; gap: 14px; }
-
-  /* Warna latar wajib ikut tercetak: pita rujukan dan penanda nada adalah
-     isi, bukan hiasan. Tanpa ini peramban membuangnya dan grafiknya kehilangan
-     satu-satunya hal yang membuatnya sebuah perbandingan. */
-  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-
-  /* Kartu tidak boleh terpotong tengah halaman. */
-  .penanda, .imt-blok, .sorot, .rujukan { break-inside: avoid; page-break-inside: avoid; }
-  .lembar-bagian > h2 { break-after: avoid; page-break-after: avoid; }
-  .lembar-kaki { break-before: auto; }
-
-  .penanda-grid { grid-template-columns: repeat(2, 1fr); }
-  .grafik svg { height: 56px; }
-
-  /* Disclaimer justru harus paling terbaca di kertas: lembar cetak adalah
-     artefak yang paling mungkin dibaca sebagai dokumen medis. */
-  .rujukan {
-    border: 1px solid #000 !important; padding: 10px 12px !important;
-    font-size: 11px !important; color: #000 !important;
-  }
-}
-
-@page { margin: 14mm; }
 
 /* ========================= Katalog produk KK ========================= */
 
@@ -1901,4 +1867,130 @@ button { cursor: pointer; font-family: inherit; }
 .riwayat-antre {
   font-style: normal; font-size: 11.5px; font-weight: var(--fw-medium);
   color: var(--accent-700, var(--text-muted));
+}
+
+/* ===================== Lembar cetak (A4) ===================== */
+
+/* Hanya muncul di kertas: sumber rujukan terkumpul dan baris tanda cetak.
+   Keduanya tidak berguna di layar — sumbernya sudah menempel di tiap kartu,
+   dan siapa yang membuka aplikasi sudah jelas. */
+.hanya-cetak { display: none; }
+
+@page { size: A4; margin: 16mm 14mm; }
+
+@media print {
+  .hanya-cetak { display: block; }
+
+  /* Krom aplikasi tidak ikut tercetak. Yang dipegang pelanggan adalah dokumen,
+     bukan tangkapan layar aplikasi. */
+  .tabbar, .page-head, .toast, .sheet-veil, .papan-veil, .btn { display: none !important; }
+
+  /* LEBAR PENUH. Shell aplikasi membatasi lebar untuk layar, dan batas itu ikut
+     tercetak sebagai kolom sempit di sepertiga kiri kertas — dua pertiga
+     halaman kosong sementara isinya berdesakan. */
+  html, body, #root, .app, .screen, .page, .page-analisis, .lembar {
+    max-width: none !important; width: auto !important;
+    display: block !important; height: auto !important;
+    min-height: 0 !important; overflow: visible !important;
+    background: #fff !important; box-shadow: none !important;
+    padding: 0 !important; margin: 0 !important;
+  }
+
+  /* Warna latar wajib ikut tercetak: pita rujukan dan nada penanda adalah isi,
+     bukan hiasan. Tanpa ini peramban membuangnya dan grafiknya kehilangan
+     satu-satunya hal yang membuatnya sebuah perbandingan. */
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+  body { font-size: 9.5pt; color: #111; }
+
+  /* ---- kop ---- */
+  .lembar { display: flex !important; flex-direction: column; gap: 9pt; }
+  .lembar-kop { padding-bottom: 6pt; border-bottom: 1.2pt solid #14514c; }
+  .lembar-kop h1 { font-size: 16pt; color: #10403c; }
+  .lembar-kop p, .lembar-kop-kanan span { font-size: 8.5pt; color: #444; }
+  .lembar-kop-kanan b { font-size: 9pt; color: #10403c; }
+
+  .lembar-bagian > h2 {
+    font-size: 7.5pt; letter-spacing: .1em; color: #555;
+    padding-bottom: 2pt; border-bottom: .4pt solid #ddd;
+  }
+
+  /* ---- ringkasan ---- */
+  .sorot {
+    padding: 5pt 7pt; border-radius: 0; border-left-width: 2.5pt;
+    gap: 1pt 8pt;
+  }
+  .sorot-nama { font-size: 9.5pt; }
+  .sorot-nilai { font-size: 12pt; }
+  .sorot-vonis { font-size: 8pt; }
+
+  /* ---- IMT ---- */
+  .imt-blok { padding: 7pt 9pt; border-radius: 0; gap: 12pt; }
+  .imt-angka > b { font-size: 26pt; }
+  .imt-terang p { font-size: 9pt; }
+  .imt-terang small { font-size: 7.5pt; }
+
+  /* ---- rincian: dari kartu menjadi BARIS DOKUMEN ----
+     Kartu berlatar dan bersudut membulat terbaca sebagai antarmuka yang
+     difoto. Di kertas yang dibutuhkan adalah baris: nama, angka, penilaian,
+     tren — sejajar ke bawah sehingga mata bisa menyusurinya satu kolom. */
+  .penanda-grid { display: block !important; }
+  .penanda {
+    display: grid !important;
+    grid-template-columns: 1fr 58pt 62pt 96pt;
+    align-items: center; gap: 3pt 8pt;
+    padding: 4.5pt 0; border: 0; border-bottom: .4pt solid #ddd;
+    border-radius: 0; background: none !important; break-inside: avoid;
+  }
+  .penanda > header { grid-column: 1; gap: 4pt; }
+  .penanda-nama { font-size: 9.5pt; }
+  .penanda-kode { font-size: 6.5pt; padding: 0 3pt; background: #eee !important; }
+  .penanda-nilai { grid-column: 2; justify-content: flex-end; gap: 2pt; }
+  .penanda-nilai b { font-size: 13pt; }
+  .penanda-nilai span { font-size: 7pt; }
+  .penanda .vonis {
+    grid-column: 3; justify-self: start; font-size: 7.5pt;
+    padding: 1pt 4pt; white-space: nowrap;
+  }
+  /* Kolom grafik berlebar TETAP supaya angka sejajar ke bawah — pada tabel,
+     angka yang bergeser antar baris terbaca ceroboh. Tetapi bila TIDAK ADA
+     satu pun tren di seluruh tabel, kolomnya dihapus seluruhnya: memesan
+     sepertiga baris untuk sesuatu yang tidak pernah muncul hanya menyisakan
+     ruang mati. */
+  .penanda-grid:not(:has(.grafik)) .penanda { grid-template-columns: 1fr 58pt 62pt; }
+  .penanda .grafik { grid-column: 4; margin: 0; gap: 1pt; width: 96pt; }
+  .penanda .grafik svg { height: 26pt; }
+  .penanda .grafik figcaption { display: none; }
+  .penanda-arah { grid-column: 1 / 4; font-size: 8pt; margin-top: -1pt; }
+  /* Sumber dikumpulkan di kaki halaman, tidak diulang tiap baris. */
+  .penanda-sumber { display: none; }
+
+  .lembar-catatan { font-size: 8pt; }
+
+  /* ---- kaki ---- */
+  .lembar-kaki { margin-top: 4pt; break-inside: avoid; }
+  .lembar-sumber { margin-bottom: 6pt; }
+  .lembar-sumber h2 {
+    font-size: 7.5pt; letter-spacing: .1em; text-transform: uppercase;
+    color: #555; margin: 0 0 2pt;
+  }
+  .lembar-sumber ol { margin: 0; padding-left: 12pt; }
+  .lembar-sumber li { font-size: 7.5pt; color: #444; }
+
+  /* Disclaimer justru harus paling terbaca di kertas: lembar cetak adalah
+     artefak yang paling mungkin dibaca sebagai dokumen medis. */
+  .rujukan {
+    border: .8pt solid #111 !important; border-radius: 0 !important;
+    padding: 6pt 8pt !important; font-size: 8pt !important; color: #111 !important;
+    background: none !important;
+  }
+
+  .lembar-tanda {
+    display: flex !important; justify-content: space-between; gap: 8pt;
+    margin-top: 6pt; padding-top: 4pt; border-top: .4pt solid #ddd;
+    font-size: 7.5pt; color: #666;
+  }
+
+  .sorot, .imt-blok, .rujukan { break-inside: avoid; }
+  .lembar-bagian > h2 { break-after: avoid; }
 }
