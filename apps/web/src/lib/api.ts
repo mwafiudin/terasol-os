@@ -134,6 +134,13 @@ export type PengukuranRow = {
   outOfRange: boolean; catatan: string | null; diukurPada: string;
   participantId: string | null; diukurOleh: string | null;
   diukurOlehNama: string | null; eventNama: string | null;
+  /**
+   * Baris ini belum sampai ke server — masih di antrean perangkat. Ditandai
+   * supaya petugas melihat angkanya tercatat tanpa disangka sudah tersimpan
+   * di pusat, dan supaya tombol ubah/hapus tidak ditawarkan untuk sesuatu
+   * yang belum punya id server.
+   */
+  antre?: boolean;
 };
 
 export type CabangRingkas = {
@@ -249,6 +256,8 @@ export type ServerParticipant = {
   needsReview: boolean; eventId: string; eventNama: string; eventTanggal: string;
   eventStatus: string; imt: number | null; berminat: boolean; convStatus: ConvStatus;
   nilaiTransaksi: number; produk: string | null; createdAt: string;
+  /** Kunci untuk mencatat pengukuran; disalin ke cermin agar tersedia offline. */
+  pelangganId: string | null;
   /** Parameter yang benar-benar diambil — dasar hitung biaya consumable. */
   paramsDiambil: ParamKey[] | null;
   /** Jejak peserta (US-04): kapan diukur, kapan status terakhir berubah. */
@@ -346,6 +355,12 @@ export const api = {
     pelangganId: string; participantId?: string | null; jenis: JenisUkur;
     konteks?: KonteksGula | null; nilai: number; diukurPada?: string;
     diukurOleh?: string | null; outOfRange?: boolean; catatan?: string | null;
+    /**
+     * Kunci idempotensi. Server melakukan upsert pada `(tenant_id, client_id)`,
+     * jadi pengukuran yang dikirim ulang setelah sinyal putus tidak
+     * menggandakan diri. Wajib diisi untuk kiriman dari antrean offline.
+     */
+    clientId?: string;
   }) => post<{ id: string }>('/pengukuran', body),
   updatePengukuran: (id: string, body: Record<string, unknown>) =>
     patch<unknown>(`/pengukuran/${id}`, body),

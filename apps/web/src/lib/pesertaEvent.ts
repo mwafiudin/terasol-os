@@ -1,5 +1,5 @@
 import { api } from './api';
-import { db, getMeta, readParticipants, setMeta } from './db';
+import { bacaCermin, db, getMeta, readParticipants, setMeta, tulisCermin } from './db';
 import { num } from './domain';
 import { isOnline } from './sync';
 import type { ConvStatus, EventRow, ParamKey } from './types';
@@ -26,6 +26,18 @@ export type PesertaRingkas = {
   /** Identitasnya sudah di-purge dari perangkat dan belum bisa diambil server. */
   terkunci: boolean;
   createdAt: string;
+  /**
+   * Diperlukan untuk mencatat pengukuran. Sebelumnya hanya bisa didapat dari
+   * `api.participantDetail`, sehingga petugas yang offline tidak pernah
+   * memilikinya; kini ikut tersimpan di cermin.
+   */
+  pelangganId: string | null;
+  /**
+   * Baris ini berasal dari salinan lokal, bukan dari server barusan. Waktu
+   * pengambilannya ditampilkan — petugas berhak tahu bahwa yang dilihatnya
+   * mungkin sudah tertinggal dari apa yang dicatat rekannya semenit lalu.
+   */
+  dariCermin: string | null;
 };
 
 export type RekapSementara = {
@@ -86,13 +98,17 @@ export async function pesertaEvent(
     belumSync: p.synced === 0,
     terkunci: p.secret === null,
     createdAt: p.createdAt,
+    pelangganId: null,
+    dariCermin: null,
   }));
 
   const peta = new Map(dariLokal.map((p) => [p.clientId, p]));
 
+  let dapatDariServer = false;
   if (isOnline() && ev.serverId) {
     try {
       const { participants } = await api.participants({ eventId: ev.serverId });
+      dapatDariServer = true;
       for (const s of participants) {
         const adaLokal = peta.get(s.clientId);
         peta.set(s.clientId, {
@@ -112,9 +128,65 @@ export async function pesertaEvent(
           belumSync: adaLokal?.belumSync ?? false,
           terkunci: false,
           createdAt: s.createdAt,
+          pelangganId: s.pelangganId ?? null,
+          dariCermin: null,
         });
       }
-    } catch { /* offline atau gagal: cukup pakai yang lokal */ }
+
+      // Disalin ke perangkat supaya daftar yang sama tetap ada saat sinyal
+      // hilang. Kegagalan menulis cermin TIDAK boleh menggagalkan tampilan —
+      // daftarnya sudah benar, cermin hanya bekal untuk nanti.
+      if (key) {
+        try {
+          await tulisCermin(key, ev.clientId, participants.map((s) => ({
+            row: {
+              clientId: s.clientId,
+              eventClientId: ev.clientId,
+              serverId: s.id,
+              pelangganId: s.pelangganId ?? null,
+              berminat: s.berminat ? 1 : 0,
+              convStatus: s.convStatus,
+              needsReview: s.needsReview ? 1 : 0,
+              createdAt: s.createdAt,
+              diambilPada: new Date().toISOString(),
+            },
+            secret: {
+              nama: s.nama, gender: s.gender, usia: String(s.usia), hp: s.hp,
+              imt: s.imt, paramsDiambil: (s.paramsDiambil ?? []) as ParamKey[],
+            },
+          })));
+        } catch { /* cermin gagal ditulis; tampilan tetap benar */ }
+      }
+    } catch { /* offline atau gagal: cermin di bawah yang menutupinya */ }
+  }
+
+  // Cermin dipakai HANYA bila server tidak terjawab. Saat online, jawaban
+  // server selalu lebih baru; menimpanya dengan salinan akan memundurkan data.
+  if (!dapatDariServer) {
+    for (const c of await bacaCermin(key, ev.clientId)) {
+      const adaLokal = peta.get(c.clientId);
+      // Record yang masih mengantre di perangkat ini lebih baru daripada
+      // salinan server — jangan ditimpa oleh cermin yang lebih tua.
+      if (adaLokal?.belumSync) continue;
+      peta.set(c.clientId, {
+        serverId: c.serverId,
+        clientId: c.clientId,
+        nama: c.secret?.nama ?? 'Identitas terkunci',
+        gender: c.secret?.gender ?? 'P',
+        usia: c.secret?.usia ?? '',
+        hp: c.secret?.hp ?? '',
+        imt: c.secret?.imt ?? null,
+        paramsDiambil: c.secret?.paramsDiambil ?? [],
+        berminat: c.berminat === 1,
+        convStatus: c.convStatus,
+        needsReview: c.needsReview === 1,
+        belumSync: false,
+        terkunci: c.secret === null,
+        createdAt: c.createdAt,
+        pelangganId: c.pelangganId,
+        dariCermin: c.diambilPada,
+      });
+    }
   }
 
   return [...peta.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));

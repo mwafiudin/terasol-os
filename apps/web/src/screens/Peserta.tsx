@@ -218,6 +218,21 @@ export function EventPeserta({ go, event, onBuka, onTambah, reloadKey }: {
         </span>
       )}
 
+      {/* Kejujuran tentang asal daftar ini.
+          Saat tanpa jaringan, yang tampil adalah salinan yang diambil terakhir
+          kali — peserta yang baru saja didaftarkan rekan di meja sebelah belum
+          ada di dalamnya. Menyembunyikan itu membuat petugas menyangka orangnya
+          belum terdaftar, lalu mendaftarkannya kedua kali. */}
+      {(() => {
+        const salinan = tampil.map((p) => p.dariCermin).filter((w): w is string => !!w).sort().at(-1);
+        return salinan ? (
+          <span className="belum-note">
+            Tanpa jaringan — daftar ini salinan yang diambil {fmtWaktu(salinan)}.
+            Peserta yang dicatat perangkat lain sesudah itu belum terlihat.
+          </span>
+        ) : null;
+      })()}
+
       {tampil.map((p) => {
         const conv = CONV_LABEL[p.convStatus ?? 'baru']!;
         return (
@@ -342,7 +357,15 @@ export function PesertaDetail({ go, peserta, onUbah, onAnalisis }: {
   // Riwayat lintas-event hidup di server: ia menyatukan kunjungan-kunjungan
   // yang di perangkat ini tidak pernah terlihat bersama. Selama peserta belum
   // tersinkron, tab riwayat memang belum punya apa-apa untuk ditampilkan.
-  const pelangganId = server?.pelangganId ?? null;
+  /**
+   * Server dulu, cermin sesudahnya.
+   *
+   * Sebelum ini nilainya HANYA dari `api.participantDetail`, sehingga petugas
+   * tanpa sinyal tidak pernah memilikinya — dan tanpa `pelangganId`, layar ini
+   * jatuh ke mode baca-saja. Persis pada petugas stasiun kedua yang justru
+   * datang untuk mengukur.
+   */
+  const pelangganId = server?.pelangganId ?? peserta.pelangganId ?? null;
 
   // Persetujuan dan tindak lanjut adalah catatan administratif — keduanya
   // milik kunjungan, bukan milik orangnya, dan mendorong turun hal yang
