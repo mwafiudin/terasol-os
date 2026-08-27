@@ -1307,7 +1307,6 @@ button { cursor: pointer; font-family: inherit; }
   .screen > .page > .segtabs,
   .screen > .page > .cari-kotak,
   .screen > .page > .chip-baris,
-  .screen > .page > .toolbar,
   .screen > .page > .warn-card,
   .screen > .page > .belum-note,
   .screen > .page > .empty-card,
@@ -1359,26 +1358,6 @@ button { cursor: pointer; font-family: inherit; }
   font-variant-numeric: tabular-nums;
 }
 
-/* Baris alat: keterangan atau penyaring di kiri, aksi di kanan.
-   Bentuk ini yang membedakan layar KELOLA dari layar TUGAS. Layar tugas punya
-   satu aksi utama dan berhak atas tombol pil selebar layar; layar kelola punya
-   daftar, dan tombol sebesar itu di atasnya menindih pekerjaan sebenarnya. */
-.toolbar {
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  min-height: 40px;
-}
-.toolbar > .chip-baris { flex: 1 1 auto; min-width: 0; margin: 0; }
-/* Di layar sempit keduanya tidak muat berdampingan, dan penyaring yang
-   terpotong separuh kata lebih buruk daripada dua baris. */
-@media (max-width: 559px) {
-  .toolbar > .chip-baris { flex-basis: 100%; }
-}
-.toolbar-judul {
-  flex: 1; min-width: 0;
-  font-size: 12px; font-weight: var(--fw-semibold); letter-spacing: .06em;
-  text-transform: uppercase; color: var(--text-muted);
-}
-.toolbar > .btn { flex: 0 0 auto; margin-left: auto; }
 
 /* ================== Panel: kepala alat menyatu dengan daftar ==================
    Aksi "Tambah" duduk di dalam permukaan yang sama dengan daftar yang ia
@@ -1392,6 +1371,12 @@ button { cursor: pointer; font-family: inherit; }
   border-bottom: 1px solid var(--border-hairline);
 }
 .panel-head > .chip-baris { flex: 1 1 auto; min-width: 0; margin: 0; }
+/* Keterangan ringkas di kiri kepala panel, saat tak ada penyaring. */
+.toolbar-judul {
+  flex: 1 1 auto; min-width: 0;
+  font-size: 12px; font-weight: var(--fw-semibold); letter-spacing: .06em;
+  text-transform: uppercase; color: var(--text-muted);
+}
 .panel-head > .btn { flex: 0 0 auto; margin-left: auto; }
 @media (max-width: 559px) {
   .panel-head > .chip-baris { flex-basis: 100%; }
@@ -1421,8 +1406,6 @@ button { cursor: pointer; font-family: inherit; }
   max-width: 42ch; margin: 0 auto;
 }
 
-/* Baris alat yang memang berdiri sendiri (daftar kartu, bukan baris). */
-.toolbar-lepas { padding: 0 2px; }
 
 /* Judul yang hanya untuk pembaca layar. */
 .sr-only {
@@ -1481,38 +1464,55 @@ button { cursor: pointer; font-family: inherit; }
 
 .tabel { width: 100%; border-collapse: collapse; }
 
-/* ---- Bentuk kartu (di bawah 1100px) ---- */
+/* ---- Bentuk kartu (di bawah 1100px) ----
+   Sel sekunder mengalir jadi SATU kalimat berpemisah titik-tengah, bukan satu
+   baris berlabel masing-masing. Empat baris label untuk empat angka pendek
+   membuat daftar pendek pun perlu digulir, dan di ponsel itu ongkos nyata. */
 @media (max-width: 1099px) {
-  .tabel, .tabel tbody, .tabel tr, .tabel td { display: block; width: 100%; }
+  .tabel, .tabel tbody, .tabel tr { display: block; width: 100%; }
   .tabel thead { display: none; }
-  .tabel tr { padding: 12px 16px; }
+  .tabel tr { position: relative; padding: 11px 16px; }
   .tabel tbody tr:not(:first-child),
   .tabel tbody + tbody tr:first-child { border-top: 1px solid var(--border-hairline); }
-  .tabel td {
-    display: flex; align-items: baseline; justify-content: space-between;
-    gap: 14px; padding: 3px 0; font-size: 13.5px;
+
+  .tabel td { display: block; padding: 0; }
+  .tabel td::before { content: none; }
+
+  /* Nama menyisakan ruang untuk tombol aksi yang naik ke barisnya. */
+  .tabel .kol-nama { padding-right: 84px; }
+
+  .tabel td.ringkas {
+    display: inline; font-size: 12.5px; color: var(--text-muted);
+    line-height: 1.7;
   }
-  /* Label kolom dibawa turun jadi label baris — bentuk yang sama dengan
-     daftar ringkasan di layar lain, sehingga tak terasa sebagai pola baru. */
-  .tabel td::before {
-    content: attr(data-label);
-    color: var(--text-muted); font-size: 12.5px; flex: 0 0 auto;
+  .tabel td.ringkas:not(:nth-last-child(2))::after { content: ' · '; }
+
+  /* Aksi naik sejajar nama alih-alih memakan barisnya sendiri. */
+  .tabel .kol-aksi { position: absolute; top: 8px; right: 10px; }
+  /* Kecuali saat konfirmasi hapus: kalimatnya butuh lebar penuh. */
+  .tabel .kol-aksi:has(.hapus-konfirm) {
+    position: static; padding-top: 8px;
   }
-  .tabel td:not([data-label]) { justify-content: flex-end; }
-  .tabel .kol-nama { display: block; padding-bottom: 6px; }
-  .tabel .kol-nama::before { display: none; }
-  .tabel .kol-aksi { padding-top: 8px; }
-  /* Baris kelompok jadi sub-judul kartu. */
-  .tabel .baris-grup { padding: 0; border: 0; }
+  .tabel .kol-aksi:has(.hapus-konfirm) .hapus-konfirm { justify-content: flex-start; }
+  /* Tombol teks (Nonaktifkan/Aktifkan) tidak muat di sudut bersama nama. */
+  .tabel .kol-aksi:has(> .btn) { position: static; padding-top: 8px; text-align: right; }
+  .tabel .kol-aksi:has(> .btn) ~ .kol-nama, .tabel tr:has(.kol-aksi > .btn) .kol-nama { padding-right: 0; }
+
   .tabel .baris-grup td {
-    padding: 10px 16px 4px; justify-content: flex-start;
-    font-size: 11.5px; font-weight: var(--fw-semibold); letter-spacing: .07em;
-    text-transform: uppercase; color: var(--text-muted);
+    padding: 4px 0 2px; font-size: 11px; font-weight: var(--fw-semibold);
+    letter-spacing: .07em; text-transform: uppercase; color: var(--text-muted);
   }
-  .tabel .baris-cabang td {
-    background: var(--brand-tint); color: var(--teal-800); padding: 8px 16px;
+  .tabel .baris-grup { padding: 6px 16px 0; }
+  .tabel .baris-cabang {
+    background: var(--brand-tint); padding: 7px 16px;
   }
+  .tabel .baris-cabang td { color: var(--teal-800); padding: 0; }
 }
+
+/* Kata yang hanya masuk akal pada bentuk kartu — di tabel, kolomnya sudah
+   menyebutkan hal yang sama di kepala. */
+.hanya-kartu { display: none; }
+@media (max-width: 1099px) { .hanya-kartu { display: inline; } }
 
 /* ---- Bentuk tabel (mulai 1100px) ---- */
 @media (min-width: 1100px) {
