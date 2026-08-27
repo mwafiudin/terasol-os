@@ -37,6 +37,17 @@ export async function buildServer() {
   await app.register(cors, {
     origin: env.corsOrigin === '*' ? true : env.corsOrigin.split(',').map((s) => s.trim()),
     credentials: true,
+    /**
+     * Daftar metode WAJIB ditulis eksplisit.
+     *
+     * Tanpa ini balasan preflight hanya memuat GET, HEAD, dan POST — himpunan
+     * "safelisted" CORS — sehingga setiap PATCH, PUT, dan DELETE dari browser
+     * ditolak sebelum sampai ke server. Uji end-to-end tidak menangkapnya
+     * karena berjalan dari Node, yang tidak mengenal preflight sama sekali;
+     * gejalanya hanya muncul di browser sungguhan, berupa tombol yang ditekan
+     * lalu diam.
+     */
+    methods: ['GET', 'HEAD', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
   });
   await app.register(jwt, {
     secret: env.jwtSecret,

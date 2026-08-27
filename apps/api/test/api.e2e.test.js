@@ -82,6 +82,29 @@ describe('Alur API end-to-end', () => {
     assert.equal(r.status, 401);
   });
 
+  it('preflight CORS mengizinkan metode yang benar-benar dipakai aplikasi', async () => {
+    // Regresi: balasan preflight pernah hanya memuat GET, HEAD, dan POST —
+    // himpunan "safelisted" CORS — sehingga setiap PATCH, PUT, dan DELETE dari
+    // browser ditolak sebelum menyentuh server. Seluruh uji lain di berkas ini
+    // buta terhadap itu: mereka berjalan dari Node, yang tidak pernah mengirim
+    // preflight. Gejalanya hanya terlihat di browser, berupa tombol yang
+    // ditekan lalu diam.
+    const res = await fetch(`${API}/participants/x/conversion`, {
+      method: 'OPTIONS',
+      headers: {
+        origin: 'https://contoh.invalid',
+        'access-control-request-method': 'PATCH',
+        'access-control-request-headers': 'authorization,content-type',
+      },
+    });
+    const izin = (res.headers.get('access-control-allow-methods') ?? '')
+      .split(',').map((m) => m.trim().toUpperCase());
+
+    for (const m of ['PATCH', 'PUT', 'DELETE']) {
+      assert.ok(izin.includes(m), `preflight harus mengizinkan ${m}, dapat: ${izin.join(',')}`);
+    }
+  });
+
   it('endpoint terlindungi menolak request tanpa token', async () => {
     const saved = token; token = null;
     const r = await call('/events');
