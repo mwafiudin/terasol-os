@@ -107,20 +107,25 @@ function TabKatalog({ pusat }: { pusat: boolean }) {
     <>
       {gagal && <div className="belum-note">{gagal}</div>}
 
-      <Button size="lg" full icon={ICONS.plus} onClick={() => setForm({ awal: null })}>
-        Tambah produk atau layanan
-      </Button>
-
-      {pusat && (
-        <div className="chip-baris">
-          <button className={`chip ${!semua ? 'on' : ''}`} onClick={() => setSemua(false)}>
-            Cabang saya
-          </button>
-          <button className={`chip ${semua ? 'on' : ''}`} onClick={() => setSemua(true)}>
-            Semua cabang
-          </button>
-        </div>
-      )}
+      {/* Aksi tambah duduk di baris alat bersama penyaringnya, bukan sebagai
+          pita selebar layar di atas daftar. Tombol pil setinggi 58px adalah
+          pola untuk satu aksi utama layar tugas — di layar yang pekerjaannya
+          memindai dan menyunting daftar, ia menindih pekerjaan itu sendiri. */}
+      <div className="toolbar">
+        {pusat ? (
+          <div className="chip-baris">
+            <button className={`chip ${!semua ? 'on' : ''}`} onClick={() => setSemua(false)}>
+              Cabang saya
+            </button>
+            <button className={`chip ${semua ? 'on' : ''}`} onClick={() => setSemua(true)}>
+              Semua cabang
+            </button>
+          </div>
+        ) : <span className="toolbar-judul">{rows.length} entri</span>}
+        <Button size="sm" icon={ICONS.plus} onClick={() => setForm({ awal: null })}>
+          Tambah
+        </Button>
+      </div>
 
       {/* Keadaan kosong hanya sah bila pemuatannya berhasil. Menampilkan
           "gagal memuat" dan "masih kosong" bersamaan mengatakan dua hal yang
@@ -337,9 +342,13 @@ function TabTim() {
   return (
     <>
       {!buka && (
-        <Button size="lg" full icon={ICONS.userPlus} onClick={() => setBuka(true)}>
-          Tambah anggota tim
-        </Button>
+        <div className="toolbar">
+          <span className="toolbar-judul">
+            {rows.filter((u) => u.active).length} akun aktif
+            {rows.some((u) => !u.active) ? ` · ${rows.filter((u) => !u.active).length} nonaktif` : ''}
+          </span>
+          <Button size="sm" icon={ICONS.userPlus} onClick={() => setBuka(true)}>Tambah</Button>
+        </div>
       )}
 
       {buka && (
@@ -420,7 +429,10 @@ function TabCabang({ tenantSaya }: { tenantSaya: string | null }) {
   return (
     <>
       {!buka && (
-        <Button size="lg" full icon={ICONS.plus} onClick={() => setBuka(true)}>Tambah cabang</Button>
+        <div className="toolbar">
+          <span className="toolbar-judul">{rows.length} cabang</span>
+          <Button size="sm" icon={ICONS.plus} onClick={() => setBuka(true)}>Tambah</Button>
+        </div>
       )}
 
       {buka && (
