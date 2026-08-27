@@ -306,7 +306,7 @@ export function Home({ go, onFollowUp, reloadKey }: Props) {
         <button className="menu-item" onClick={() => go('produk')}>
           <span className="ic"><Icon d={ICONS.cart} size={19} /></span>
           <span className="tx">
-            <b>Produk KK</b><span>Kandungan dan keterangan produsen</span>
+            <b>Produk</b><span>Kandungan, aturan pakai, dan harga daftar</span>
           </span>
           <Icon d={ICONS.chevR} />
         </button>

@@ -16,7 +16,7 @@ import { Home } from './screens/Home';
 import { Consent, Done, Register, Screening } from './screens/Participant';
 import { EventPeserta, PesertaDetail, type SasaranAnalisis } from './screens/Peserta';
 import { Analisis } from './screens/Analisis';
-import { ProdukKK } from './screens/Produk';
+import { ProdukKatalog } from './screens/Produk';
 
 type Screen =
   | 'home' | 'events' | 'outlet' | 'hs'
@@ -124,7 +124,7 @@ export default function App() {
     }] : []),
     // Terbuka untuk semua peran: pertanyaan 'ini isinya apa' datang di meja,
     // bukan di kantor, dan yang ditanya adalah petugas.
-    { id: 'produk', label: 'Produk KK', icon: ICONS.cart },
+    { id: 'produk', label: 'Produk', icon: ICONS.cart },
     { id: 'settings', label: 'Pengaturan', icon: ICONS.gear },
   ];
 
@@ -182,7 +182,7 @@ export default function App() {
         {screen === 'master' && koordinator && (
           <Master go={go} tab={masterTab} onTab={setMasterTab} />
         )}
-        {screen === 'produk' && <ProdukKK go={go} />}
+        {screen === 'produk' && <ProdukKatalog go={go} />}
         {screen === 'outlet' && <Placeholder kind="outlet" />}
         {screen === 'hs' && <Placeholder kind="hs" />}
       </main>
