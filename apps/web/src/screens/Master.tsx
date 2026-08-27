@@ -21,21 +21,31 @@ const JENIS: { k: JenisTransaksi; label: string; tone: string }[] = [
  * Admin Pusat bisa meminta pandangan lintas cabang secara sadar. Membatasi di
  * lapisan tampilan saja akan menjadi pagar yang bisa dilangkahi.
  */
-export function Master({ go }: { go: Nav }) {
+export type MasterTab = 'katalog' | 'tim' | 'cabang';
+
+/**
+ * Tab dikendalikan dari luar supaya sub-menu sidebar bisa mengarahkannya
+ * langsung. Di layar ≥1100px judul dan tab di dalam halaman disembunyikan —
+ * sidebar sudah menyebut keduanya, dan mengulangnya berarti empat baris krom
+ * sebelum satu pun isi terlihat.
+ */
+export function Master({ go, tab, onTab }: { go: Nav; tab: MasterTab; onTab: (t: MasterTab) => void }) {
   const { user } = useApp();
   const pusat = user?.role === 'admin_pusat';
-  const [tab, setTab] = useState<'katalog' | 'tim' | 'cabang'>('katalog');
 
   const daftarTab = [
     { id: 'katalog' as const, label: 'Produk & layanan', icon: ICONS.tag },
     { id: 'tim' as const, label: 'Tim', icon: ICONS.users },
     ...(pusat ? [{ id: 'cabang' as const, label: 'Cabang', icon: ICONS.outlet }] : []),
   ];
+  const judulTab = daftarTab.find((t) => t.id === tab)?.label ?? 'Master data';
 
   return (
-    <div className="page">
+    <div className="page page-master">
       <PageHead title="Master data" onBack={() => go('home')}
         right={<Badge tone="accent">{ROLE_LABEL[user?.role ?? ''] ?? user?.role}</Badge>} />
+      {/* Judul tetap ada bagi pembaca layar meski tersembunyi di sidebar-layout. */}
+      <h1 className="sr-only">Master data — {judulTab}</h1>
 
       <span className="recap-sub">
         <span>
@@ -45,7 +55,7 @@ export function Master({ go }: { go: Nav }) {
         </span>
       </span>
 
-      <SegTabs tabs={daftarTab} active={tab} onSelect={setTab} />
+      <SegTabs tabs={daftarTab} active={tab} onSelect={onTab} />
 
       {tab === 'katalog' && <TabKatalog pusat={pusat} />}
       {tab === 'tim' && <TabTim />}
@@ -107,51 +117,53 @@ function TabKatalog({ pusat }: { pusat: boolean }) {
     <>
       {gagal && <div className="belum-note">{gagal}</div>}
 
-      {/* Aksi tambah duduk di baris alat bersama penyaringnya, bukan sebagai
-          pita selebar layar di atas daftar. Tombol pil setinggi 58px adalah
-          pola untuk satu aksi utama layar tugas — di layar yang pekerjaannya
-          memindai dan menyunting daftar, ia menindih pekerjaan itu sendiri. */}
-      <div className="toolbar">
-        {pusat ? (
-          <div className="chip-baris">
-            <button className={`chip ${!semua ? 'on' : ''}`} onClick={() => setSemua(false)}>
-              Cabang saya
-            </button>
-            <button className={`chip ${semua ? 'on' : ''}`} onClick={() => setSemua(true)}>
-              Semua cabang
-            </button>
-          </div>
-        ) : <span className="toolbar-judul">{rows.length} entri</span>}
-        <Button size="sm" icon={ICONS.plus} onClick={() => setForm({ awal: null })}>
-          Tambah
-        </Button>
-      </div>
-
-      {/* Keadaan kosong hanya sah bila pemuatannya berhasil. Menampilkan
-          "gagal memuat" dan "masih kosong" bersamaan mengatakan dua hal yang
-          bertentangan, dan yang kedua adalah dugaan yang tidak kita ketahui. */}
-      {rows.length === 0 && !gagal && (
-        <div className="card empty-card">
-          <div className="ic"><Icon d={ICONS.tag} size={26} /></div>
-          <b>Katalog masih kosong</b>
-          <p>
-            Isi dengan produk dan terapi yang benar-benar dijual di sini. Form
-            belanja akan memilih dari daftar ini, sehingga nama dan harganya
-            tidak perlu diketik ulang tiap kali.
-          </p>
+      {/* Baris alat menyatu dengan daftarnya dalam satu permukaan: aksi
+          "Tambah" jadi punya tambatan, alih-alih mengambang di ruang kosong
+          antara tab dan isi. */}
+      <div className="card panel">
+        <div className="panel-head">
+          {pusat ? (
+            <div className="chip-baris">
+              <button className={`chip ${!semua ? 'on' : ''}`} onClick={() => setSemua(false)}>
+                Cabang saya
+              </button>
+              <button className={`chip ${semua ? 'on' : ''}`} onClick={() => setSemua(true)}>
+                Semua cabang
+              </button>
+            </div>
+          ) : (
+            <span className="toolbar-judul">
+              {rows.length} entri{rows.some((k) => !k.aktif) ? ` · ${rows.filter((k) => !k.aktif).length} nonaktif` : ''}
+            </span>
+          )}
+          <Button size="sm" icon={ICONS.plus} onClick={() => setForm({ awal: null })}>
+            Tambah
+          </Button>
         </div>
-      )}
 
-      {grup.map((namaGrup) => (
-        <div className="master-grup" key={namaGrup}>
-          {namaGrup && <span className="section-title">{namaGrup}</span>}
-          {JENIS.map((j) => {
-            const isi = rows.filter((k) => kunciGrup(k) === namaGrup && k.jenis === j.k);
-            if (isi.length === 0) return null;
-            return (
-              <div key={j.k}>
-                <h3 className="ukur-grup-judul">{j.label}</h3>
-                <div className="card ukur-daftar">
+        {/* Keadaan kosong hanya sah bila pemuatannya berhasil. Menampilkan
+            "gagal memuat" dan "masih kosong" bersamaan mengatakan dua hal yang
+            bertentangan, dan yang kedua adalah dugaan yang tidak kita ketahui. */}
+        {rows.length === 0 && !gagal && (
+          <div className="panel-kosong">
+            <b>Katalog masih kosong</b>
+            <p>
+              Isi dengan produk dan terapi yang benar-benar dijual di sini. Form
+              belanja akan memilih dari daftar ini, sehingga nama dan harganya
+              tidak perlu diketik ulang tiap kali.
+            </p>
+          </div>
+        )}
+
+        {grup.map((namaGrup) => (
+          <div key={namaGrup}>
+            {namaGrup && <div className="panel-cabang">{namaGrup}</div>}
+            {JENIS.map((j) => {
+              const isi = rows.filter((k) => kunciGrup(k) === namaGrup && k.jenis === j.k);
+              if (isi.length === 0) return null;
+              return (
+                <div key={j.k}>
+                  <div className="panel-grup">{j.label}</div>
                   {isi.map((k) => (
                     <div className={`master-baris ${k.aktif ? '' : 'nonaktif'}`} key={k.id}>
                       <div className="master-isi">
@@ -194,11 +206,11 @@ function TabKatalog({ pusat }: { pusat: boolean }) {
                     </div>
                   ))}
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      ))}
+              );
+            })}
+          </div>
+        ))}
+      </div>
 
       {rows.length > 0 && (
         <small className="hint">
@@ -341,15 +353,6 @@ function TabTim() {
 
   return (
     <>
-      {!buka && (
-        <div className="toolbar">
-          <span className="toolbar-judul">
-            {rows.filter((u) => u.active).length} akun aktif
-            {rows.some((u) => !u.active) ? ` · ${rows.filter((u) => !u.active).length} nonaktif` : ''}
-          </span>
-          <Button size="sm" icon={ICONS.userPlus} onClick={() => setBuka(true)}>Tambah</Button>
-        </div>
-      )}
 
       {buka && (
         <div className="card consumable-card">
@@ -381,7 +384,16 @@ function TabTim() {
         </div>
       )}
 
-      <div className="card ukur-daftar">
+      <div className="card panel">
+        <div className="panel-head">
+          <span className="toolbar-judul">
+            {rows.filter((u) => u.active).length} akun aktif
+            {rows.some((u) => !u.active) ? ` · ${rows.filter((u) => !u.active).length} nonaktif` : ''}
+          </span>
+          {!buka && (
+            <Button size="sm" icon={ICONS.userPlus} onClick={() => setBuka(true)}>Tambah</Button>
+          )}
+        </div>
         {rows.map((u) => (
           <div className={`master-baris ${u.active ? '' : 'nonaktif'}`} key={u.id}>
             <div className="master-isi">
@@ -428,12 +440,12 @@ function TabCabang({ tenantSaya }: { tenantSaya: string | null }) {
 
   return (
     <>
-      {!buka && (
-        <div className="toolbar">
-          <span className="toolbar-judul">{rows.length} cabang</span>
+      <div className="toolbar toolbar-lepas">
+        <span className="toolbar-judul">{rows.length} cabang</span>
+        {!buka && (
           <Button size="sm" icon={ICONS.plus} onClick={() => setBuka(true)}>Tambah</Button>
-        </div>
-      )}
+        )}
+      </div>
 
       {buka && (
         <div className="card consumable-card">
