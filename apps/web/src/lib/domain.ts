@@ -75,6 +75,23 @@ export const CONV_LABEL: Record<string, { label: string; ringkas: string; tone: 
   batal: { label: 'Tidak jadi', ringkas: 'Tidak jadi', tone: 'sage' },
 };
 
+/**
+ * Waktu ringkas untuk baris daftar: "26 Agu · 19.34". Tahun hanya ikut bila
+ * bukan tahun ini — pada baris yang harus memuat nama, nilai, dan penilaian
+ * sekaligus, "2026" nyaris tidak pernah menjadi informasi baru.
+ */
+export function fmtWaktuSingkat(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  const tanggal = d.toLocaleDateString('id-ID', {
+    day: 'numeric', month: 'short',
+    ...(d.getFullYear() === new Date().getFullYear() ? {} : { year: 'numeric' }),
+  });
+  const jam = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  return `${tanggal} · ${jam}`;
+}
+
 export function fmtWaktu(iso: string | null | undefined): string {
   if (!iso) return '—';
   const d = new Date(iso);

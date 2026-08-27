@@ -443,6 +443,59 @@ describe('Alur API end-to-end', () => {
     await call(`/transaksi/${r.body.id}`, { method: 'DELETE' });
   });
 
+  it('menghapus pengukuran menyembunyikannya, bukan membuangnya', async () => {
+    // Hasil pengukuran adalah fakta pada satu momen dan tidak bisa diulang.
+    // Kalau yang terhapus ternyata bukan yang dimaksud, harus ada jalan pulang.
+    const buat = await call('/pengukuran', {
+      method: 'POST',
+      body: JSON.stringify({ pelangganId, jenis: 'kolesterol', nilai: 188 }),
+    });
+    assert.equal(buat.status, 201, JSON.stringify(buat.body));
+    const id = buat.body.id;
+
+    const adaSebelum = (await call(`/pelanggan/${pelangganId}/pengukuran`))
+      .body.pengukuran.some((x) => x.id === id);
+    assert.ok(adaSebelum);
+
+    assert.equal((await call(`/pengukuran/${id}`, { method: 'DELETE' })).status, 200);
+
+    const adaSesudah = (await call(`/pelanggan/${pelangganId}/pengukuran`))
+      .body.pengukuran.some((x) => x.id === id);
+    assert.equal(adaSesudah, false, 'yang terhapus tidak boleh ikut terbaca');
+
+    // Menghapus dua kali tidak berpura-pura berhasil.
+    assert.equal((await call(`/pengukuran/${id}`, { method: 'DELETE' })).status, 404);
+
+    // ...tapi barisnya masih ada dan bisa dipulihkan.
+    assert.equal((await call(`/pengukuran/${id}/pulihkan`, { method: 'POST' })).status, 200);
+    const adaLagi = (await call(`/pelanggan/${pelangganId}/pengukuran`))
+      .body.pengukuran.find((x) => x.id === id);
+    assert.ok(adaLagi, 'pengukuran harus bisa dipulihkan');
+    assert.equal(Number(adaLagi.nilai), 188, 'nilainya kembali utuh');
+
+    await call(`/pengukuran/${id}`, { method: 'DELETE' });
+  });
+
+  it('transaksi yang dihapus tidak ikut dihitung dalam total', async () => {
+    const awal = (await call(`/pelanggan/${pelangganId}/transaksi`)).body.total;
+    const r = await call('/transaksi', {
+      method: 'POST',
+      body: JSON.stringify({ pelangganId, nama: '__uji_hapus', jumlah: 1, hargaSatuan: 500000 }),
+    });
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+    assert.equal((await call(`/pelanggan/${pelangganId}/transaksi`)).body.total, awal + 500000);
+
+    await call(`/transaksi/${r.body.id}`, { method: 'DELETE' });
+    assert.equal(
+      (await call(`/pelanggan/${pelangganId}/transaksi`)).body.total, awal,
+      'total harus kembali seperti sebelum transaksi dibuat',
+    );
+
+    await call(`/transaksi/${r.body.id}/pulihkan`, { method: 'POST' });
+    assert.equal((await call(`/pelanggan/${pelangganId}/transaksi`)).body.total, awal + 500000);
+    await call(`/transaksi/${r.body.id}`, { method: 'DELETE' });
+  });
+
   it('daftar rekan hanya memuat nama dan peran, bukan email', async () => {
     const r = await call('/rekan');
     assert.equal(r.status, 200);

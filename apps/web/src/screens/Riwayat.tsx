@@ -1,16 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge, Button, Field, Icon, ICONS, Rujukan, Sheet } from '../components/ui';
 import { api, type PengukuranRow, type TransaksiRow, type JenisTransaksi } from '../lib/api';
-import { dec, fmtTanggal, fmtWaktu, num, rp } from '../lib/domain';
+import { dec, fmtTanggal, fmtWaktu, fmtWaktuSingkat, num, rp } from '../lib/domain';
 import {
-  DISCLAIMER, KATEGORI_LABEL, KONTEKS_GULA, UKUR, diLuarWajar, hitungImt, nilaiImt, nilaiUkur,
-  type Gender, type JenisUkur, type KategoriUkur, type KonteksGula, type Nada,
+  DISCLAIMER, KATEGORI_LABEL, KONTEKS_GULA, UKUR, diLuarWajar, hitungImt, nilaiImt,
+  nilaiTensi, nilaiUkur,
+  type Gender, type JenisUkur, type KategoriUkur, type KonteksGula, type Penilaian,
 } from '../lib/rujukan';
 import { useApp } from '../lib/store';
-
-const NADA_TONE: Record<Nada, string> = {
-  normal: 'success', perhatian: 'warning', tinggi: 'danger', rendah: 'warning', netral: 'sage',
-};
+import { PapanUkur, PilihGrup, type Grup } from './PapanUkur';
 
 const KATEGORI_URUT: KategoriUkur[] = ['antropometri', 'tensi', 'darah'];
 const JENIS_URUT = Object.keys(UKUR) as JenisUkur[];
@@ -26,17 +24,24 @@ function fmtNilai(jenis: JenisUkur, nilai: number): string {
 
 /* ========================= Tab: Hasil Pengukuran ========================= */
 
-export function TabPengukuran({ pelangganId, participantId, gender, onUbah }: {
+export function TabPengukuran({ pelangganId, participantId, gender, nama, onUbah }: {
   pelangganId: string;
   participantId: string | null;
   gender: Gender;
+  /** Nama pelanggan, ditampilkan di kepala papan ukur. */
+  nama: string;
   onUbah?: () => void;
 }) {
   const { user, say } = useApp();
   const [rows, setRows] = useState<PengukuranRow[] | null>(null);
   const [rekan, setRekan] = useState<Rekan[]>([]);
-  const [buka, setBuka] = useState<Set<JenisUkur>>(new Set());
-  const [form, setForm] = useState<{ mode: 'baru' } | { mode: 'ubah'; row: PengukuranRow } | null>(null);
+  // Berisi kunci deret, bukan jenis: gula darah punya satu baris per konteks.
+  const [buka, setBuka] = useState<Set<string>>(new Set());
+  // Mencatat berjalan dua tahap: pilih kelompok alat, lalu papan angka.
+  // Mengubah satu nilai tetap lewat form biasa — di sana yang dibutuhkan bukan
+  // kecepatan mengetik, melainkan melihat konteks lengkap satu rekaman.
+  const [catat, setCatat] = useState<{ tahap: 'grup' } | { tahap: 'papan'; grup: Grup; konteks: KonteksGula } | null>(null);
+  const [form, setForm] = useState<{ mode: 'ubah'; row: PengukuranRow } | null>(null);
   // Konfirmasi hapus dibuat di dalam aplikasi, bukan lewat `confirm()` bawaan
   // browser: dialog itu tampak asing di PWA terpasang, dan sebagian browser
   // meredamnya diam-diam — penghapusan yang tampak tidak terjadi apa-apa.
@@ -55,29 +60,11 @@ export function TabPengukuran({ pelangganId, participantId, gender, onUbah }: {
     void api.rekan().then((r) => setRekan(r.rekan)).catch(() => setRekan([]));
   }, []);
 
-  /**
-   * Riwayat dikelompokkan per jenis, terbaru dulu. Gula darah dipisah lagi
-   * per konteks: menggabungkan GDP dan GD2PP dalam satu deret akan membuat
-   * grafiknya naik-turun tanpa arti, karena keduanya memang tidak sebanding.
-   */
-  const deret = useMemo(() => {
-    const peta = new Map<string, { jenis: JenisUkur; konteks: KonteksGula | null; baris: PengukuranRow[] }>();
-    for (const r of rows ?? []) {
-      const kunci = r.jenis === 'gula' ? `gula:${r.konteks ?? 'sewaktu'}` : r.jenis;
-      if (!peta.has(kunci)) {
-        peta.set(kunci, { jenis: r.jenis, konteks: r.jenis === 'gula' ? (r.konteks ?? 'sewaktu') : null, baris: [] });
-      }
-      peta.get(kunci)!.baris.push(r);
-    }
-    for (const d of peta.values()) {
-      d.baris.sort((a, b) => b.diukurPada.localeCompare(a.diukurPada));
-    }
-    return peta;
-  }, [rows]);
+  const deret = useMemo(() => bangunDeret(rows ?? [], gender), [rows, gender]);
 
   const terbaru = (jenis: JenisUkur): number | null => {
-    for (const d of deret.values()) if (d.jenis === jenis && d.baris[0]) return angka(d.baris[0].nilai);
-    return null;
+    const d = deret.find((x) => x.jenis === jenis);
+    return d?.titik[0]?.nilai ?? null;
   };
 
   const imt = hitungImt(terbaru('tinggi'), terbaru('berat'));
@@ -93,59 +80,72 @@ export function TabPengukuran({ pelangganId, participantId, gender, onUbah }: {
 
   if (rows === null) return <span className="hint">Memuat riwayat…</span>;
 
-  const kunci = [...deret.entries()].sort(
-    (a, b) => JENIS_URUT.indexOf(a[1].jenis) - JENIS_URUT.indexOf(b[1].jenis),
-  );
+  const imtNilai = imt == null ? null : nilaiImt(imt);
+  const tinggi = terbaru('tinggi');
+  const berat = terbaru('berat');
 
   return (
     <>
       {gagal && <div className="belum-note">{gagal}</div>}
 
-      <Button size="lg" full icon={ICONS.plus} onClick={() => setForm({ mode: 'baru' })}>
-        Catat pengukuran
-      </Button>
-
-      {rows.length === 0 && (
+      {rows.length === 0 ? (
         <div className="card empty-card">
           <div className="ic"><Icon d={ICONS.pulse} size={26} /></div>
           <b>Belum ada pengukuran</b>
           <p>Setiap hasil yang dicatat di sini tersimpan dengan waktu dan petugasnya.</p>
+          <Button size="sm" icon={ICONS.plus} onClick={() => setCatat({ tahap: 'grup' })}>
+            Catat pengukuran
+          </Button>
         </div>
+      ) : (
+        <Button size="lg" full icon={ICONS.plus} onClick={() => setCatat({ tahap: 'grup' })}>
+          Catat pengukuran
+        </Button>
       )}
 
-      {imt != null && (
-        <div className="card ukur-card">
-          <div className="ukur-atas">
-            <span className="ukur-label">Indeks Massa Tubuh</span>
-            <Badge tone={NADA_TONE[nilaiImt(imt).nada]}>{nilaiImt(imt).label}</Badge>
+      {/* IMT adalah satu-satunya angka turunan di layar ini — bukan hasil
+          pengukuran, melainkan kesimpulan dari dua di antaranya. Permukaannya
+          dibedakan supaya perannya terbaca tanpa perlu dijelaskan. */}
+      {imtNilai && (
+        <div className="imt-kartu">
+          <div className="imt-atas">
+            <span className="imt-judul">Indeks Massa Tubuh</span>
+            <span className={`vonis vonis-${imtNilai.nada}`}>{imtNilai.singkat}</span>
           </div>
-          <div className="ukur-nilai"><b>{dec(imt)}</b><span>kg/m²</span></div>
-          <small>Dihitung dari tinggi dan berat terbaru.</small>
-          <Rujukan sumber={nilaiImt(imt).sumber} />
+          <p className="imt-nilai"><b>{dec(imt!)}</b><span>kg/m²</span></p>
+          <p className="imt-asal">
+            dari {tinggi != null ? `${fmtNilai('tinggi', tinggi)} cm` : 'tinggi'}
+            {' · '}{berat != null ? `${fmtNilai('berat', berat)} kg` : 'berat'} terbaru
+          </p>
+          <p className="imt-sumber">{imtNilai.sumber}</p>
         </div>
       )}
 
       {KATEGORI_URUT.map((kat) => {
-        const isi = kunci.filter(([, d]) => UKUR[d.jenis].kategori === kat);
+        const isi = deret.filter((d) => UKUR[d.jenis].kategori === kat);
         if (isi.length === 0) return null;
         return (
-          <div key={kat}>
-            <span className="section-title">{KATEGORI_LABEL[kat]}</span>
-            {isi.map(([k, d]) => (
-              <KartuUkur key={k} deret={d} gender={gender}
-                pasangan={d.jenis === 'sistolik' ? terbaru('diastolik')
-                  : d.jenis === 'diastolik' ? terbaru('sistolik') : null}
-                terbuka={buka.has(d.jenis) || d.jenis === 'gula'}
-                onToggle={() => setBuka((s) => {
-                  const n = new Set(s); n.has(d.jenis) ? n.delete(d.jenis) : n.add(d.jenis); return n;
-                })}
-                bolehHapus={bolehHapus}
-                konfirmHapus={konfirmHapus}
-                onUbah={(row) => setForm({ mode: 'ubah', row })}
-                onMintaHapus={setKonfirmHapus}
-                onHapus={(row) => void hapus(row)} />
-            ))}
-          </div>
+          <section className="ukur-grup" key={kat}>
+            <h3 className="ukur-grup-judul">{KATEGORI_LABEL[kat]}</h3>
+            {/* Satu kartu per kategori, bukan per angka. Enam kartu setinggi
+                layar dengan bobot identik membuat tidak ada yang menonjol. */}
+            <div className="card ukur-daftar">
+              {isi.map((d) => (
+                <BarisUkur key={d.kunci} deret={d}
+                  terbuka={buka.has(d.kunci)}
+                  onToggle={() => setBuka((s) => {
+                    const n = new Set(s);
+                    if (n.has(d.kunci)) n.delete(d.kunci); else n.add(d.kunci);
+                    return n;
+                  })}
+                  bolehHapus={bolehHapus}
+                  konfirmHapus={konfirmHapus}
+                  onUbah={(row) => setForm({ mode: 'ubah', row })}
+                  onMintaHapus={setKonfirmHapus}
+                  onHapus={(row) => void hapus(row)} />
+              ))}
+            </div>
+          </section>
         );
       })}
 
@@ -155,21 +155,59 @@ export function TabPengukuran({ pelangganId, participantId, gender, onUbah }: {
         </Rujukan>
       )}
 
+      {catat?.tahap === 'grup' && (
+        <Sheet title="Catat pengukuran" subtitle={nama}
+          onClose={() => setCatat(null)}>
+          <PilihGrup
+            onBatal={() => setCatat(null)}
+            onPilih={(g) => setCatat({
+              tahap: 'papan', grup: g,
+              konteks: g.slot.find((s) => s.jenis === 'gula')?.konteks ?? 'sewaktu',
+            })} />
+        </Sheet>
+      )}
+
+      {catat?.tahap === 'papan' && (
+        <PapanUkur
+          judul={nama}
+          grup={catat.grup}
+          konteksGula={catat.konteks}
+          tinggiAcuan={terbaru('tinggi')}
+          beratAcuan={terbaru('berat')}
+          onBatal={() => setCatat(null)}
+          onSimpan={async (isi) => {
+            try {
+              // Satu waktu ukur untuk seluruh kelompok: ketiganya memang
+              // diambil dalam satu sesi, dan waktu yang identik itulah yang
+              // nanti memasangkan sistolik dengan diastoliknya.
+              const diukurPada = new Date().toISOString();
+              for (const x of isi) {
+                await api.createPengukuran({
+                  pelangganId, participantId,
+                  jenis: x.slot.jenis,
+                  konteks: x.slot.konteks,
+                  nilai: x.nilai,
+                  diukurPada,
+                  outOfRange: x.outOfRange,
+                });
+              }
+              say(`${isi.length} pengukuran tercatat.`);
+              setCatat(null);
+              await muat(); onUbah?.();
+            } catch { say('Gagal menyimpan. Periksa koneksi.'); }
+          }} />
+      )}
+
       {form && (
         <FormPengukuran
-          awal={form.mode === 'ubah' ? form.row : null}
+          awal={form.row}
           rekan={rekan}
           userId={user?.id ?? null}
           onTutup={() => setForm(null)}
           onSimpan={async (nilaiBaru) => {
             try {
-              if (form.mode === 'ubah') {
-                await api.updatePengukuran(form.row.id, nilaiBaru);
-                say('Pengukuran diperbarui.');
-              } else {
-                await api.createPengukuran({ ...nilaiBaru, pelangganId, participantId } as never);
-                say('Pengukuran tercatat.');
-              }
+              await api.updatePengukuran(form.row.id, nilaiBaru);
+              say('Pengukuran diperbarui.');
               setForm(null);
               await muat(); onUbah?.();
             } catch { say('Gagal menyimpan. Periksa koneksi.'); }
@@ -179,13 +217,142 @@ export function TabPengukuran({ pelangganId, participantId, gender, onUbah }: {
   );
 }
 
-function KartuUkur({
-  deret, gender, pasangan, terbuka, onToggle,
-  bolehHapus, konfirmHapus, onUbah, onMintaHapus, onHapus,
+/* --------------------------- model tampilan --------------------------- */
+
+/** Satu pembacaan pada satu waktu. Bisa ditopang dua rekaman (tensi). */
+type Titik = {
+  waktu: string;
+  tampil: string;
+  /** Nilai tunggal untuk menghitung selisih; null bila berpasangan. */
+  nilai: number | null;
+  penilaian: Penilaian | null;
+  outOfRange: boolean;
+  oleh: string | null;
+  event: string | null;
+  catatan: string | null;
+  rekaman: PengukuranRow[];
+};
+
+type Deret = {
+  kunci: string;
+  /** Jenis wakil — menentukan kategori dan satuan deret. */
+  jenis: JenisUkur;
+  nama: string;
+  kode: string | null;
+  /** Arti kode, dieja saat baris dibuka. */
+  keterangan: string | null;
+  satuan: string;
+  titik: Titik[];
+};
+
+/**
+ * Menyusun rekaman mentah menjadi deret yang bisa dibaca manusia.
+ *
+ * Dua penggabungan yang tidak bisa diserahkan ke tampilan:
+ *
+ *   Sistolik dan diastolik disatukan jadi "119/79". Tekanan darah dibaca,
+ *   ditulis, dan dinilai sebagai satu angka; menampilkannya sebagai dua baris
+ *   membuat vonis yang sama tercetak dua kali dari data yang sama.
+ *
+ *   Gula darah tetap dipisah per konteks. GDP dan GD2PP tidak sebanding, jadi
+ *   menyatukannya jadi satu deret akan menghasilkan naik-turun tanpa arti.
+ */
+function bangunDeret(rows: PengukuranRow[], gender: Gender): Deret[] {
+  const ember = new Map<string, PengukuranRow[]>();
+  for (const r of rows) {
+    const k = r.jenis === 'gula' ? `gula:${r.konteks ?? 'sewaktu'}`
+      : r.jenis === 'sistolik' || r.jenis === 'diastolik' ? 'tensi'
+        : r.jenis;
+    if (!ember.has(k)) ember.set(k, []);
+    ember.get(k)!.push(r);
+  }
+
+  const hasil: Deret[] = [];
+
+  for (const [kunci, isi] of ember) {
+    isi.sort((a, b) => b.diukurPada.localeCompare(a.diukurPada));
+
+    if (kunci === 'tensi') {
+      // Dipasangkan lewat waktu ukur: satu screening menulis kedua angka
+      // dengan timestamp yang sama persis.
+      const perWaktu = new Map<string, PengukuranRow[]>();
+      for (const r of isi) {
+        if (!perWaktu.has(r.diukurPada)) perWaktu.set(r.diukurPada, []);
+        perWaktu.get(r.diukurPada)!.push(r);
+      }
+      const titik: Titik[] = [...perWaktu.entries()].map(([waktu, pasangan]) => {
+        const sis = pasangan.find((r) => r.jenis === 'sistolik');
+        const dia = pasangan.find((r) => r.jenis === 'diastolik');
+        const s = sis ? angka(sis.nilai) : null;
+        const d = dia ? angka(dia.nilai) : null;
+        const utama = sis ?? dia!;
+        return {
+          waktu,
+          // Yang tidak terukur ditulis "–", bukan disembunyikan: pembacaan
+          // tensi yang hanya separuh adalah fakta yang perlu terlihat.
+          tampil: s != null && d != null
+            ? `${Math.round(s)}/${Math.round(d)}`
+            : `${s != null ? Math.round(s) : '–'}/${d != null ? Math.round(d) : '–'}`,
+          nilai: null,
+          penilaian: s != null && d != null ? nilaiTensi(s, d) : null,
+          outOfRange: pasangan.some((r) => r.outOfRange),
+          oleh: utama.diukurOlehNama,
+          event: utama.eventNama,
+          catatan: pasangan.map((r) => r.catatan).find(Boolean) ?? null,
+          rekaman: pasangan,
+        };
+      });
+      // "Tensi", bukan "Tekanan darah": judul kelompoknya sudah menyebut itu,
+      // dan nama baris yang mengulang judul di atasnya hanya menambah baris
+      // untuk dibaca tanpa menambah satu pun informasi.
+      hasil.push({
+        kunci, jenis: 'sistolik', nama: 'Tensi', kode: null,
+        keterangan: 'Sistolik / diastolik', satuan: 'mmHg', titik,
+      });
+      continue;
+    }
+
+    const contoh = isi[0]!;
+    const meta = UKUR[contoh.jenis];
+    const kodeGula = contoh.jenis === 'gula'
+      ? KONTEKS_GULA.find((k) => k.k === (contoh.konteks ?? 'sewaktu')) ?? null
+      : null;
+
+    hasil.push({
+      kunci,
+      jenis: contoh.jenis,
+      // Kode GDS/GDP/GD2PP sudah dibawa chip di sebelah nama; mengeja
+      // "Sewaktu" di samping chip "GDS" mengatakan hal yang sama dua kali.
+      nama: meta.label,
+      kode: kodeGula?.kode ?? null,
+      keterangan: kodeGula ? `${kodeGula.label} — ${kodeGula.syarat.toLowerCase()}` : null,
+      satuan: meta.satuan,
+      titik: isi.map((r) => {
+        const n = angka(r.nilai);
+        return {
+          waktu: r.diukurPada,
+          tampil: fmtNilai(r.jenis, n),
+          nilai: n,
+          penilaian: nilaiUkur(r.jenis, n, { gender, konteks: r.konteks }),
+          outOfRange: r.outOfRange,
+          oleh: r.diukurOlehNama,
+          event: r.eventNama,
+          catatan: r.catatan,
+          rekaman: [r],
+        };
+      }),
+    });
+  }
+
+  return hasil.sort((a, b) => JENIS_URUT.indexOf(a.jenis) - JENIS_URUT.indexOf(b.jenis));
+}
+
+/* ------------------------------ satu baris ------------------------------ */
+
+function BarisUkur({
+  deret, terbuka, onToggle, bolehHapus, konfirmHapus, onUbah, onMintaHapus, onHapus,
 }: {
-  deret: { jenis: JenisUkur; konteks: KonteksGula | null; baris: PengukuranRow[] };
-  gender: Gender;
-  pasangan: number | null;
+  deret: Deret;
   terbuka: boolean;
   onToggle: () => void;
   bolehHapus: boolean;
@@ -194,90 +361,102 @@ function KartuUkur({
   onMintaHapus: (id: string | null) => void;
   onHapus: (r: PengukuranRow) => void;
 }) {
-  const { jenis, konteks, baris } = deret;
-  const meta = UKUR[jenis];
-  const kini = baris[0]!;
-  const nilai = angka(kini.nilai);
-  const sebelum = baris[1] ? angka(baris[1].nilai) : null;
-  const penilaian = nilaiUkur(jenis, nilai, { gender, konteks, pasangan });
+  const kini = deret.titik[0]!;
+  const sebelum = deret.titik[1];
 
-  const kodeGula = konteks ? KONTEKS_GULA.find((k) => k.k === konteks) : null;
-  const judul = kodeGula ? `${meta.label} — ${kodeGula.label}` : meta.label;
-
-  // Selisih hanya bermakna kalau ada pembanding di konteks yang sama.
-  const selisih = sebelum == null ? null : Math.round((nilai - sebelum) * 10) / 10;
+  // Selisih hanya dihitung untuk deret bernilai tunggal, dan sengaja tidak
+  // diberi warna baik/buruk: berat badan turun bisa berarti dua hal yang
+  // sangat berbeda, dan menghakiminya sudah menjadi interpretasi.
+  const selisih = kini.nilai != null && sebelum?.nilai != null
+    ? Math.round((kini.nilai - sebelum.nilai) * 10) / 10
+    : null;
 
   return (
-    <div className="card ukur-card">
-      <div className="ukur-atas">
-        <span className="ukur-label">
-          {judul}
-          {kodeGula && <span className="ukur-kode">{kodeGula.kode}</span>}
-        </span>
-        {penilaian && <Badge tone={NADA_TONE[penilaian.nada]}>{penilaian.label}</Badge>}
-      </div>
-
-      <div className="ukur-nilai">
-        <b>{fmtNilai(jenis, nilai)}</b>
-        <span>{meta.satuan}</span>
-        {selisih != null && selisih !== 0 && (
-          <span className={`ukur-tren ${selisih > 0 ? 'naik' : 'turun'}`}>
-            <Icon d={selisih > 0 ? ICONS.naik : ICONS.turun} size={14} sw={2.2} />
-            {selisih > 0 ? '+' : '−'}{fmtNilai(jenis, Math.abs(selisih))}
+    <div className={`ukur-item ${terbuka ? 'buka' : ''}`}>
+      <button className="ukur-item-head" onClick={onToggle} aria-expanded={terbuka}>
+        <span className="ukur-item-utama">
+          <span className="ukur-item-nama">
+            {deret.nama}
+            {deret.kode && <span className="ukur-kode">{deret.kode}</span>}
           </span>
-        )}
-        {kini.outOfRange && <Badge tone="danger">Di luar rentang wajar</Badge>}
-      </div>
+          <span className="ukur-item-meta">
+            {kini.penilaian && (
+              <span className={`vonis vonis-${kini.penilaian.nada}`}>{kini.penilaian.singkat}</span>
+            )}
+            {kini.outOfRange && <span className="vonis vonis-tinggi">Di luar rentang wajar</span>}
+            <span>{fmtWaktuSingkat(kini.waktu)}</span>
+          </span>
+        </span>
 
-      <small>
-        {fmtWaktu(kini.diukurPada)}
-        {kini.diukurOlehNama ? ` · oleh ${kini.diukurOlehNama}` : ''}
-        {kini.eventNama ? ` · ${kini.eventNama}` : ''}
-      </small>
+        <span className="ukur-item-nilai">
+          <b>{kini.tampil}</b>
+          <span>{deret.satuan}</span>
+          {selisih != null && selisih !== 0 && (
+            <span className="ukur-tren">
+              <Icon d={selisih > 0 ? ICONS.naik : ICONS.turun} size={12} sw={2.4} />
+              {selisih > 0 ? '+' : '−'}{fmtNilai(deret.jenis, Math.abs(selisih))}
+            </span>
+          )}
+        </span>
 
-      {baris.length > 1 && (
-        <button className="link-btn sm" onClick={onToggle}>
-          {terbuka ? 'Sembunyikan riwayat' : `Lihat ${baris.length - 1} pengukuran sebelumnya`}
-        </button>
-      )}
+        <span className="ukur-item-chev"><Icon d={ICONS.chevR} size={18} /></span>
+      </button>
 
-      {(terbuka || baris.length === 1) && (
-        <div className="riwayat-list">
-          {baris.map((r) => (
-            <div className="riwayat-baris" key={r.id}>
-              <div className="riwayat-isi">
-                <b>{fmtNilai(jenis, angka(r.nilai))} {meta.satuan}</b>
-                <span>
-                  {fmtWaktu(r.diukurPada)}
-                  {r.diukurOlehNama ? ` · ${r.diukurOlehNama}` : ''}
-                </span>
-                {r.catatan && <em>{r.catatan}</em>}
-              </div>
-              {konfirmHapus === r.id ? (
-                <div className="hapus-konfirm">
-                  <span>Hapus?</span>
-                  <button className="link-btn sm bahaya" onClick={() => onHapus(r)}>Ya, hapus</button>
-                  <button className="link-btn sm" onClick={() => onMintaHapus(null)}>Batal</button>
+      {terbuka && (
+        <div className="ukur-item-detail">
+          {deret.keterangan && <p className="ukur-keterangan">{deret.keterangan}</p>}
+          {kini.penilaian && (
+            <p className="ukur-rujukan">
+              <b>{kini.penilaian.label}</b>
+              <span>{kini.penilaian.sumber}</span>
+            </p>
+          )}
+
+          <div className="riwayat-list">
+            {deret.titik.map((t) => (
+              <div className="riwayat-baris" key={t.waktu}>
+                <div className="riwayat-isi">
+                  <b>{t.tampil} {deret.satuan}</b>
+                  <span>
+                    {fmtWaktu(t.waktu)}
+                    {t.oleh ? ` · ${t.oleh}` : ''}
+                    {t.event ? ` · ${t.event}` : ''}
+                  </span>
+                  {t.catatan && <em>{t.catatan}</em>}
                 </div>
-              ) : (
                 <div className="riwayat-aksi">
-                  <button className="ikon-btn" aria-label="Ubah" onClick={() => onUbah(r)}>
-                    <Icon d={ICONS.pencil} size={16} />
-                  </button>
-                  {bolehHapus && (
+                  {/* Tensi ditopang dua rekaman, jadi tombolnya diberi nama
+                      angka mana yang akan diubah — tanpa itu petugas menebak. */}
+                  {t.rekaman.map((r) => (
+                    <button key={r.id} className="ikon-btn"
+                      aria-label={t.rekaman.length > 1 ? `Ubah ${UKUR[r.jenis].label}` : 'Ubah'}
+                      title={t.rekaman.length > 1 ? UKUR[r.jenis].singkat : 'Ubah'}
+                      onClick={() => onUbah(r)}>
+                      {t.rekaman.length > 1
+                        ? <span className="ikon-teks">{UKUR[r.jenis].singkat}</span>
+                        : <Icon d={ICONS.pencil} size={16} />}
+                    </button>
+                  ))}
+                  {bolehHapus && konfirmHapus !== t.waktu && (
                     <button className="ikon-btn bahaya" aria-label="Hapus"
-                      onClick={() => onMintaHapus(r.id)}>
+                      onClick={() => onMintaHapus(t.waktu)}>
                       <Icon d={ICONS.trash} size={16} />
                     </button>
                   )}
                 </div>
-              )}
-            </div>
-          ))}
+                {konfirmHapus === t.waktu && (
+                  <div className="hapus-konfirm">
+                    <span>Hapus pembacaan {t.tampil} {deret.satuan} ini?</span>
+                    <button className="link-btn sm bahaya"
+                      onClick={() => t.rekaman.forEach((r) => onHapus(r))}>Ya, hapus</button>
+                    <button className="link-btn sm" onClick={() => onMintaHapus(null)}>Batal</button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
-
-      {penilaian && <Rujukan sumber={penilaian.sumber} />}
     </div>
   );
 }
@@ -289,19 +468,26 @@ function untukInput(iso?: string): string {
   return new Date(d.getTime() - off).toISOString().slice(0, 16);
 }
 
+/**
+ * Mengubah satu rekaman yang sudah ada.
+ *
+ * Pencatatan baru tidak lewat sini — itu memakai papan angka, yang cocok untuk
+ * mengetik cepat sambil berdiri. Yang dibutuhkan saat membetulkan satu angka
+ * justru sebaliknya: melihat waktu, petugas, dan catatannya sekaligus.
+ */
 function FormPengukuran({ awal, rekan, userId, onTutup, onSimpan }: {
-  awal: PengukuranRow | null;
+  awal: PengukuranRow;
   rekan: Rekan[];
   userId: string | null;
   onTutup: () => void;
   onSimpan: (v: Record<string, unknown>) => Promise<void>;
 }) {
-  const [jenis, setJenis] = useState<JenisUkur>(awal?.jenis ?? 'tinggi');
-  const [konteks, setKonteks] = useState<KonteksGula>(awal?.konteks ?? 'sewaktu');
-  const [nilai, setNilai] = useState(awal ? fmtNilai(awal.jenis, angka(awal.nilai)) : '');
-  const [kapan, setKapan] = useState(untukInput(awal?.diukurPada));
-  const [oleh, setOleh] = useState(awal?.diukurOleh ?? userId ?? '');
-  const [catatan, setCatatan] = useState(awal?.catatan ?? '');
+  const jenis = awal.jenis;
+  const [konteks, setKonteks] = useState<KonteksGula>(awal.konteks ?? 'sewaktu');
+  const [nilai, setNilai] = useState(fmtNilai(awal.jenis, angka(awal.nilai)));
+  const [kapan, setKapan] = useState(untukInput(awal.diukurPada));
+  const [oleh, setOleh] = useState(awal.diukurOleh ?? userId ?? '');
+  const [catatan, setCatatan] = useState(awal.catatan ?? '');
   const [busy, setBusy] = useState(false);
   const [konfirmasi, setKonfirmasi] = useState(false);
 
@@ -331,24 +517,7 @@ function FormPengukuran({ awal, rekan, userId, onTutup, onSimpan }: {
   }
 
   return (
-    <Sheet title={awal ? 'Ubah pengukuran' : 'Catat pengukuran'}
-      subtitle={awal ? UKUR[awal.jenis].label : 'Satu parameter per catatan'}
-      onClose={onTutup}>
-
-      {!awal && (
-        <Field label="Parameter" htmlFor="f-jenis">
-          <select id="f-jenis" className="input" value={jenis}
-            onChange={(e) => { setJenis(e.target.value as JenisUkur); setKonfirmasi(false); }}>
-            {KATEGORI_URUT.map((kat) => (
-              <optgroup key={kat} label={KATEGORI_LABEL[kat]}>
-                {JENIS_URUT.filter((j) => UKUR[j].kategori === kat).map((j) => (
-                  <option key={j} value={j}>{UKUR[j].label}</option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-        </Field>
-      )}
+    <Sheet title="Ubah pengukuran" subtitle={UKUR[awal.jenis].label} onClose={onTutup}>
 
       {jenis === 'gula' && (
         <Field label="Jenis pemeriksaan gula darah" htmlFor="f-konteks">
@@ -401,7 +570,7 @@ function FormPengukuran({ awal, rekan, userId, onTutup, onSimpan }: {
       </Field>
 
       <Button full size="lg" icon={ICONS.check} disabled={!siap || busy} onClick={() => void simpan()}>
-        {awal ? 'Simpan perubahan' : 'Simpan pengukuran'}
+        Simpan perubahan
       </Button>
       <button className="link-btn" onClick={onTutup}>Batal</button>
     </Sheet>

@@ -28,7 +28,16 @@ export type Gender = 'P' | 'L';
 export type Nada = 'normal' | 'perhatian' | 'tinggi' | 'rendah' | 'netral';
 
 export type Penilaian = {
+  /** Kalimat lengkap dengan angka ambangnya. Dipakai saat baris dibuka. */
   label: string;
+  /**
+   * Bentuk pendek untuk chip di baris ringkas.
+   *
+   * Tetap mempertahankan kata "rujukan": itulah yang menjaga kalimat ini
+   * sebagai perbandingan, bukan vonis. "Tinggi" muat di chip, tapi ia berhenti
+   * menjadi perbandingan dan mulai terdengar seperti diagnosis.
+   */
+  singkat: string;
   nada: Nada;
   sumber: string;
 };
@@ -107,7 +116,10 @@ export function nilaiImt(imt: number): Penilaian {
         : imt < 25 ? 'Berat badan lebih'
           : imt < 30 ? 'Obesitas I'
             : 'Obesitas II';
-  return { label, nada: imt >= 25 ? 'tinggi' : nada, sumber: SUMBER.imt };
+  // Nama kategori IMT sudah pendek dan merupakan istilah resminya, jadi hanya
+  // "berat badan" yang disingkat.
+  const singkat = label.replace('Berat badan ', 'BB ');
+  return { label, singkat, nada: imt >= 25 ? 'tinggi' : nada, sumber: SUMBER.imt };
 }
 
 export function hitungImt(tinggiCm: number | null, beratKg: number | null): number | null {
@@ -117,30 +129,34 @@ export function hitungImt(tinggiCm: number | null, beratKg: number | null): numb
 
 /* ============================== gula darah ============================== */
 
+const DALAM: Pick<Penilaian, 'singkat' | 'nada'> = { singkat: 'Dalam rujukan', nada: 'normal' };
+const DI_ATAS: Pick<Penilaian, 'singkat' | 'nada'> = { singkat: 'Di atas rujukan', nada: 'tinggi' };
+const PRA_DM: Pick<Penilaian, 'singkat' | 'nada'> = { singkat: 'Prediabetes', nada: 'perhatian' };
+
 export function nilaiGula(mgdl: number, konteks: KonteksGula): Penilaian {
   const s = SUMBER.gula;
   if (konteks === 'puasa') {
-    if (mgdl < 100) return { label: 'Dalam rentang rujukan', nada: 'normal', sumber: s };
-    if (mgdl < 126) return { label: 'Rentang prediabetes (100–125)', nada: 'perhatian', sumber: s };
-    return { label: 'Di atas rentang rujukan (≥126)', nada: 'tinggi', sumber: s };
+    if (mgdl < 100) return { label: 'Dalam rentang rujukan (<100)', ...DALAM, sumber: s };
+    if (mgdl < 126) return { label: 'Rentang prediabetes (100–125)', ...PRA_DM, sumber: s };
+    return { label: 'Di atas rentang rujukan (≥126)', ...DI_ATAS, sumber: s };
   }
   if (konteks === '2jam_pp') {
-    if (mgdl < 140) return { label: 'Dalam rentang rujukan', nada: 'normal', sumber: s };
-    if (mgdl < 200) return { label: 'Rentang prediabetes (140–199)', nada: 'perhatian', sumber: s };
-    return { label: 'Di atas rentang rujukan (≥200)', nada: 'tinggi', sumber: s };
+    if (mgdl < 140) return { label: 'Dalam rentang rujukan (<140)', ...DALAM, sumber: s };
+    if (mgdl < 200) return { label: 'Rentang prediabetes (140–199)', ...PRA_DM, sumber: s };
+    return { label: 'Di atas rentang rujukan (≥200)', ...DI_ATAS, sumber: s };
   }
   // Sewaktu: hanya ada satu ambang yang lazim dipakai.
-  if (mgdl < 200) return { label: 'Dalam rentang rujukan (<200)', nada: 'normal', sumber: s };
-  return { label: 'Di atas rentang rujukan (≥200)', nada: 'tinggi', sumber: s };
+  if (mgdl < 200) return { label: 'Dalam rentang rujukan (<200)', ...DALAM, sumber: s };
+  return { label: 'Di atas rentang rujukan (≥200)', ...DI_ATAS, sumber: s };
 }
 
 /* ============================== kolesterol ============================== */
 
 export function nilaiKolesterol(mgdl: number): Penilaian {
   const s = SUMBER.kolesterol;
-  if (mgdl < 200) return { label: 'Dalam rentang rujukan (<200)', nada: 'normal', sumber: s };
-  if (mgdl < 240) return { label: 'Batas tinggi (200–239)', nada: 'perhatian', sumber: s };
-  return { label: 'Di atas rentang rujukan (≥240)', nada: 'tinggi', sumber: s };
+  if (mgdl < 200) return { label: 'Dalam rentang rujukan (<200)', ...DALAM, sumber: s };
+  if (mgdl < 240) return { label: 'Batas tinggi (200–239)', singkat: 'Batas tinggi', nada: 'perhatian', sumber: s };
+  return { label: 'Di atas rentang rujukan (≥240)', ...DI_ATAS, sumber: s };
 }
 
 /* ============================== asam urat ============================== */
@@ -153,9 +169,11 @@ export const RENTANG_ASAM_URAT: Record<Gender, { min: number; max: number }> = {
 export function nilaiAsamUrat(mgdl: number, gender: Gender): Penilaian {
   const r = RENTANG_ASAM_URAT[gender];
   const s = `${SUMBER.asamUrat} (${gender === 'L' ? 'pria' : 'wanita'} ${r.min}–${r.max})`;
-  if (mgdl < r.min) return { label: 'Di bawah rentang rujukan', nada: 'rendah', sumber: s };
-  if (mgdl > r.max) return { label: 'Di atas rentang rujukan', nada: 'tinggi', sumber: s };
-  return { label: 'Dalam rentang rujukan', nada: 'normal', sumber: s };
+  if (mgdl < r.min) {
+    return { label: `Di bawah rentang rujukan (<${r.min})`, singkat: 'Di bawah rujukan', nada: 'rendah', sumber: s };
+  }
+  if (mgdl > r.max) return { label: `Di atas rentang rujukan (>${r.max})`, ...DI_ATAS, sumber: s };
+  return { label: `Dalam rentang rujukan (${r.min}–${r.max})`, ...DALAM, sumber: s };
 }
 
 /* ============================ tekanan darah ============================ */
@@ -163,12 +181,12 @@ export function nilaiAsamUrat(mgdl: number, gender: Gender): Penilaian {
 export function nilaiTensi(sistolik: number, diastolik: number): Penilaian {
   const s = SUMBER.tensi;
   if (sistolik >= 140 || diastolik >= 90) {
-    return { label: 'Di atas rentang rujukan (≥140/90)', nada: 'tinggi', sumber: s };
+    return { label: 'Di atas rentang rujukan (≥140/90)', ...DI_ATAS, sumber: s };
   }
   if (sistolik >= 120 || diastolik >= 80) {
-    return { label: 'Prahipertensi (120–139 / 80–89)', nada: 'perhatian', sumber: s };
+    return { label: 'Prahipertensi (120–139 / 80–89)', singkat: 'Prahipertensi', nada: 'perhatian', sumber: s };
   }
-  return { label: 'Dalam rentang rujukan (<120/80)', nada: 'normal', sumber: s };
+  return { label: 'Dalam rentang rujukan (<120/80)', ...DALAM, sumber: s };
 }
 
 /* ============================ lingkar perut ============================ */
@@ -179,8 +197,8 @@ export function nilaiLingkarPerut(cm: number, gender: Gender): Penilaian {
   const ambang = AMBANG_LINGKAR_PERUT[gender];
   const s = `${SUMBER.lingkarPerut} (${gender === 'L' ? 'pria' : 'wanita'} <${ambang} cm)`;
   return cm >= ambang
-    ? { label: `Di atas ambang (≥${ambang} cm)`, nada: 'tinggi', sumber: s }
-    : { label: 'Dalam rentang rujukan', nada: 'normal', sumber: s };
+    ? { label: `Di atas ambang (≥${ambang} cm)`, singkat: 'Di atas ambang', nada: 'tinggi', sumber: s }
+    : { label: `Dalam rentang rujukan (<${ambang} cm)`, ...DALAM, sumber: s };
 }
 
 /* ============================== gabungan ============================== */
