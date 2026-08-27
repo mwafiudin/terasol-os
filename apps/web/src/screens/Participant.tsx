@@ -5,8 +5,9 @@ import { imtOf, normalisasiHp, num, PARAMS, periksaHp, periksaUsia } from '../li
 import { draftToRecord, hpSudahAda, useDraft } from '../lib/draft';
 import { useApp } from '../lib/store';
 import { refreshPending, syncNow } from '../lib/sync';
+import type { KonteksGula } from '../lib/rujukan';
 import type { ParamKey } from '../lib/types';
-import { PapanUkur, SLOT_REGISTRASI } from './PapanUkur';
+import { PapanUkur, PilihGrup, grupUntuk, type Grup } from './PapanUkur';
 
 type Nav = (screen: string) => void;
 
@@ -202,35 +203,84 @@ export function Consent({ go, consentText }: { go: Nav; consentText: { versi: st
  * (US-03), supaya aplikasi yang tertutup mendadak di lapangan tidak
  * menghilangkan pengukuran yang sudah diambil.
  */
+/**
+ * Kunci slot menjadi kunci draft.
+ *
+ * Slot gula darah membawa konteksnya di dalam kunci ("gula:puasa") supaya ubin
+ * bisa menampilkan kodenya. Draft menyimpannya sebagai satu nilai `gula`
+ * dengan konteks di kolom terpisah — kalau tidak, satu peserta bisa punya tiga
+ * angka gula darah yang tidak pernah dimaksudkan bersamaan.
+ */
+const keParam = (kunci: string) => kunci.split(':')[0] as ParamKey;
+
 export function Screening({ go }: { go: Nav }) {
   const { key } = useApp();
-  const { draft, setValue } = useDraft();
+  const { draft, setValue, patch } = useDraft();
+  const [pilih, setPilih] = useState<{ grup: Grup; konteks: KonteksGula } | null>(null);
+
   if (!draft || !key) return null;
 
-  const terisi = PARAMS.filter((p) => (draft.values[p.k] ?? '') !== '').length;
+  const nama = `${draft.nama || 'Peserta'}${draft.usia ? ` · ${draft.usia} th` : ''}`;
+  const adaNilai = (k: ParamKey) => (draft.values[k] ?? '') !== '';
+  const terisiTotal = PARAMS.filter((p) => adaNilai(p.k)).length;
+
+  // Kemajuan per kelompok, memakai kelompok yang sama dengan layar peserta.
+  const perGrup: Record<string, number> = {};
+  for (const g of grupUntuk(draft.konteksGula ?? 'sewaktu')) {
+    perGrup[g.id] = g.slot.filter((s) => adaNilai(keParam(s.kunci))).length;
+  }
+
+  if (!pilih) {
+    return (
+      <div className="page">
+        <PageHead title={nama} step={`LANGKAH 3 DARI 3 · ${terisiTotal} DARI ${PARAMS.length} TERISI`}
+          onBack={() => go('consent')}
+          right={<span className="saved-chip"><Icon d={ICONS.check} size={14} sw={2.2} />Tersimpan</span>} />
+        <PilihGrup
+          terisi={perGrup}
+          onPilih={(grup, konteks) => {
+            // Konteks gula ikut disimpan ke draft: angka gula darah tanpa
+            // konteks tidak punya rentang rujukan yang benar.
+            if (grup.id === 'darah') void patch(key, { konteksGula: konteks });
+            setPilih({ grup, konteks });
+          }}
+          // Registrasi boleh diselesaikan tanpa satu pun angka: pesertanya sudah
+          // terdaftar dan sudah menyetujui, dan pengukurannya bisa saja dilakukan
+          // di meja lain atau tidak sama sekali.
+          onSelesai={() => go('done')}
+          onBatal={() => go('consent')}
+          labelBatal="Kembali ke persetujuan"
+        />
+      </div>
+    );
+  }
 
   return (
     <PapanUkur
-      judul={`${draft.nama || 'Peserta'}${draft.usia ? ` · ${draft.usia} th` : ''}`}
-      subjudul={`LANGKAH 3 DARI 3 · ${terisi} DARI ${PARAMS.length} TERISI`}
+      judul={nama}
+      subjudul={`${pilih.grup.label.toUpperCase()} · LANGKAH 3 DARI 3`}
       kanan={<span className="saved-chip"><Icon d={ICONS.check} size={14} sw={2.2} />Tersimpan</span>}
-      slot={SLOT_REGISTRASI}
-      label="Pengukuran"
-      labelSimpan="Selesai"
-      // Registrasi boleh diselesaikan tanpa satu pun angka: pesertanya sudah
-      // terdaftar dan sudah menyetujui, dan pengukurannya bisa saja dilakukan
-      // di meja lain atau tidak sama sekali. Mengunci tombol di sini menahan
-      // orang yang sudah selesai antre di layar yang tidak bisa ditinggalkan.
+      slot={pilih.grup.slot}
+      label={pilih.grup.label}
+      konteksGula={pilih.konteks}
+      labelSimpan="Simpan kelompok"
       bolehKosong
-      nilai={draft.values as Record<string, string>}
+      // Nilai draft dipetakan ke kunci slot; gula darah dibawa ke kunci
+      // berkonteks agar ubinnya menampilkan angka yang sudah terisi.
+      nilai={Object.fromEntries(
+        pilih.grup.slot.map((s) => [s.kunci, draft.values[keParam(s.kunci)] ?? '']),
+      )}
       onNilai={(kunci: string, ubah: (lama: string) => string) => {
+        const k = keParam(kunci);
         // Dibaca dari store, BUKAN dari draft hasil render: zustand menulisnya
         // sinkron, jadi ketukan beruntun tetap menumpuk dengan benar.
-        const cur = useDraft.getState().draft?.values[kunci as ParamKey] ?? '';
-        void setValue(key, kunci as ParamKey, ubah(cur));
+        const cur = useDraft.getState().draft?.values[k] ?? '';
+        void setValue(key, k, ubah(cur));
       }}
-      onBatal={() => go('consent')}
-      onSimpan={async () => { go('done'); }}
+      onBatal={() => setPilih(null)}
+      // Kembali ke pemilih, bukan langsung selesai: kelompok berikutnya diambil
+      // dari sana, dan kemajuannya terlihat sebagai penanda tercentang.
+      onSimpan={async () => { setPilih(null); }}
     />
   );
 }

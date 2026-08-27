@@ -205,8 +205,11 @@ export type SyncParticipant = {
   consent: { granted: boolean; versiTeks: string; ts: string };
   screening: {
     clientId: string; tinggi: number | null; berat: number | null;
-    sistolik: number | null; diastolik: number | null; gula: number | null;
-    kolesterol: number | null; asamUrat: number | null;
+    lingkarPerut: number | null;
+    sistolik: number | null; diastolik: number | null; nadi: number | null;
+    gula: number | null; kolesterol: number | null; asamUrat: number | null;
+    /** Jenis gula darah yang dipilih petugas; menentukan rentang rujukannya. */
+    konteksGula: KonteksGula | null;
     paramsDiambil: string[]; outOfRange: boolean; measuredAt: string;
   } | null;
   conversion: {
@@ -277,6 +280,7 @@ export type ParticipantDetail = {
   consent: { granted: boolean; versiTeks: string; ts: string } | null;
   screening: {
     tinggi: number | null; berat: number | null; imt: number | null;
+    lingkarPerut: number | null; nadi: number | null;
     sistolik: number | null; diastolik: number | null; gula: number | null;
     kolesterol: number | null; asamUrat: number | null;
     paramsDiambil: ParamKey[]; outOfRange: boolean; measuredAt: string;

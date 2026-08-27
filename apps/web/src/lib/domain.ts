@@ -9,8 +9,10 @@ import type { EventStatus, ParamKey } from './types';
 export const PARAMS: { k: ParamKey; label: string; unit: string; min: number; max: number; dec?: boolean }[] = [
   { k: 'tinggi', label: 'Tinggi badan', unit: 'cm', min: 120, max: 210 },
   { k: 'berat', label: 'Berat badan', unit: 'kg', min: 30, max: 180 },
+  { k: 'lingkar_perut', label: 'Lingkar perut', unit: 'cm', min: 40, max: 200 },
   { k: 'sistolik', label: 'Tensi — sistolik', unit: 'mmHg', min: 70, max: 250 },
   { k: 'diastolik', label: 'Tensi — diastolik', unit: 'mmHg', min: 40, max: 150 },
+  { k: 'nadi', label: 'Nadi', unit: 'bpm', min: 40, max: 180 },
   { k: 'gula', label: 'Gula darah', unit: 'mg/dL', min: 50, max: 500 },
   { k: 'kolesterol', label: 'Kolesterol', unit: 'mg/dL', min: 100, max: 400 },
   { k: 'asam_urat', label: 'Asam urat', unit: 'mg/dL', min: 2, max: 15, dec: true },

@@ -203,16 +203,19 @@ export default async function syncRoutes(app: FastifyInstance) {
           const s = p.screening;
           await tx.query(
             `insert into screenings (tenant_id, participant_id, client_id, tinggi, berat, sistolik,
-                                     diastolik, gula, kolesterol, asam_urat, params_diambil, out_of_range, measured_at)
-             values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+                                     diastolik, gula, kolesterol, asam_urat, lingkar_perut, nadi,
+                                     params_diambil, out_of_range, measured_at)
+             values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
              on conflict (participant_id) do update
                 set tinggi = excluded.tinggi, berat = excluded.berat, sistolik = excluded.sistolik,
                     diastolik = excluded.diastolik, gula = excluded.gula, kolesterol = excluded.kolesterol,
-                    asam_urat = excluded.asam_urat, params_diambil = excluded.params_diambil,
+                    asam_urat = excluded.asam_urat, lingkar_perut = excluded.lingkar_perut,
+                    nadi = excluded.nadi, params_diambil = excluded.params_diambil,
                     out_of_range = excluded.out_of_range, measured_at = excluded.measured_at`,
             [ctx.tenantId, participantId, s.clientId, s.tinggi ?? null, s.berat ?? null,
              s.sistolik ?? null, s.diastolik ?? null, s.gula ?? null, s.kolesterol ?? null,
-             s.asamUrat ?? null, s.paramsDiambil, s.outOfRange, s.measuredAt],
+             s.asamUrat ?? null, s.lingkarPerut ?? null, s.nadi ?? null,
+             s.paramsDiambil, s.outOfRange, s.measuredAt],
           );
           await cerminkanScreening(tx, ctx.tenantId, pelangganId, participantId, s);
         }

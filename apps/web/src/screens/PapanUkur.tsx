@@ -106,9 +106,20 @@ export function kelompokkan(slot: Slot[]): { label: string; slot: Slot[] }[] {
 
 /* ============================= pilih grup ============================= */
 
-export function PilihGrup({ onPilih, onBatal }: {
+export function PilihGrup({ onPilih, onBatal, terisi, onSelesai, labelBatal }: {
   onPilih: (g: Grup, konteks: KonteksGula) => void;
   onBatal: () => void;
+  /**
+   * Berapa parameter yang sudah terisi per kelompok.
+   *
+   * Dipakai alur registrasi, yang melewati pemilih ini sekali per kelompok:
+   * tanpa penanda kemajuan, layar yang sama muncul tiga kali dan petugas harus
+   * mengingat sendiri mana yang sudah dikerjakan.
+   */
+  terisi?: Record<string, number>;
+  /** Menyelesaikan tanpa mengisi kelompok berikutnya. */
+  onSelesai?: () => void;
+  labelBatal?: string;
 }) {
   // Jenis gula darah ditanya sebagai langkah kedua, bukan sebagai kolom yang
   // menggantung di bawah daftar. Ia hanya berlaku untuk satu kelompok, jadi
@@ -140,23 +151,36 @@ export function PilihGrup({ onPilih, onBatal }: {
     <div className="pilih-grup">
       <p className="pilih-grup-tanya">Kelompok mana yang diukur sekarang?</p>
 
-      {grupUntuk('sewaktu').map((g) => (
-        <button key={g.id} className="grup-kartu"
-          onClick={() => (g.id === 'darah' ? setTahapGula(true) : onPilih(g, 'sewaktu'))}>
-          <span className="grup-ikon"><Icon d={g.ikon} size={20} /></span>
-          <span className="grup-tx">
-            <b>{g.label}</b>
-            <span>
-              {g.id === 'darah'
-                ? 'Gula darah · Kolesterol total · Asam urat'
-                : g.slot.map((s) => namaUbin(s, 'GDS')).join(' · ')}
+      {grupUntuk('sewaktu').map((g) => {
+        const isi = terisi?.[g.id] ?? 0;
+        return (
+          <button key={g.id} className={`grup-kartu${isi > 0 ? ' terisi' : ''}`}
+            onClick={() => (g.id === 'darah' ? setTahapGula(true) : onPilih(g, 'sewaktu'))}>
+            <span className="grup-ikon">
+              {isi >= g.slot.length
+                ? <Icon d={ICONS.check} size={20} sw={2.4} />
+                : <Icon d={g.ikon} size={20} />}
             </span>
-          </span>
-          <Icon d={ICONS.chevR} size={18} />
-        </button>
-      ))}
+            <span className="grup-tx">
+              <b>{g.label}</b>
+              <span>
+                {g.id === 'darah'
+                  ? 'Gula darah · Kolesterol total · Asam urat'
+                  : g.slot.map((s) => namaUbin(s, 'GDS')).join(' · ')}
+              </span>
+            </span>
+            {terisi && <span className="grup-hitung">{isi}/{g.slot.length}</span>}
+            <Icon d={ICONS.chevR} size={18} />
+          </button>
+        );
+      })}
 
-      <button className="link-btn" onClick={onBatal}>Batal</button>
+      {/* Menyelesaikan tanpa mengisi sisanya adalah jalan yang sah: sebagian
+          alat mungkin tidak tersedia, atau peserta hanya diukur sebagian. */}
+      {onSelesai && (
+        <Button full icon={ICONS.check} onClick={onSelesai}>Selesai</Button>
+      )}
+      <button className="link-btn" onClick={onBatal}>{labelBatal ?? 'Batal'}</button>
     </div>
   );
 }

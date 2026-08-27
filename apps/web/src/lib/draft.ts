@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { decryptJson, encryptJson, type Envelope } from './crypto';
 import { db, getMeta, setMeta } from './db';
 import { outOfRange } from './domain';
+import type { KonteksGula } from './rujukan';
 import type { ParamKey, ParticipantSecret } from './types';
 
 export type Draft = {
@@ -14,6 +15,13 @@ export type Draft = {
   consentGranted: boolean | null;
   consentVersi: string;
   values: Partial<Record<ParamKey, string>>;
+  /**
+   * Jenis gula darah yang dipilih petugas saat memilih kelompok Pemeriksaan
+   * darah. Menentukan rentang rujukannya: 140 mg/dL sesudah puasa dan 140
+   * mg/dL dua jam sesudah makan berarti dua hal yang berbeda, jadi angkanya
+   * tidak boleh dikirim tanpa konteks ini.
+   */
+  konteksGula: KonteksGula | null;
   berminat: boolean;
   startedAt: string;
 };
@@ -24,7 +32,7 @@ export function emptyDraft(eventClientId: string, consentVersi: string): Draft {
     eventClientId,
     nama: '', gender: '', usia: '', hp: '',
     consentGranted: null, consentVersi,
-    values: {}, berminat: false,
+    values: {}, konteksGula: null, berminat: false,
     startedAt: new Date().toISOString(),
   };
 }

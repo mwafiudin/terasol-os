@@ -351,7 +351,8 @@ export function PesertaDetail({ go, peserta, onUbah, onAnalisis }: {
     if (server?.screening) {
       const s = server.screening;
       const peta: Record<ParamKey, number | null> = {
-        tinggi: s.tinggi, berat: s.berat, sistolik: s.sistolik, diastolik: s.diastolik,
+        tinggi: s.tinggi, berat: s.berat, lingkar_perut: s.lingkarPerut,
+        sistolik: s.sistolik, diastolik: s.diastolik, nadi: s.nadi,
         gula: s.gula, kolesterol: s.kolesterol, asam_urat: s.asamUrat,
       };
       v = peta[p.k] == null ? null : dec(peta[p.k]!);
