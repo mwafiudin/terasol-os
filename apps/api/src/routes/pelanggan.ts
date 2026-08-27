@@ -165,6 +165,47 @@ export default async function pelangganRoutes(app: FastifyInstance) {
     });
   });
 
+  /**
+   * Daftar data terhapus milik seorang pelanggan.
+   *
+   * Hapus lunak tanpa cara melihatnya kembali sama saja dengan hapus biasa —
+   * hanya lebih boros ruang. Endpoint ini yang membuat "bisa dipulihkan"
+   * menjadi janji yang bisa ditepati petugas, bukan sekadar sifat basis data.
+   *
+   * Aksesnya sama dengan yang boleh menghapus: siapa yang bisa membuang harus
+   * bisa mengembalikan, dan tidak lebih dari itu.
+   */
+  app.get('/pelanggan/:id/terhapus', { preHandler: requireRole('koordinator', 'admin_pusat') }, async (req) => {
+    const { id } = req.params as { id: string };
+    const ctx = ctxOf(req);
+
+    return withTenant(ctx, async (tx) => {
+      const pengukuran = await tx.query(
+        `select pg.id, pg.jenis, pg.konteks, pg.nilai,
+                pg.diukur_pada as "diukurPada", pg.deleted_at as "dihapusPada",
+                u.nama as "dihapusOlehNama"
+           from pengukuran pg
+           left join users u on u.id = pg.deleted_by
+          where pg.pelanggan_id = $1 and pg.deleted_at is not null
+          order by pg.deleted_at desc
+          limit 100`,
+        [id],
+      );
+      const transaksi = await tx.query(
+        `select t.id, t.jenis, t.nama, t.jumlah, t.total,
+                to_char(t.tanggal,'YYYY-MM-DD') as tanggal,
+                t.deleted_at as "dihapusPada", u.nama as "dihapusOlehNama"
+           from transaksi t
+           left join users u on u.id = t.deleted_by
+          where t.pelanggan_id = $1 and t.deleted_at is not null
+          order by t.deleted_at desc
+          limit 100`,
+        [id],
+      );
+      return { pengukuran: pengukuran.rows, transaksi: transaksi.rows };
+    });
+  });
+
   app.post('/pengukuran', { preHandler: requireAuth }, async (req, reply) => {
     const parsed = pengukuranBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'bad_request', detail: parsed.error.flatten() });

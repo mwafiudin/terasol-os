@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge, Button, Field, Icon, ICONS, Rujukan, Sheet } from '../components/ui';
-import { api, type PengukuranRow, type TransaksiRow, type JenisTransaksi } from '../lib/api';
+import {
+  api,
+  type DaftarTerhapus, type JenisTransaksi, type PengukuranRow, type TransaksiRow,
+} from '../lib/api';
 import { dec, fmtTanggal, fmtWaktu, fmtWaktuSingkat, num, rp } from '../lib/domain';
 import {
   DISCLAIMER, KATEGORI_LABEL, KONTEKS_GULA, UKUR, diLuarWajar, hitungImt, nilaiImt,
@@ -795,5 +798,111 @@ function FormTransaksi({ awal, onTutup, onSimpan }: {
       </Button>
       <button className="link-btn" onClick={onTutup}>Batal</button>
     </Sheet>
+  );
+}
+
+/* ============================ Data terhapus ============================ */
+
+/**
+ * Memulihkan pengukuran dan transaksi yang dihapus.
+ *
+ * Hapus lunak tanpa cara melihat kembali sama saja dengan hapus biasa, hanya
+ * lebih boros ruang. Layar inilah yang membuat "bisa dipulihkan" menjadi janji
+ * yang bisa ditepati petugas, bukan sekadar sifat basis data.
+ *
+ * Sengaja tidak muncul selama tidak ada yang terhapus: daftar kosong yang
+ * selalu terpampang mengajarkan mata untuk mengabaikannya, dan justru itu yang
+ * membuatnya tidak terlihat saat akhirnya berisi.
+ */
+export function KartuTerhapus({ pelangganId, onUbah }: {
+  pelangganId: string;
+  onUbah?: () => void;
+}) {
+  const { say } = useApp();
+  const [data, setData] = useState<DaftarTerhapus | null>(null);
+  const [sibuk, setSibuk] = useState<string | null>(null);
+
+  const muat = useCallback(async () => {
+    try { setData(await api.terhapus(pelangganId)); }
+    catch { setData({ pengukuran: [], transaksi: [] }); }
+  }, [pelangganId]);
+
+  useEffect(() => { void muat(); }, [muat]);
+
+  async function pulihkan(jenis: 'ukur' | 'trx', id: string, sebutan: string) {
+    setSibuk(id);
+    try {
+      if (jenis === 'ukur') await api.pulihkanPengukuran(id);
+      else await api.pulihkanTransaksi(id);
+      say(`${sebutan} dipulihkan.`);
+      await muat(); onUbah?.();
+    } catch { say('Gagal memulihkan. Periksa koneksi.'); }
+    finally { setSibuk(null); }
+  }
+
+  if (!data) return null;
+  const jumlah = data.pengukuran.length + data.transaksi.length;
+  if (jumlah === 0) return null;
+
+  return (
+    <div className="card consumable-card">
+      <div className="kartu-judul">
+        <b>Data terhapus</b>
+        <Badge tone="sage">{jumlah}</Badge>
+      </div>
+      <small>
+        Masih tersimpan dan tidak ikut terhitung di mana pun. Pulihkan bila
+        ternyata bukan ini yang dimaksud.
+      </small>
+
+      <div className="terhapus-daftar">
+        {data.pengukuran.map((p) => {
+          const meta = UKUR[p.jenis];
+          const kode = p.konteks ? KONTEKS_GULA.find((k) => k.k === p.konteks)?.kode : null;
+          return (
+            <div className="terhapus-baris" key={p.id}>
+              <div className="terhapus-isi">
+                <b>
+                  {meta.label}{kode ? ` · ${kode}` : ''} —{' '}
+                  {fmtNilai(p.jenis, angka(p.nilai))} {meta.satuan}
+                </b>
+                <span>Diukur {fmtWaktuSingkat(p.diukurPada)}</span>
+                <em>
+                  Dihapus {fmtWaktuSingkat(p.dihapusPada)}
+                  {p.dihapusOlehNama ? ` oleh ${p.dihapusOlehNama}` : ''}
+                </em>
+              </div>
+              <Button size="sm" variant="secondary" icon={ICONS.refresh}
+                disabled={sibuk === p.id}
+                onClick={() => void pulihkan('ukur', p.id, meta.label)}>
+                Pulihkan
+              </Button>
+            </div>
+          );
+        })}
+
+        {data.transaksi.map((t) => (
+          <div className="terhapus-baris" key={t.id}>
+            <div className="terhapus-isi">
+              <b>{t.nama} — {rp(Number(t.total))}</b>
+              <span>
+                {JENIS_TRX.find((j) => j.k === t.jenis)?.label ?? t.jenis}
+                {t.jumlah > 1 ? ` · ${t.jumlah} item` : ''}
+                {' · '}{fmtTanggal(t.tanggal, { day: 'numeric', month: 'long', year: 'numeric' })}
+              </span>
+              <em>
+                Dihapus {fmtWaktuSingkat(t.dihapusPada)}
+                {t.dihapusOlehNama ? ` oleh ${t.dihapusOlehNama}` : ''}
+              </em>
+            </div>
+            <Button size="sm" variant="secondary" icon={ICONS.refresh}
+              disabled={sibuk === t.id}
+              onClick={() => void pulihkan('trx', t.id, t.nama)}>
+              Pulihkan
+            </Button>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

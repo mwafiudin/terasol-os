@@ -476,6 +476,39 @@ describe('Alur API end-to-end', () => {
     await call(`/pengukuran/${id}`, { method: 'DELETE' });
   });
 
+  it('data terhapus bisa ditemukan kembali beserta siapa yang menghapusnya', async () => {
+    // Hapus lunak tanpa cara melihatnya kembali sama saja dengan hapus biasa.
+    // Uji ini menjaga janji "bisa dipulihkan" tetap bisa ditepati dari layar,
+    // bukan hanya benar di tingkat basis data.
+    const buat = await call('/pengukuran', {
+      method: 'POST',
+      body: JSON.stringify({ pelangganId, jenis: 'lingkar_perut', nilai: 84 }),
+    });
+    assert.equal(buat.status, 201, JSON.stringify(buat.body));
+    const id = buat.body.id;
+
+    const kosong = await call(`/pelanggan/${pelangganId}/terhapus`);
+    assert.equal(kosong.status, 200, JSON.stringify(kosong.body));
+    assert.equal(kosong.body.pengukuran.some((x) => x.id === id), false,
+      'yang belum dihapus tidak boleh muncul di daftar terhapus');
+
+    await call(`/pengukuran/${id}`, { method: 'DELETE' });
+
+    const isi = await call(`/pelanggan/${pelangganId}/terhapus`);
+    const item = isi.body.pengukuran.find((x) => x.id === id);
+    assert.ok(item, 'yang dihapus harus bisa ditemukan kembali');
+    assert.equal(Number(item.nilai), 84, 'nilainya utuh, siap dipulihkan');
+    assert.ok(item.dihapusPada, 'waktu penghapusan ikut tercatat');
+    assert.ok(item.dihapusOlehNama, 'siapa yang menghapus ikut tercatat');
+
+    await call(`/pengukuran/${id}/pulihkan`, { method: 'POST' });
+    const sesudah = await call(`/pelanggan/${pelangganId}/terhapus`);
+    assert.equal(sesudah.body.pengukuran.some((x) => x.id === id), false,
+      'yang sudah dipulihkan keluar dari daftar terhapus');
+
+    await call(`/pengukuran/${id}`, { method: 'DELETE' });
+  });
+
   it('transaksi yang dihapus tidak ikut dihitung dalam total', async () => {
     const awal = (await call(`/pelanggan/${pelangganId}/transaksi`)).body.total;
     const r = await call('/transaksi', {

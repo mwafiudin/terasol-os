@@ -150,6 +150,17 @@ export type PusatRingkasan = {
   };
 };
 
+export type DaftarTerhapus = {
+  pengukuran: {
+    id: string; jenis: JenisUkur; konteks: KonteksGula | null; nilai: string;
+    diukurPada: string; dihapusPada: string; dihapusOlehNama: string | null;
+  }[];
+  transaksi: {
+    id: string; jenis: JenisTransaksi; nama: string; jumlah: number; total: string;
+    tanggal: string; dihapusPada: string; dihapusOlehNama: string | null;
+  }[];
+};
+
 export type JenisTransaksi = 'produk' | 'terapi' | 'paket';
 
 export type TransaksiRow = {
@@ -318,6 +329,7 @@ export const api = {
   updatePengukuran: (id: string, body: Record<string, unknown>) =>
     patch<unknown>(`/pengukuran/${id}`, body),
   deletePengukuran: (id: string) => del<{ ok: true }>(`/pengukuran/${id}`),
+  pulihkanPengukuran: (id: string) => post<{ ok: true }>(`/pengukuran/${id}/pulihkan`),
 
   transaksi: (pelangganId: string) =>
     request<{ transaksi: TransaksiRow[]; total: number }>(`/pelanggan/${pelangganId}/transaksi`),
@@ -328,6 +340,10 @@ export const api = {
   updateTransaksi: (id: string, body: Record<string, unknown>) =>
     patch<unknown>(`/transaksi/${id}`, body),
   deleteTransaksi: (id: string) => del<{ ok: true }>(`/transaksi/${id}`),
+  pulihkanTransaksi: (id: string) => post<{ ok: true }>(`/transaksi/${id}/pulihkan`),
+
+  terhapus: (pelangganId: string) =>
+    request<DaftarTerhapus>(`/pelanggan/${pelangganId}/terhapus`),
 
   pusatRingkasan: () => request<PusatRingkasan>('/pusat/ringkasan'),
 

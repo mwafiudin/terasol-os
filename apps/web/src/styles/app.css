@@ -1221,3 +1221,30 @@ button { cursor: pointer; font-family: inherit; }
   background: var(--surface-brand-soft); color: var(--teal-800);
   font-size: 12px; font-weight: var(--fw-semibold); letter-spacing: .03em;
 }
+
+/* ============================ Data terhapus ============================ */
+
+.kartu-judul {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+.kartu-judul > b {
+  font-family: var(--font-display); font-size: 16px;
+  font-weight: var(--fw-semibold); color: var(--teal-900);
+}
+
+.terhapus-daftar {
+  display: flex; flex-direction: column;
+  border-top: 1px solid var(--border-hairline);
+}
+.terhapus-baris {
+  display: flex; align-items: center; gap: 12px; padding: 11px 0; flex-wrap: wrap;
+}
+.terhapus-baris:not(:last-child) { border-bottom: 1px solid var(--border-hairline); }
+.terhapus-isi { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+/* Isinya diredam, bukan dicoret: teks tercoret sulit dibaca, padahal justru
+   harus terbaca jelas untuk memutuskan apakah ia yang perlu dikembalikan. */
+.terhapus-isi b {
+  font-size: 14px; font-weight: var(--fw-semibold); color: var(--text-muted);
+}
+.terhapus-isi span { font-size: 12px; color: var(--text-subtle); }
+.terhapus-isi em { font-size: 12px; font-style: normal; color: var(--danger-700); }
