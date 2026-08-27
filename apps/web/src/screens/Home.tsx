@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Badge, Button, Icon, ICONS } from '../components/ui';
 import { api, type ServerParticipant } from '../lib/api';
 import { getMeta, setMeta } from '../lib/db';
-import { CONV_LABEL, fmtTanggal, rp } from '../lib/domain';
+import { CONV_LABEL, fmtSejak, fmtTanggal, rp } from '../lib/domain';
 import { activeEvent, countsFor, pullEvents, type EventCounts } from '../lib/events';
 import { useInstall } from '../lib/install';
 import { useApp } from '../lib/store';
@@ -142,10 +142,44 @@ export function Home({ go, onFollowUp, reloadKey }: Props) {
 
   const online = isOnline();
   const pending = sync?.pending ?? 0;
-  const dotCls = sync?.running ? 'sync-dot busy' : pending === 0 ? 'sync-dot ok' : 'sync-dot';
-  const syncTitle = sync?.running ? 'Menyinkronkan…'
-    : pending === 0 ? 'Semua data tersinkron'
-      : `${pending} record belum tersinkron`;
+
+  /**
+   * Keadaan sync sebagai SATU pernyataan.
+   *
+   * Sebelumnya offline diumumkan dua kali — sekali di baris status, sekali di
+   * kotak terpisah di bawahnya — sementara hal yang paling penting justru tidak
+   * pernah disebut: kapan terakhir data ini benar-benar sampai ke server. Pada
+   * aplikasi yang sengaja bisa bekerja berhari-hari tanpa sinyal, "tersinkron"
+   * tanpa keterangan waktu tidak menjawab apa pun.
+   */
+  const keadaan = sync?.running ? 'jalan'
+    : !online ? 'offline'
+      : sync?.lastError ? 'gagal'
+        : pending > 0 ? 'antre'
+          // Perangkat yang belum pernah mengirim apa pun bukan "tersinkron" —
+          // ia sekadar belum punya apa-apa untuk dikirim. Menyebutnya
+          // tersinkron lalu menambahkan "belum pernah tersinkron" di bawahnya
+          // adalah dua kalimat yang saling membantah.
+          : sync?.lastSyncAt ? 'aman' : 'kosong';
+
+  const dotCls = `sync-dot${keadaan === 'jalan' ? ' busy'
+    : keadaan === 'aman' ? ' ok' : keadaan === 'gagal' ? ' gagal' : ''}`;
+
+  const syncTitle = {
+    jalan: 'Menyinkronkan…',
+    offline: 'Offline — input tetap berjalan',
+    gagal: 'Sync belum berhasil',
+    aman: 'Semua data tersinkron',
+    antre: `${pending} record menunggu terkirim`,
+    kosong: 'Tidak ada antrean',
+  }[keadaan];
+
+  const syncDetail = keadaan === 'kosong'
+    ? 'Belum ada data yang perlu dikirim dari perangkat ini.'
+    : [
+      keadaan !== 'antre' && pending > 0 ? `${pending} record menunggu` : null,
+      sync?.lastSyncAt ? `terakhir ${fmtSejak(sync.lastSyncAt)}` : 'belum pernah terkirim',
+    ].filter(Boolean).join(' · ');
 
   async function doSync() {
     const r = await syncNow(key);
@@ -175,27 +209,29 @@ export function Home({ go, onFollowUp, reloadKey }: Props) {
         </button>
       </div>
 
-      <div className="sync-row">
+      <div className={`sync-row ${keadaan}`}>
         <span className={dotCls} />
-        <span className="sync-title">{syncTitle}</span>
-        <button className="sim-btn" onClick={() => {
-          const next = !offlineSim;
-          setOfflineSim(next);
-          setSimulatedOffline(next);
-          say(next ? 'Mode offline. Semua input tetap tersimpan di perangkat.' : 'Kembali online.');
-          void load();
-        }}>{offlineSim ? 'Kembali online' : 'Uji offline'}</button>
+        <span className="sync-tx">
+          <b>{syncTitle}</b>
+          <span>{syncDetail}</span>
+        </span>
+        {/* Simulasi offline adalah alat uji, bukan fitur lapangan. Sebelumnya
+            ia terbit ke produksi berdampingan dengan tombol Sync sungguhan —
+            satu ketukan keliru membuat petugas mengira sinyalnya hilang. */}
+        {import.meta.env.DEV && (
+          <button className="sim-btn" onClick={() => {
+            const next = !offlineSim;
+            setOfflineSim(next);
+            setSimulatedOffline(next);
+            say(next ? 'Mode offline. Semua input tetap tersimpan di perangkat.' : 'Kembali online.');
+            void load();
+          }}>{offlineSim ? 'Kembali online' : 'Uji offline'}</button>
+        )}
         <button className="sync-btn" onClick={() => void doSync()} disabled={sync?.running}>
-          <Icon d={ICONS.refresh} size={15} sw={2} />Sync
+          <Icon d={ICONS.refresh} size={15} sw={2} />
+          {sync?.running ? 'Menyinkronkan' : 'Sync'}
         </button>
       </div>
-
-      {!online && (
-        <div className="offline-note">
-          <span className="dot" />
-          <span>Offline — input tetap berjalan, data aman di perangkat.</span>
-        </div>
-      )}
 
       {/* R1 — antrean menumpuk. Sync sudah dipicu otomatis; ini memberi tahu
           petugas kenapa sebaiknya cari sinyal sekarang, tanpa memblokir input. */}

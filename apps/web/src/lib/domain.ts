@@ -92,6 +92,26 @@ export function fmtWaktuSingkat(iso: string | null | undefined): string {
   return `${tanggal} · ${jam}`;
 }
 
+/**
+ * Jarak waktu dari sekarang, dalam bahasa manusia.
+ *
+ * Untuk status sync, "3 menit lalu" langsung menjawab pertanyaannya; jam
+ * dinding memaksa pembacanya menghitung sendiri. Lewat sehari jam dinding
+ * justru yang lebih berguna, jadi di situ ia yang dipakai.
+ */
+export function fmtSejak(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  const detik = Math.round((Date.now() - d.getTime()) / 1000);
+  if (detik < 60) return 'baru saja';
+  const menit = Math.round(detik / 60);
+  if (menit < 60) return `${menit} menit lalu`;
+  const jam = Math.round(menit / 60);
+  if (jam < 24) return `${jam} jam lalu`;
+  return fmtTanggal(iso, { day: 'numeric', month: 'short' });
+}
+
 export function fmtWaktu(iso: string | null | undefined): string {
   if (!iso) return '—';
   const d = new Date(iso);

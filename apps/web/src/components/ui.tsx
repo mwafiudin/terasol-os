@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
 
 /* ------------------------------- ikon ------------------------------- */
 
@@ -103,6 +103,70 @@ export function Field({ label, children, htmlFor }: { label: string; children: R
     <div className="field">
       <label htmlFor={htmlFor}>{label}</label>
       {children}
+    </div>
+  );
+}
+
+/**
+ * Kolom nominal rupiah dengan pemisah ribuan.
+ *
+ * `1050000` dan `10500000` nyaris tidak terbedakan sekilas, dan satu digit
+ * kelebihan pada harga adalah kesalahan yang baru ketahuan saat rekap tidak
+ * masuk akal. Dengan pemisah, `1.050.000` terbaca sebagai jumlah, bukan
+ * sebagai deretan angka yang harus dihitung sendiri.
+ *
+ * Nilai yang dipegang pemanggil tetap digit polos — pemformatan hanya untuk
+ * mata. Yang tersimpan tidak boleh bergantung pada cara ia ditampilkan.
+ */
+export function InputRupiah({ id, value, onChange, placeholder, autoFocus, disabled }: {
+  id?: string;
+  /** Digit polos, tanpa pemisah. String kosong berarti belum diisi. */
+  value: string;
+  onChange: (digit: string) => void;
+  placeholder?: string;
+  autoFocus?: boolean;
+  disabled?: boolean;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  const caret = useRef<number | null>(null);
+
+  const tampil = value === '' ? '' : Number(value).toLocaleString('id-ID');
+
+  // Menyisipkan titik memindahkan teks di kanan kursor, jadi kursornya harus
+  // ditempatkan ulang. Tanpa ini, mengetik di tengah angka melempar kursor ke
+  // ujung dan digit berikutnya masuk ke tempat yang salah.
+  useLayoutEffect(() => {
+    if (caret.current == null || !ref.current) return;
+    ref.current.setSelectionRange(caret.current, caret.current);
+    caret.current = null;
+  });
+
+  function ubah(e: React.ChangeEvent<HTMLInputElement>) {
+    const el = e.target;
+    const digitSebelumKursor = el.value
+      .slice(0, el.selectionStart ?? el.value.length)
+      .replace(/\D/g, '').length;
+
+    const digit = el.value.replace(/\D/g, '');
+    onChange(digit);
+
+    // Kursor diletakkan setelah digit ke-N yang sama, dihitung pada teks baru.
+    const baru = digit === '' ? '' : Number(digit).toLocaleString('id-ID');
+    let terlewat = 0;
+    let i = 0;
+    while (i < baru.length && terlewat < digitSebelumKursor) {
+      if (/\d/.test(baru[i]!)) terlewat++;
+      i++;
+    }
+    caret.current = i;
+  }
+
+  return (
+    <div className="input-uang">
+      <span className="input-uang-awalan" aria-hidden="true">Rp</span>
+      <input ref={ref} id={id} className="input" type="text" inputMode="numeric"
+        value={tampil} onChange={ubah} placeholder={placeholder}
+        autoFocus={autoFocus} disabled={disabled} autoComplete="off" />
     </div>
   );
 }

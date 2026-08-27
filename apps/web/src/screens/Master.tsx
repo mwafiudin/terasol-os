@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Badge, Button, Field, Icon, ICONS, PageHead, SegTabs, Sheet } from '../components/ui';
+import { Badge, Button, Field, Icon, ICONS, InputRupiah, PageHead, SegTabs, Sheet } from '../components/ui';
 import { api, ApiError, type CabangRow, type JenisTransaksi, type KatalogRow } from '../lib/api';
 import { ROLE_LABEL, fmtTanggal, rp } from '../lib/domain';
 import { useApp } from '../lib/store';
@@ -280,8 +280,7 @@ function FormKatalog({ awal, cabang, onTutup, onSelesai }: {
       </Field>
 
       <Field label="Harga acuan" htmlFor="k-harga">
-        <input id="k-harga" className="input" inputMode="numeric" value={harga}
-          onChange={(e) => setHarga(e.target.value.replace(/\D/g, ''))} placeholder="cth. 350000" />
+        <InputRupiah id="k-harga" value={harga} onChange={setHarga} placeholder="350.000" />
         <small className="field-bantu">
           Harga ini hanya mengisi form belanja. Transaksi menyimpan harganya
           sendiri, jadi nota lama tidak ikut berubah saat daftar harga diperbarui.

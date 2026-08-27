@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Badge, Button, Field, Icon, ICONS, PageHead } from '../components/ui';
+import { Badge, Button, Field, Icon, ICONS, InputRupiah, PageHead } from '../components/ui';
 import { api, type ConflictGroup, type PusatRingkasan } from '../lib/api';
 import { LOCAL_RETENTION_HOURS } from '../lib/db';
 import { PARAM_LABEL, ROLE_LABEL, fmtTanggal, rp } from '../lib/domain';
@@ -265,11 +265,10 @@ function BiayaTab() {
       {!dimuat && <small>Memuat…</small>}
 
       {dimuat && params.map((k) => (
-        <Field key={k} label={`${PARAM_LABEL[k]} (Rp per strip)`} htmlFor={`h-${k}`}>
-          <input id={`h-${k}`} className="input" inputMode="numeric"
-            disabled={!bolehUbah} placeholder="belum diatur"
+        <Field key={k} label={`${PARAM_LABEL[k]} — per strip`} htmlFor={`h-${k}`}>
+          <InputRupiah id={`h-${k}`} disabled={!bolehUbah} placeholder="belum diatur"
             value={harga[k] ?? ''}
-            onChange={(e) => setHarga({ ...harga, [k]: e.target.value.replace(/\D/g, '') })} />
+            onChange={(v) => setHarga({ ...harga, [k]: v })} />
         </Field>
       ))}
 

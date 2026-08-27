@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Badge, Button, Field, Icon, ICONS, PageHead, SegTabs, Sheet } from '../components/ui';
+import { Badge, Button, Field, Icon, ICONS, InputRupiah, PageHead, SegTabs, Sheet } from '../components/ui';
 import { api, type ParticipantDetail } from '../lib/api';
 import { readParticipant } from '../lib/db';
 import { CONV_LABEL, PARAM_LABEL, PARAMS, dec, fmtTanggal, fmtWaktu, imtOf, num, rp } from '../lib/domain';
@@ -492,8 +492,7 @@ export function PesertaDetail({ go, peserta, onUbah }: {
         {koordinator && peserta.serverId && beliBuka && (
           <>
             <Field label="Nilai transaksi" htmlFor="d-nilai">
-              <input id="d-nilai" className="input" inputMode="numeric" value={nilai}
-                onChange={(e) => setNilai(e.target.value.replace(/\D/g, ''))} placeholder="cth. 1400000" />
+              <InputRupiah id="d-nilai" value={nilai} onChange={setNilai} placeholder="1.400.000" />
             </Field>
             <Field label="Produk yang dibeli" htmlFor="d-produk">
               <input id="d-produk" className="input" value={produk}

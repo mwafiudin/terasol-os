@@ -164,7 +164,22 @@ button { cursor: pointer; font-family: inherit; }
   font-family: var(--font-display); font-size: 19px; font-weight: var(--fw-semibold); color: var(--teal-900);
 }
 
-.sync-row { display: flex; align-items: center; gap: 9px; padding: 0 4px; }
+/* Baris status sync. Satu pernyataan, dua tingkat: keadaan sekarang di
+   atas, dan kapan data terakhir benar-benar sampai ke server di bawahnya —
+   pada aplikasi yang bisa bekerja berhari-hari tanpa sinyal, keterangan waktu
+   itulah yang menjawab pertanyaan sebenarnya. */
+.sync-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-radius: var(--radius-md);
+  background: var(--surface-card); border: 1px solid var(--border-hairline);
+}
+.sync-row.offline, .sync-row.gagal { border-color: var(--warning-500); background: var(--warning-100); }
+.sync-row.antre { border-color: var(--border-default); }
+.sync-tx { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.sync-tx b { font-size: 13.5px; font-weight: var(--fw-semibold); color: var(--text-body); }
+.sync-tx > span { font-size: 12px; color: var(--text-muted); }
+.sync-row.offline .sync-tx b, .sync-row.gagal .sync-tx b { color: var(--warning-700); }
+.sync-dot.gagal { background: var(--danger-500); }
 .sync-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--warning-500); }
 .sync-dot.ok { background: var(--success-500); }
 .sync-dot.busy { animation: pulse 1.4s ease-in-out infinite; }
@@ -1343,4 +1358,17 @@ button { cursor: pointer; font-family: inherit; }
      seluruhnya. Di bawah 1100px rel masih berupa ikon tanpa label, sehingga
      kepala inilah satu-satunya yang menyebut nama cabang. */
   .screen > .page > .home-head { display: none; }
+}
+
+/* Kolom nominal. Awalan "Rp" menempel di dalam kolom supaya jelas satuannya
+   tanpa memakan satu baris label sendiri. */
+.input-uang { position: relative; }
+.input-uang-awalan {
+  position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+  font-size: 15px; font-weight: var(--fw-medium); color: var(--text-muted);
+  pointer-events: none;
+}
+.input-uang .input {
+  padding-left: 44px;
+  font-variant-numeric: tabular-nums;
 }
