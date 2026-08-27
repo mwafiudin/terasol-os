@@ -138,7 +138,7 @@ function TabKatalog({ pusat }: { pusat: boolean }) {
       )}
 
       {grup.map((namaGrup) => (
-        <div key={namaGrup}>
+        <div className="master-grup" key={namaGrup}>
           {namaGrup && <span className="section-title">{namaGrup}</span>}
           {JENIS.map((j) => {
             const isi = rows.filter((k) => kunciGrup(k) === namaGrup && k.jenis === j.k);
