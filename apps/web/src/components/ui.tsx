@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 
 /* ------------------------------- ikon ------------------------------- */
 
@@ -260,6 +260,76 @@ export function Rujukan({ sumber, children }: { sumber?: string; children?: Reac
         {sumber && <div className="rujukan-sumber">Rujukan: {sumber}</div>}
       </div>
     </div>
+  );
+}
+
+/* ============================== paginasi ============================== */
+
+/**
+ * Memotong daftar panjang menjadi halaman.
+ *
+ * Dipakai untuk daftar yang tumbuh tanpa batas seiring pemakaian — peserta,
+ * akun, event, katalog. Daftar yang panjangnya ditentukan kenyataan usaha
+ * (cabang, produk) dibiarkan utuh: memberi tombol halaman pada tujuh baris
+ * hanya menambah krom.
+ */
+export function usePaginasi<T>(isi: T[], perHalaman = 20) {
+  const [hal, setHal] = useState(1);
+  const total = Math.max(1, Math.ceil(isi.length / perHalaman));
+
+  // Daftar bisa menyusut di bawah kaki sendiri — setelah disaring atau dicari,
+  // halaman yang sedang dibuka mungkin tidak ada lagi, dan yang terlihat adalah
+  // layar kosong tanpa sebab yang jelas.
+  useEffect(() => { if (hal > total) setHal(1); }, [hal, total]);
+
+  const mulai = (hal - 1) * perHalaman;
+  const halAman = Math.min(hal, total);
+  return {
+    hal: halAman,
+    setHal,
+    totalHal: total,
+    potong: isi.slice((halAman - 1) * perHalaman, (halAman - 1) * perHalaman + perHalaman),
+    dari: isi.length ? mulai + 1 : 0,
+    sampai: Math.min(mulai + perHalaman, isi.length),
+    jumlah: isi.length,
+  };
+}
+
+/**
+ * Kendali halaman. Hanya muncul bila memang ada lebih dari satu halaman —
+ * baris "1–7 dari 7" dengan dua tombol mati tidak memberi tahu apa pun.
+ *
+ * `onPindah` juga menggulung ke puncak daftar: tanpa itu, halaman berikutnya
+ * tiba di tengah-tengah dan pembacanya harus menggulung ke atas sendiri untuk
+ * menemukan awalnya.
+ */
+export function Paginasi({ hal, totalHal, dari, sampai, jumlah, satuan = 'baris', onPindah }: {
+  hal: number; totalHal: number; dari: number; sampai: number; jumlah: number;
+  satuan?: string;
+  onPindah: (h: number) => void;
+}) {
+  if (totalHal <= 1) return null;
+  const pindah = (h: number) => {
+    onPindah(Math.min(Math.max(1, h), totalHal));
+    document.querySelector('.screen')?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  return (
+    <nav className="paginasi" aria-label="Navigasi halaman">
+      <span className="paginasi-jumlah">
+        {dari}–{sampai} dari {jumlah} {satuan}
+      </span>
+      <div className="paginasi-tombol">
+        <button className="ikon-btn" onClick={() => pindah(hal - 1)}
+          disabled={hal <= 1} aria-label="Halaman sebelumnya">
+          <Icon d={ICONS.back} size={18} />
+        </button>
+        <span className="paginasi-posisi" aria-live="polite">{hal} / {totalHal}</span>
+        <button className="ikon-btn" onClick={() => pindah(hal + 1)}
+          disabled={hal >= totalHal} aria-label="Halaman berikutnya">
+          <Icon d={ICONS.chevR} size={18} />
+        </button>
+      </div>
+    </nav>
   );
 }
 
