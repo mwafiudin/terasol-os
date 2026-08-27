@@ -544,6 +544,22 @@ button { cursor: pointer; font-family: inherit; }
 .sheet-title b { font-family: var(--font-display); font-size: 19px; font-weight: var(--fw-semibold); color: var(--teal-900); }
 .sheet-title span { font-size: 13px; color: var(--text-muted); }
 
+/* Pemisah antara mengubah data akun dan tindakan yang mengeluarkan orang dari
+   perangkatnya. Keduanya tinggal di lembar yang sama, tetapi menekan yang
+   kedua sambil mengira sedang menekan yang pertama tidak boleh mudah. */
+.sheet-pisah { height: 1px; background: var(--border-hairline); margin: 4px 0; }
+
+/* Sandi sementara yang dibacakan lewat telepon: dieja huruf per huruf, jadi
+   spasinya dilebarkan dan angkanya tidak boleh menyempit. */
+.sandi-baru {
+  font-family: var(--font-mono, ui-monospace, "SFMono-Regular", Menlo, monospace);
+  font-size: 20px; font-weight: var(--fw-semibold); letter-spacing: .08em;
+  color: var(--teal-900); text-align: center;
+  padding: 12px 10px; border-radius: var(--radius-sm);
+  background: var(--brand-soft); user-select: all;
+  overflow-wrap: anywhere;
+}
+
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
 
 /* ---- Boot ---- */
@@ -1036,13 +1052,18 @@ button { cursor: pointer; font-family: inherit; }
 /* Konfirmasi hapus di dalam kartu. Menggantikan `confirm()` bawaan browser,
    yang tampak asing di PWA terpasang dan bisa diredam diam-diam — penghapusan
    yang tampak tidak terjadi apa-apa lebih buruk daripada tidak ada tombolnya. */
-.hapus-konfirm {
+/* Pita konfirmasi dalam aplikasi. `confirm()` bawaan peramban ditekan diam-diam
+   di sebagian konteks, sehingga tindakan yang menunggunya tidak pernah terjadi
+   dan tidak pernah mengeluh. `.konfirm` adalah bentuk umumnya; `.hapus-konfirm`
+   adalah nama lama yang masih dipakai di layar lain. */
+.hapus-konfirm, .konfirm {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   padding: 8px 10px; border-radius: var(--radius-sm);
   background: var(--danger-100); color: var(--danger-700);
   font-size: 13px; font-weight: var(--fw-medium);
 }
-.hapus-konfirm > span { flex: 1; min-width: 0; }
+.hapus-konfirm > span, .konfirm > span { flex: 1; min-width: 0; }
+.konfirm-aksi { display: flex; gap: 8px; flex: 0 0 auto; }
 .link-btn.bahaya { color: var(--danger-700); font-weight: var(--fw-semibold); }
 
 /* ==================== Catat pengukuran: pilih kelompok ==================== */
@@ -1416,6 +1437,16 @@ button { cursor: pointer; font-family: inherit; }
 @media (max-width: 559px) {
   .panel-head > .chip-baris { flex-basis: 100%; }
 }
+
+/* Baris penyaring di bawah kepala panel. Dipisahkan dari `.panel-head` karena
+   kolom cari perlu melebar penuh, sementara kepala panel menampung keterangan
+   dan tombol yang harus tetap sebaris. */
+.saring {
+  display: flex; gap: 10px; flex-wrap: wrap;
+  padding: 12px 16px; border-bottom: 1px solid var(--border-hairline);
+}
+.saring > .input { flex: 1 1 220px; min-width: 0; }
+.saring > select.input { flex: 0 1 200px; }
 
 /* Pengelompokan di dalam panel — sub-judul, bukan kartu terpisah. */
 .panel-grup, .panel-cabang {

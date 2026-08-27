@@ -172,6 +172,16 @@ export type CabangRow = {
   pengguna: number; event: number; pelanggan: number;
 };
 
+/**
+ * `cabang` selalu ikut, bahkan bagi Koordinator yang hanya punya satu. RLS
+ * memberi Admin Pusat baris dari semua cabang, dan daftar tanpa kolom itu
+ * menyajikan beberapa "Budi · Petugas · Aktif" yang tidak bisa dibedakan.
+ */
+export type PenggunaRow = {
+  id: string; nama: string; email: string; role: Role; active: boolean;
+  tenantId: string; cabang: string; createdAt: string;
+};
+
 export type JenisTransaksi = 'produk' | 'terapi' | 'paket';
 
 export type TransaksiRow = {
@@ -382,10 +392,24 @@ export const api = {
   setEventPetugas: (eventId: string, userIds: string[]) =>
     put<{ ok: true; jumlah: number }>(`/events/${eventId}/petugas`, { userIds }),
 
-  users: () => request<{ users: { id: string; nama: string; email: string; role: Role; active: boolean }[] }>('/users'),
-  createUser: (u: { nama: string; email: string; password: string; role: 'petugas' | 'koordinator' }) =>
-    post<unknown>('/users', u),
-  setUserActive: (id: string, active: boolean) => patch<unknown>(`/users/${id}`, { active }),
+  users: (q: { cabang?: string; cari?: string } = {}) => {
+    const p = new URLSearchParams();
+    if (q.cabang) p.set('cabang', q.cabang);
+    if (q.cari?.trim()) p.set('cari', q.cari.trim());
+    return request<{ users: PenggunaRow[] }>(`/users${p.size ? `?${p}` : ''}`);
+  },
+  createUser: (u: { nama: string; email: string; password: string; role: Role; tenantId?: string }) =>
+    post<PenggunaRow>('/users', u),
+  /**
+   * Satu pintu untuk semua ubahan akun. Sebelumnya ada `setUserActive` yang
+   * hanya bisa mengirim `active`, sehingga peran dan nama tidak pernah bisa
+   * diubah dari aplikasi meski rutenya sudah menerima keduanya.
+   */
+  updateUser: (id: string, b: { nama?: string; role?: Role; active?: boolean }) =>
+    patch<PenggunaRow>(`/users/${id}`, b),
+  /** Balasannya memuat sandi baru SATU KALI. Tidak bisa diminta ulang. */
+  resetPassword: (id: string) =>
+    post<{ ok: true; nama: string; password: string; sesiDicabut: number }>(`/users/${id}/reset-password`),
 
   devices: () => request<{
     devices: { id: string; deviceId: string; deviceLabel: string | null; revokedAt: string | null;

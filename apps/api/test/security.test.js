@@ -354,3 +354,96 @@ describe('Pelanggan, pengukuran, dan transaksi', () => {
     );
   });
 });
+
+/**
+ * Migrasi 007 melonggarkan `users` dan sebagian `device_sessions` untuk Admin
+ * Pusat. Blok ini memagari kelonggaran itu dari dua arah: yang seharusnya kini
+ * BOLEH, dan yang harus TETAP TERTUTUP meski policy-nya bertetangga.
+ *
+ * Uji "admin_pusat boleh membaca lintas cabang tetapi tidak menulis" di atas
+ * tetap berlaku untuk catatan pelayanan, dan sengaja tidak diubah — kelonggaran
+ * ini hanya untuk akun, bukan untuk peserta atau pengukuran.
+ */
+describe('Akun lintas cabang (migrasi 007)', () => {
+  const akun = (tenantId, email, role = 'petugas') =>
+    admin.query(
+      `insert into users (tenant_id, email, password_hash, nama, role)
+       values ($1,$2,'x',$3,$4::user_role) returning id`,
+      [tenantId, email, email, role],
+    ).then((r) => r.rows[0].id);
+
+  it('Admin Pusat boleh MEMBUAT akun di cabang lain', async () => {
+    const { rows } = await asTenant(tenantA, 'admin_pusat', (c) => c.query(
+      `insert into users (tenant_id, email, password_hash, nama, role)
+       values ($1,'__uji_buat@uji.invalid','x','__uji_buat','koordinator') returning id`,
+      [tenantB],
+    ));
+    assert.ok(rows[0].id, 'cabang baru harus bisa mendapat koordinator pertamanya');
+  });
+
+  it('Admin Pusat boleh MENGUBAH akun cabang lain', async () => {
+    const id = await akun(tenantB, '__uji_ubah@uji.invalid');
+    const { rowCount } = await asTenant(tenantA, 'admin_pusat', (c) =>
+      c.query('update users set active = false where id = $1', [id]));
+    assert.equal(rowCount, 1, 'penonaktifan terpusat harus sampai ke cabang lain');
+  });
+
+  it('Admin Pusat boleh MENCABUT sesi di cabang lain, tetapi tidak menerbitkannya', async () => {
+    const id = await akun(tenantB, '__uji_sesi@uji.invalid');
+    await admin.query(
+      `insert into device_sessions (tenant_id, user_id, device_id, refresh_token_hash)
+       values ($1,$2,'__uji_dev','x')`,
+      [tenantB, id],
+    );
+
+    const { rowCount } = await asTenant(tenantA, 'admin_pusat', (c) =>
+      c.query('update device_sessions set revoked_at = now() where user_id = $1', [id]));
+    assert.equal(rowCount, 1, 'pencabutan sesi adalah alat penonaktifan akun');
+
+    // Policy pelonggarnya `for update`, jadi INSERT tetap dinilai policy lama.
+    await assert.rejects(
+      () => asTenant(tenantA, 'admin_pusat', (c) => c.query(
+        `insert into device_sessions (tenant_id, user_id, device_id, refresh_token_hash)
+         values ($1,$2,'__uji_dev2','y')`,
+        [tenantB, id],
+      )),
+      /row-level security/i,
+      'Admin Pusat tidak boleh menerbitkan sesi di cabang yang tidak ia layani',
+    );
+  });
+
+  it('Koordinator tetap tidak melihat maupun menyentuh akun cabang lain', async () => {
+    const id = await akun(tenantB, '__uji_koord@uji.invalid');
+
+    const lihat = await asTenant(tenantA, 'koordinator', (c) =>
+      c.query('select count(*)::int as n from users where id = $1', [id]));
+    assert.equal(lihat.rows[0].n, 0, 'akun cabang lain tidak boleh terlihat');
+
+    const ubah = await asTenant(tenantA, 'koordinator', (c) =>
+      c.query('update users set nama = $2 where id = $1', [id, '__uji_diretas']));
+    assert.equal(ubah.rowCount, 0, 'barisnya tak terlihat, jadi tak ada yang berubah');
+
+    await assert.rejects(
+      () => asTenant(tenantA, 'koordinator', (c) => c.query(
+        `insert into users (tenant_id, email, password_hash, nama, role)
+         values ($1,'__uji_selundup@uji.invalid','x','__uji_selundup','koordinator')`,
+        [tenantB],
+      )),
+      /row-level security/i,
+    );
+  });
+
+  it('Admin Pusat TETAP tidak bisa mengarang peserta di cabang lain', async () => {
+    // Kelonggaran 007 berhenti di akun. Kalau uji ini suatu saat lulus tanpa
+    // ditolak, batas antara mengelola orang dan mengarang catatan pelayanan
+    // sudah runtuh.
+    await assert.rejects(
+      () => asTenant(tenantA, 'admin_pusat', (c) => c.query(
+        `insert into participants (tenant_id, event_id, client_id, nama, gender, usia, hp)
+         values ($1,$2,gen_random_uuid(),'__uji_karangan','P',60,'081100000007')`,
+        [tenantB, eventB],
+      )),
+      /row-level security/i,
+    );
+  });
+});

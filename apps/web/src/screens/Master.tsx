@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useState } from 'react';
 import { Badge, Button, Field, Icon, ICONS, InputRupiah, PageHead, SegTabs, Sheet } from '../components/ui';
-import { api, ApiError, type CabangRow, type JenisTransaksi, type KatalogRow } from '../lib/api';
+import { api, ApiError, type CabangRow, type JenisTransaksi, type KatalogRow, type PenggunaRow } from '../lib/api';
 import { ROLE_LABEL, fmtTanggal, rp } from '../lib/domain';
 import { useApp } from '../lib/store';
 import type { Role } from '../lib/types';
@@ -58,7 +58,7 @@ export function Master({ go, tab, onTab }: { go: Nav; tab: MasterTab; onTab: (t:
       <SegTabs tabs={daftarTab} active={tab} onSelect={onTab} />
 
       {tab === 'katalog' && <TabKatalog pusat={pusat} />}
-      {tab === 'tim' && <TabTim />}
+      {tab === 'tim' && <TabTim pusat={pusat} />}
       {tab === 'cabang' && pusat && <TabCabang tenantSaya={user?.tenantId ?? null} />}
     </div>
   );
@@ -350,19 +350,164 @@ function FormKatalog({ awal, cabang, onTutup, onSelesai }: {
 
 /* ============================== Tim ============================== */
 
-type Pengguna = { id: string; nama: string; email: string; role: Role; active: boolean };
+/**
+ * Peran yang boleh diberikan oleh peran yang sedang masuk.
+ *
+ * Cerminan dari `bolehBeriPeran` di server, bukan penggantinya: server tetap
+ * menolak sendiri. Yang dikerjakan di sini hanya tidak menawarkan pilihan yang
+ * pasti ditolak — pagar tampilan yang dianggap pagar sungguhan adalah pagar
+ * yang bisa dilangkahi lewat satu permintaan HTTP.
+ */
+function peranTersedia(pemanggil: Role | undefined): Role[] {
+  const dasar: Role[] = ['petugas', 'koordinator'];
+  return pemanggil === 'admin_pusat' ? [...dasar, 'admin_pusat'] : dasar;
+}
 
-function TabTim() {
+function TabTim({ pusat }: { pusat: boolean }) {
   const { say, user } = useApp();
-  const [rows, setRows] = useState<Pengguna[] | null>(null);
+  const [rows, setRows] = useState<PenggunaRow[] | null>(null);
+  const [cabang, setCabang] = useState<CabangRow[]>([]);
+  const [cari, setCari] = useState('');
+  const [filterCabang, setFilterCabang] = useState('');
   const [buka, setBuka] = useState(false);
-  const [f, setF] = useState({ nama: '', email: '', password: '', role: 'petugas' as 'petugas' | 'koordinator' });
-  const [busy, setBusy] = useState(false);
+  const [kelola, setKelola] = useState<PenggunaRow | null>(null);
+  const [gagal, setGagal] = useState<string | null>(null);
 
   const muat = useCallback(async () => {
-    try { setRows((await api.users()).users); } catch { setRows([]); }
-  }, []);
-  useEffect(() => { void muat(); }, [muat]);
+    setGagal(null);
+    try { setRows((await api.users({ cari, cabang: filterCabang || undefined })).users); }
+    catch { setGagal('Gagal memuat daftar akun. Periksa koneksi.'); setRows([]); }
+  }, [cari, filterCabang]);
+
+  // Ketikan pencarian ditahan sejenak: satu permintaan per huruf akan membanjiri
+  // server dan membuat hasilnya tiba tidak berurutan.
+  useEffect(() => {
+    const t = setTimeout(() => void muat(), cari ? 300 : 0);
+    return () => clearTimeout(t);
+  }, [muat, cari]);
+
+  useEffect(() => {
+    if (pusat) void api.cabang().then((r) => setCabang(r.cabang)).catch(() => setCabang([]));
+  }, [pusat]);
+
+  if (rows === null) return <span className="hint">Memuat tim…</span>;
+
+  const aktif = rows.filter((u) => u.active).length;
+  const nonaktif = rows.length - aktif;
+
+  return (
+    <>
+      {buka && (
+        <FormAkun
+          pusat={pusat}
+          cabang={cabang}
+          peran={peranTersedia(user?.role)}
+          onBatal={() => setBuka(false)}
+          onSelesai={async (nama) => { setBuka(false); say(`Akun ${nama} dibuat.`); await muat(); }}
+        />
+      )}
+
+      <div className="card panel">
+        <div className="panel-head">
+          <span className="toolbar-judul">
+            {aktif} akun aktif{nonaktif > 0 ? ` · ${nonaktif} nonaktif` : ''}
+          </span>
+          {!buka && (
+            <Button size="sm" icon={ICONS.userPlus} onClick={() => setBuka(true)}>Tambah</Button>
+          )}
+        </div>
+
+        <div className="saring">
+          <input className="input" type="search" value={cari} placeholder="Cari nama atau email…"
+            aria-label="Cari akun" onChange={(e) => setCari(e.target.value)} />
+          {pusat && cabang.length > 0 && (
+            <select className="input" value={filterCabang} aria-label="Saring cabang"
+              onChange={(e) => setFilterCabang(e.target.value)}>
+              <option value="">Semua cabang</option>
+              {cabang.map((c) => <option key={c.id} value={c.id}>{c.nama}</option>)}
+            </select>
+          )}
+        </div>
+
+        {gagal && <span className="hint">{gagal}</span>}
+
+        {rows.length === 0 ? (
+          <span className="hint">
+            {cari || filterCabang ? 'Tidak ada akun yang cocok.' : 'Belum ada akun.'}
+          </span>
+        ) : (
+          <table className="tabel">
+            <thead>
+              <tr>
+                <th>Nama</th>
+                <th>Email</th>
+                {pusat && <th className="kol-sempit">Cabang</th>}
+                <th className="kol-sempit">Peran</th>
+                <th className="kol-sempit">Status</th>
+                <th className="kol-aksi"><span className="sr-only">Aksi</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((u) => (
+                <tr className={u.active ? '' : 'nonaktif'} key={u.id}>
+                  <td data-label="Nama" className="kol-nama">
+                    <b>{u.nama}</b>
+                    {u.id === user?.id && <em>Akun Anda</em>}
+                  </td>
+                  <td data-label="Email" className="ringkas">{u.email}</td>
+                  {pusat && <td data-label="Cabang" className="kol-sempit ringkas">{u.cabang}</td>}
+                  <td data-label="Peran" className="kol-sempit ringkas">{ROLE_LABEL[u.role] ?? u.role}</td>
+                  <td data-label="Status" className="kol-sempit ringkas">
+                    <span className={`vonis ${u.active ? 'vonis-normal' : 'vonis-netral'}`}>
+                      {u.active ? 'Aktif' : 'Nonaktif'}
+                    </span>
+                  </td>
+                  <td className="kol-aksi">
+                    <Button size="sm" variant="secondary" onClick={() => setKelola(u)}>Kelola</Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {kelola && (
+        <SheetAkun
+          akun={kelola}
+          sendiri={kelola.id === user?.id}
+          peran={peranTersedia(user?.role)}
+          onTutup={() => setKelola(null)}
+          onBerubah={async (pesan) => { say(pesan); await muat(); }}
+        />
+      )}
+
+      <small className="hint">
+        Menonaktifkan akun langsung mencabut sesi di semua perangkatnya.
+        {pusat && ' Sebagai Admin Pusat, daftar ini memuat akun seluruh cabang.'}
+      </small>
+    </>
+  );
+}
+
+/* --------------------------- akun baru --------------------------- */
+
+function FormAkun({ pusat, cabang, peran, onBatal, onSelesai }: {
+  pusat: boolean;
+  cabang: CabangRow[];
+  peran: Role[];
+  onBatal: () => void;
+  onSelesai: (nama: string) => Promise<void>;
+}) {
+  const { say, user } = useApp();
+  const [f, setF] = useState({
+    nama: '', email: '', password: '',
+    role: 'petugas' as Role,
+    // Bawaannya cabang sendiri. Admin Pusat yang lupa menggantinya tetap
+    // mendapatkan perilaku lama, bukan akun yang mendarat di cabang acak.
+    tenantId: user?.tenantId ?? '',
+  });
+  const [busy, setBusy] = useState(false);
 
   async function tambah() {
     if (!f.nama.trim() || !f.email.trim() || f.password.length < 8) {
@@ -371,106 +516,215 @@ function TabTim() {
     }
     setBusy(true);
     try {
-      await api.createUser({ ...f, nama: f.nama.trim(), email: f.email.trim() });
-      say(`Akun ${f.nama.trim()} dibuat.`);
-      setF({ nama: '', email: '', password: '', role: 'petugas' });
-      setBuka(false);
-      await muat();
-    } catch { say('Gagal membuat akun. Email mungkin sudah dipakai.'); }
-    finally { setBusy(false); }
+      await api.createUser({
+        nama: f.nama.trim(), email: f.email.trim(), password: f.password, role: f.role,
+        ...(pusat && f.tenantId ? { tenantId: f.tenantId } : {}),
+      });
+      await onSelesai(f.nama.trim());
+    } catch (err) {
+      say(err instanceof ApiError && (err.status === 409 || err.status === 403)
+        ? err.message
+        : 'Gagal membuat akun. Periksa koneksi.');
+    } finally { setBusy(false); }
   }
 
-  if (rows === null) return <span className="hint">Memuat tim…</span>;
-
   return (
-    <>
+    <div className="card consumable-card">
+      <b>Akun baru</b>
+      <Field label="Nama" htmlFor="t-nama">
+        <input id="t-nama" className="input" value={f.nama} autoFocus
+          onChange={(e) => setF({ ...f, nama: e.target.value })} />
+      </Field>
+      <Field label="Email" htmlFor="t-email">
+        <input id="t-email" className="input" type="email" value={f.email}
+          onChange={(e) => setF({ ...f, email: e.target.value })} />
+      </Field>
+      <Field label="Kata sandi awal" htmlFor="t-sandi">
+        <input id="t-sandi" className="input" type="password" value={f.password}
+          onChange={(e) => setF({ ...f, password: e.target.value })} />
+        <small className="field-bantu">Minimal 8 karakter. Minta diganti setelah masuk pertama kali.</small>
+      </Field>
 
-      {buka && (
-        <div className="card consumable-card">
-          <b>Akun baru</b>
-          <Field label="Nama" htmlFor="t-nama">
-            <input id="t-nama" className="input" value={f.nama} autoFocus
-              onChange={(e) => setF({ ...f, nama: e.target.value })} />
-          </Field>
-          <Field label="Email" htmlFor="t-email">
-            <input id="t-email" className="input" type="email" value={f.email}
-              onChange={(e) => setF({ ...f, email: e.target.value })} />
-          </Field>
-          <Field label="Kata sandi awal" htmlFor="t-sandi">
-            <input id="t-sandi" className="input" type="password" value={f.password}
-              onChange={(e) => setF({ ...f, password: e.target.value })} />
-            <small className="field-bantu">Minimal 8 karakter. Minta diganti setelah masuk pertama kali.</small>
-          </Field>
-          <div className="field">
-            <label>Peran</label>
-            <div className="pill-row">
-              <button className={`pill-choice ${f.role === 'petugas' ? 'on' : ''}`}
-                onClick={() => setF({ ...f, role: 'petugas' })}>Petugas</button>
-              <button className={`pill-choice ${f.role === 'koordinator' ? 'on' : ''}`}
-                onClick={() => setF({ ...f, role: 'koordinator' })}>Koordinator</button>
-            </div>
-          </div>
-          <Button full icon={ICONS.check} disabled={busy} onClick={() => void tambah()}>Buat akun</Button>
-          <button className="link-btn" onClick={() => setBuka(false)}>Batal</button>
-        </div>
+      {/* Tanpa pemilih ini, cabang yang baru dibuka tidak akan pernah punya
+          koordinator pertamanya — akunnya selalu lahir di cabang si pembuat. */}
+      {pusat && cabang.length > 0 && (
+        <Field label="Cabang" htmlFor="t-cabang">
+          <select id="t-cabang" className="input" value={f.tenantId}
+            onChange={(e) => setF({ ...f, tenantId: e.target.value })}>
+            {cabang.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nama}{c.status === 'inactive' ? ' (nonaktif)' : ''}
+              </option>
+            ))}
+          </select>
+        </Field>
       )}
 
-      <div className="card panel">
-        <div className="panel-head">
-          <span className="toolbar-judul">
-            {rows.filter((u) => u.active).length} akun aktif
-            {rows.some((u) => !u.active) ? ` · ${rows.filter((u) => !u.active).length} nonaktif` : ''}
-          </span>
-          {!buka && (
-            <Button size="sm" icon={ICONS.userPlus} onClick={() => setBuka(true)}>Tambah</Button>
-          )}
-        </div>
-        <table className="tabel">
-          <thead>
-            <tr>
-              <th>Nama</th>
-              <th>Email</th>
-              <th className="kol-sempit">Peran</th>
-              <th className="kol-sempit">Status</th>
-              <th className="kol-aksi"><span className="sr-only">Aksi</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((u) => (
-              <tr className={u.active ? '' : 'nonaktif'} key={u.id}>
-                <td data-label="Nama" className="kol-nama">
-                  <b>{u.nama}</b>
-                  {u.id === user?.id && <em>Akun Anda</em>}
-                </td>
-                <td data-label="Email" className="ringkas">{u.email}</td>
-                <td data-label="Peran" className="kol-sempit ringkas">{ROLE_LABEL[u.role] ?? u.role}</td>
-                <td data-label="Status" className="kol-sempit ringkas">
-                  <span className={`vonis ${u.active ? 'vonis-normal' : 'vonis-netral'}`}>
-                    {u.active ? 'Aktif' : 'Nonaktif'}
-                  </span>
-                </td>
-                <td className="kol-aksi">
-                  {/* Menonaktifkan akun sendiri ditolak server; tombolnya tidak
-                      ditampilkan sekalian agar tidak perlu dijelaskan dua kali. */}
-                  {u.id !== user?.id && (
-                    <Button size="sm" variant="secondary"
-                      onClick={() => void api.setUserActive(u.id, !u.active)
-                        .then(() => { say(u.active ? 'Akun dinonaktifkan.' : 'Akun diaktifkan.'); return muat(); })
-                        .catch(() => say('Gagal menyimpan. Periksa koneksi.'))}>
-                      {u.active ? 'Nonaktifkan' : 'Aktifkan'}
-                    </Button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <PilihPeran peran={peran} nilai={f.role} onPilih={(role) => setF({ ...f, role })} />
 
-      <small className="hint">
-        Menonaktifkan akun langsung mencabut sesi di semua perangkatnya.
-      </small>
-    </>
+      <Button full icon={ICONS.check} disabled={busy} onClick={() => void tambah()}>Buat akun</Button>
+      <button className="link-btn" onClick={onBatal}>Batal</button>
+    </div>
+  );
+}
+
+function PilihPeran({ peran, nilai, onPilih, nonaktif }: {
+  peran: Role[]; nilai: Role; onPilih: (r: Role) => void; nonaktif?: boolean;
+}) {
+  return (
+    <div className="field">
+      <label>Peran</label>
+      <div className="pill-row">
+        {peran.map((r) => (
+          <button key={r} disabled={nonaktif}
+            className={`pill-choice ${nilai === r ? 'on' : ''}`}
+            onClick={() => onPilih(r)}>{ROLE_LABEL[r] ?? r}</button>
+        ))}
+      </div>
+      {nilai === 'admin_pusat' && (
+        <small className="field-bantu">
+          Admin Pusat membaca data seluruh cabang dan dapat mengelola akun di mana pun.
+        </small>
+      )}
+    </div>
+  );
+}
+
+/* --------------------------- kelola akun --------------------------- */
+
+/**
+ * Satu tempat untuk semua tindakan atas satu akun.
+ *
+ * Sebelumnya barisnya hanya punya tombol Nonaktifkan, dan mengubah peran atau
+ * memulihkan sandi tidak mungkin dilakukan dari aplikasi meski rutenya sudah
+ * menerima keduanya. Ditaruh di lembar, bukan sebagai tiga tombol per baris:
+ * tabel dengan tiga tombol di tiap baris tidak muat di ponsel, dan tindakan
+ * yang jarang dipakai tidak layak menempati kolom permanen.
+ */
+function SheetAkun({ akun, sendiri, peran, onTutup, onBerubah }: {
+  akun: PenggunaRow;
+  sendiri: boolean;
+  peran: Role[];
+  onTutup: () => void;
+  onBerubah: (pesan: string) => Promise<void>;
+}) {
+  const { say } = useApp();
+  const [nama, setNama] = useState(akun.nama);
+  const [role, setRole] = useState<Role>(akun.role);
+  const [busy, setBusy] = useState(false);
+  const [konfirmSandi, setKonfirmSandi] = useState(false);
+  const [sandiBaru, setSandiBaru] = useState<string | null>(null);
+
+  const berubah = nama.trim() !== akun.nama || role !== akun.role;
+
+  async function simpan() {
+    if (!nama.trim()) { say('Nama tidak boleh kosong.'); return; }
+    setBusy(true);
+    try {
+      await api.updateUser(akun.id, {
+        ...(nama.trim() !== akun.nama ? { nama: nama.trim() } : {}),
+        ...(role !== akun.role ? { role } : {}),
+      });
+      onTutup();
+      await onBerubah(`Perubahan pada ${nama.trim()} disimpan.`);
+    } catch (err) {
+      say(err instanceof ApiError && (err.status === 400 || err.status === 403)
+        ? err.message
+        : 'Gagal menyimpan. Periksa koneksi.');
+    } finally { setBusy(false); }
+  }
+
+  async function setAktif(aktif: boolean) {
+    setBusy(true);
+    try {
+      await api.updateUser(akun.id, { active: aktif });
+      onTutup();
+      await onBerubah(aktif ? `${akun.nama} diaktifkan.` : `${akun.nama} dinonaktifkan.`);
+    } catch (err) {
+      say(err instanceof ApiError && err.status === 400
+        ? err.message
+        : 'Gagal menyimpan. Periksa koneksi.');
+    } finally { setBusy(false); }
+  }
+
+  async function setelUlang() {
+    setKonfirmSandi(false);
+    setBusy(true);
+    try {
+      const r = await api.resetPassword(akun.id);
+      setSandiBaru(r.password);
+      await onBerubah(`Kata sandi ${r.nama} disetel ulang.`);
+    } catch (err) {
+      say(err instanceof ApiError && err.status === 400
+        ? err.message
+        : 'Gagal menyetel ulang. Periksa koneksi.');
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <Sheet title={akun.nama} subtitle={`${akun.email} · ${akun.cabang}`} onClose={onTutup}>
+      {/* Sandi baru ditampilkan sekali dan tidak bisa diminta ulang — server
+          tidak menyimpannya. Diletakkan paling atas supaya tidak terlewat. */}
+      {sandiBaru ? (
+        <div className="card consumable-card">
+          <b>Kata sandi sementara</b>
+          <p className="sandi-baru">{sandiBaru}</p>
+          <small className="field-bantu">
+            Catat sekarang — ini satu-satunya kali sandi ini ditampilkan. Sampaikan
+            kepada {akun.nama} dan minta ia menggantinya lewat Pengaturan → Akun
+            setelah masuk. Semua sesi perangkatnya sudah keluar.
+          </small>
+          <Button full variant="secondary" onClick={onTutup}>Selesai</Button>
+        </div>
+      ) : (
+        <>
+          <Field label="Nama" htmlFor="k-nama">
+            <input id="k-nama" className="input" value={nama}
+              onChange={(e) => setNama(e.target.value)} />
+          </Field>
+
+          {/* Peran sendiri tidak bisa diubah sendiri: hanya Admin Pusat yang
+              dapat mengangkat Admin Pusat, jadi menurunkan diri sendiri adalah
+              pintu satu arah. Server menolaknya; di sini cukup dikunci. */}
+          <PilihPeran peran={peran} nilai={role} onPilih={setRole} nonaktif={sendiri} />
+          {sendiri && (
+            <small className="field-bantu">
+              Peran akun sendiri tidak dapat diubah. Minta rekan dengan peran setara melakukannya.
+            </small>
+          )}
+
+          <Button full icon={ICONS.check} disabled={busy || !berubah}
+            onClick={() => void simpan()}>Simpan perubahan</Button>
+
+          <div className="sheet-pisah" />
+
+          {konfirmSandi ? (
+            <div className="konfirm">
+              <span>Setel ulang kata sandi {akun.nama}? Semua perangkatnya akan keluar.</span>
+              <div className="konfirm-aksi">
+                <Button size="sm" variant="ghost" onClick={() => setKonfirmSandi(false)}>Batal</Button>
+                <Button size="sm" disabled={busy} onClick={() => void setelUlang()}>Setel ulang</Button>
+              </div>
+            </div>
+          ) : (
+            <Button full variant="secondary" disabled={busy || sendiri}
+              onClick={() => setKonfirmSandi(true)}>Setel ulang kata sandi</Button>
+          )}
+          {sendiri && (
+            <small className="field-bantu">
+              Ganti kata sandi sendiri lewat Pengaturan → Akun, yang menuntut sandi lama.
+            </small>
+          )}
+
+          {!sendiri && (
+            <Button full variant={akun.active ? 'ghost' : 'secondary'} disabled={busy}
+              onClick={() => void setAktif(!akun.active)}>
+              {akun.active ? 'Nonaktifkan akun' : 'Aktifkan akun'}
+            </Button>
+          )}
+        </>
+      )}
+    </Sheet>
   );
 }
 
