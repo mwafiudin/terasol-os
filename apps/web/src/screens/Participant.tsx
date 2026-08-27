@@ -177,6 +177,11 @@ export function Screening({ go }: { go: Nav }) {
       slot={SLOT_REGISTRASI}
       label="Pengukuran"
       labelSimpan="Selesai"
+      // Registrasi boleh diselesaikan tanpa satu pun angka: pesertanya sudah
+      // terdaftar dan sudah menyetujui, dan pengukurannya bisa saja dilakukan
+      // di meja lain atau tidak sama sekali. Mengunci tombol di sini menahan
+      // orang yang sudah selesai antre di layar yang tidak bisa ditinggalkan.
+      bolehKosong
       nilai={draft.values as Record<string, string>}
       onNilai={(kunci: string, ubah: (lama: string) => string) => {
         // Dibaca dari store, BUKAN dari draft hasil render: zustand menulisnya

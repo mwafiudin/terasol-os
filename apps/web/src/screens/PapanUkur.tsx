@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Button, Icon, ICONS } from '../components/ui';
 import { PARAMS, dec, num } from '../lib/domain';
 import {
@@ -74,6 +74,34 @@ export function grupUntuk(konteksGula: KonteksGula): Grup[] {
       slot: [slot('gula', konteksGula), slot('kolesterol'), slot('asam_urat')],
     },
   ];
+}
+
+/**
+ * Peta jenis → nama kelompok, DITURUNKAN dari `grupUntuk` dan bukan diketik
+ * ulang. Keanggotaan kelompok hanya boleh dinyatakan di satu tempat: kalau
+ * suatu saat lingkar perut pindah kelompok, papan registrasi harus ikut pindah
+ * tanpa ada yang mengingatnya.
+ */
+const GRUP_JENIS = new Map<JenisUkur, string>(
+  grupUntuk('sewaktu').flatMap((g) => g.slot.map((s) => [s.jenis, g.label] as const)),
+);
+
+/**
+ * Memecah daftar slot menjadi kelompok berjudul, dengan urutan slot apa adanya.
+ *
+ * Menggabungkan hanya yang BERDAMPINGAN, bukan mengelompokkan ulang: urutan
+ * slot adalah urutan alat yang dipegang petugas, dan menyusun ulang demi
+ * kerapian judul akan menyuruh orang bolak-balik antar alat.
+ */
+export function kelompokkan(slot: Slot[]): { label: string; slot: Slot[] }[] {
+  const keluar: { label: string; slot: Slot[] }[] = [];
+  for (const s of slot) {
+    const label = GRUP_JENIS.get(s.jenis) ?? 'Lainnya';
+    const akhir = keluar[keluar.length - 1];
+    if (akhir && akhir.label === label) akhir.slot.push(s);
+    else keluar.push({ label, slot: [s] });
+  }
+  return keluar;
 }
 
 /* ============================= pilih grup ============================= */
@@ -197,6 +225,22 @@ export function PapanUkur({
   const [warn, setWarn] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  /**
+   * Ubin aktif ditarik ke dalam pandangan setiap kali berpindah.
+   *
+   * Papan tiga ubin selalu muat sekaligus, jadi ini tidak pernah terasa. Papan
+   * registrasi memuat tujuh: menekan Lanjut dari ubin terakhir yang terlihat
+   * memindahkan kursor ke ubin di balik lipatan, dan petugas mengetik angka ke
+   * kotak yang tidak bisa dilihatnya.
+   */
+  const ubinRef = useRef<Record<string, HTMLButtonElement | null>>({});
+  useEffect(() => {
+    const el = ubinRef.current[aktif];
+    if (!el) return;
+    const diam = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView({ block: 'nearest', behavior: diam ? 'auto' : 'smooth' });
+  }, [aktif]);
+
   const idx = slot.findIndex((s) => s.kunci === aktif);
   const kini = slot[idx]!;
   const meta = UKUR[kini.jenis];
@@ -259,6 +303,7 @@ export function PapanUkur({
   }
 
   const kodeGula = KONTEKS_GULA.find((k) => k.k === konteksGula)!;
+  const kelompok = kelompokkan(slot);
 
   return (
     <div className="papan-veil" role="dialog" aria-modal="true" aria-label={`Catat ${label}`}>
@@ -278,51 +323,62 @@ export function PapanUkur({
 
         <div className="papan-isi">
           <div className="papan-tengah">
-            <div className="papan-ubin">
-              {slot.map((s) => {
-                const v = nilai[s.kunci] ?? '';
-                const isAktif = s.kunci === aktif;
-                return (
-                  <button key={s.kunci}
-                    className={`ubin${isAktif ? ' aktif' : v ? ' terisi' : ''}`}
-                    onClick={() => { setAktif(s.kunci); setWarn(null); }}>
-                    <span className="ubin-label">
-                      {namaUbin(s, kodeGula.kode)} · {UKUR[s.jenis].satuan}
-                    </span>
-                    <span className="ubin-nilai">{v || (isAktif ? '' : '—')}</span>
-                  </button>
-                );
-              })}
-            </div>
+            {/* Judul kelompok hanya muncul bila papan memang memuat lebih dari
+                satu — pada "Catat pengukuran" kelompoknya sudah disebut di
+                kepala layar, dan mengulanginya di sini hanya menambah baris. */}
+            {kelompok.map((g) => (
+              <div className="papan-grup" key={g.label}>
+                {kelompok.length > 1 && <p className="papan-grup-judul">{g.label}</p>}
+                <div className="papan-ubin">
+                  {g.slot.map((s) => {
+                    const v = nilai[s.kunci] ?? '';
+                    const isAktif = s.kunci === aktif;
+                    return (
+                      <button key={s.kunci}
+                        ref={(el) => { ubinRef.current[s.kunci] = el; }}
+                        className={`ubin${isAktif ? ' aktif' : v ? ' terisi' : ''}`}
+                        onClick={() => { setAktif(s.kunci); setWarn(null); }}>
+                        <span className="ubin-label">
+                          {namaUbin(s, kodeGula.kode)} · {UKUR[s.jenis].satuan}
+                        </span>
+                        <span className="ubin-nilai">{v || (isAktif ? '' : '—')}</span>
+                      </button>
+                    );
+                  })}
+                </div>
 
-            {/* Rentang wajar parameter yang sedang diketik. Petugas tahu angka
-                itu masuk akal atau tidak sebelum menekan Lanjut, bukan sesudah
-                diperingatkan. */}
-            {/* Nama lengkap parameternya, bukan nama ubin: kode seperti GDP
-                adalah singkatan resmi dan tidak boleh diturunkan hurufnya. */}
-            <p className="papan-rentang">
-              Rentang wajar {meta.label.toLowerCase()}: {meta.wajar.min}–{meta.wajar.max} {meta.satuan}
-            </p>
-
-            {warn === aktif && (
-              <div className="range-warn">
-                Nilai di luar rentang wajar. Ketuk Lanjut sekali lagi untuk konfirmasi.
+                {/* Menempel pada kelompok yang menghasilkannya, bukan di dasar
+                    papan. Saat mengukur tensi, IMT bukan umpan balik — ia
+                    sekadar angka yang kebetulan ada di layar; dan di papan
+                    tujuh ubin, dasar papan berada di balik lipatan. */}
+                {imt != null && g.slot.some((s) => s.jenis === 'tinggi' || s.jenis === 'berat') && (
+                  <div className="imt-chip">
+                    <b>IMT otomatis:</b>
+                    <span>{dec(imt)} — {nilaiImt(imt).label}</span>
+                  </div>
+                )}
               </div>
-            )}
-
-            {/* Hanya di kelompok yang benar-benar mengubahnya. Saat mengukur
-                tensi, IMT bukan umpan balik — ia sekadar angka yang kebetulan
-                ada di layar. */}
-            {imt != null && slot.some((s) => s.jenis === 'tinggi' || s.jenis === 'berat') && (
-              <div className="imt-chip">
-                <b>IMT otomatis:</b>
-                <span>{dec(imt)} — {nilaiImt(imt).label}</span>
-              </div>
-            )}
+            ))}
           </div>
         </div>
 
         <div className="keypad-dock">
+          {/* Keduanya menerangkan angka yang SEDANG diketik, jadi tempatnya
+              menempel pada papan angka, bukan di daftar ubin yang menggulung —
+              begitu ubinnya bertambah, petunjuk yang ikut menggulung akan
+              hilang persis ketika paling dibutuhkan. Peringatannya pun kini
+              bersebelahan dengan tombol yang diminta diketuk ulang. */}
+          {warn === aktif ? (
+            <div className="range-warn">
+              Nilai di luar rentang wajar. Ketuk Lanjut sekali lagi untuk konfirmasi.
+            </div>
+          ) : (
+            /* Nama lengkap parameternya, bukan nama ubin: kode seperti GDP
+               adalah singkatan resmi dan tidak boleh diturunkan hurufnya. */
+            <p className="papan-rentang">
+              Rentang wajar {meta.label.toLowerCase()}: {meta.wajar.min}–{meta.wajar.max} {meta.satuan}
+            </p>
+          )}
           <div className="keypad-actions">
             {terakhir ? (
               <>

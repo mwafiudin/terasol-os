@@ -309,8 +309,18 @@ button { cursor: pointer; font-family: inherit; }
 
 .keypad-dock {
   flex: none; background: var(--white); border-top: 1px solid var(--border-hairline);
-  padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 10px;
+  padding: 10px 16px 16px; display: flex; flex-direction: column; gap: 10px;
 }
+/* Rentang dan peringatan bergantian mengisi slot yang sama tepat di atas
+   tombol yang mereka terangkan. Tombolnya sendiri tidak bergeser saat
+   keduanya bertukar: dock berjangkar di tepi bawah, jadi yang bergerak adalah
+   tepi atasnya. Tinggi minimum di sini hanya memberi napas pada baris rentang
+   yang cuma satu baris. */
+.keypad-dock .papan-rentang, .keypad-dock .range-warn {
+  margin: 0; min-height: 34px; display: flex; align-items: center;
+  justify-content: center; text-align: center;
+}
+.keypad-dock .range-warn { padding: 6px 12px; font-size: 13px; }
 .keypad-actions { display: flex; gap: 10px; }
 .keypad { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
 .key {
@@ -1076,9 +1086,23 @@ button { cursor: pointer; font-family: inherit; }
 }
 
 .papan-ubin { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* Judul kelompok pada papan yang memuat lebih dari satu. Sengaja kecil dan
+   tenang: ia menandai batas, bukan meminta dibaca — yang dicari mata petugas
+   tetap nama parameter di dalam ubin. */
+.papan-grup { display: flex; flex-direction: column; gap: 6px; }
+.papan-grup + .papan-grup { margin-top: 2px; }
+.papan-grup-judul {
+  font-size: 10.5px; line-height: 1; letter-spacing: .09em;
+  text-transform: uppercase; font-weight: var(--fw-semibold);
+  color: var(--text-muted); padding-left: 2px;
+}
 .ubin {
   display: flex; flex-direction: column; gap: 4px; min-height: 84px;
   padding: 12px 14px; text-align: left;
+  /* Ruang di atas cukup untuk ikut membawa judul kelompoknya saat ubin ditarik
+     ke dalam pandangan — kalau tidak, ubin pertama tiba tanpa judulnya. */
+  scroll-margin: 24px 0 12px;
   border: 1px solid var(--border-hairline); border-radius: var(--radius-card);
   background: var(--ivory-050); color: inherit;
   transition: border-color var(--dur-fast) var(--ease-calm),
