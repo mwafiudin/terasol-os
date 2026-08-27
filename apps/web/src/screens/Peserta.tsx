@@ -97,7 +97,7 @@ export function EventPeserta({ go, event, onBuka, onTambah, reloadKey }: {
       {/* Rekap sementara — dihitung di perangkat supaya tetap tampil saat
           offline, termasuk peserta yang belum sempat terkirim. */}
       {rekap && (
-        <div className="card consumable-card">
+        <div className="card consumable-card rekap-lebar">
           <b>Rekap sementara</b>
           <div className="stat-grid">
             <div className="stat-card"><b>{rekap.peserta}</b><span>Peserta</span></div>
