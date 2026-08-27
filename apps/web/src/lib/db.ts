@@ -1,7 +1,9 @@
 import Dexie, { type Table } from 'dexie';
 import { decryptJson, encryptJson, type Envelope } from './crypto';
 import type {
-  AnonTallyRow, EventRow, ParticipantRow, ParticipantSecret, ParticipantView,
+  AnonTallyRow, CerminRow, CerminSecret, CerminView, EventRow,
+  ParticipantRow, ParticipantSecret, ParticipantView,
+  UkurAntreRow, UkurAntreSecret, UkurAntreView,
 } from './types';
 
 export type MetaRow = { key: string; value: unknown };
@@ -11,6 +13,8 @@ class TerasolDb extends Dexie {
   events!: Table<EventRow, string>;
   participants!: Table<ParticipantRow, string>;
   anonTallies!: Table<AnonTallyRow, string>;
+  cermin!: Table<CerminRow, string>;
+  ukurAntre!: Table<UkurAntreRow, string>;
 
   constructor() {
     super('terasol-os');
@@ -19,6 +23,12 @@ class TerasolDb extends Dexie {
       events: 'clientId, status, tanggal, synced',
       participants: 'clientId, eventClientId, synced, needsReview, createdAt',
       anonTallies: 'clientId, eventClientId, synced',
+    });
+    // v2 — cermin peserta perangkat lain, dan antrean pengukuran offline.
+    // Dexie mempertahankan tabel v1 apa adanya; tidak ada migrasi data.
+    this.version(2).stores({
+      cermin: 'clientId, eventClientId, diambilPada',
+      ukurAntre: 'clientId, pelangganId, synced',
     });
   }
 }
@@ -76,6 +86,75 @@ export async function readParticipants(
   return Promise.all(rows.map((r) => readParticipant(key, r)));
 }
 
+/* ---------------------------- cermin peserta ---------------------------- */
+
+/**
+ * Menyimpan salinan daftar peserta satu event dari server.
+ *
+ * Menggantikan seluruh isi cermin untuk event itu, bukan menambahkan: peserta
+ * yang dihapus atau digabung di server harus ikut hilang dari salinan, dan
+ * cermin yang hanya bertambah akan menampilkan orang yang sudah tidak ada.
+ */
+export async function tulisCermin(
+  key: CryptoKey,
+  eventClientId: string,
+  isi: { row: Omit<CerminRow, 'iv' | 'ct'>; secret: CerminSecret }[],
+): Promise<void> {
+  const baris: CerminRow[] = [];
+  for (const { row, secret } of isi) {
+    const env = await encryptJson(key, secret);
+    baris.push({ ...row, iv: env.iv, ct: env.ct });
+  }
+  await db.transaction('rw', db.cermin, async () => {
+    const lama = await db.cermin.where('eventClientId').equals(eventClientId).primaryKeys();
+    await db.cermin.bulkDelete(lama);
+    await db.cermin.bulkPut(baris);
+  });
+}
+
+export async function bacaCermin(
+  key: CryptoKey | null,
+  eventClientId: string,
+): Promise<CerminView[]> {
+  const baris = await db.cermin.where('eventClientId').equals(eventClientId).toArray();
+  return Promise.all(baris.map(async (r) => {
+    if (!key || !r.iv || !r.ct) return { ...r, secret: null };
+    try {
+      return { ...r, secret: await decryptJson<CerminSecret>(key, { iv: r.iv, ct: r.ct } as Envelope) };
+    } catch {
+      return { ...r, secret: null };
+    }
+  }));
+}
+
+/* -------------------------- antrean pengukuran -------------------------- */
+
+export async function antreUkur(
+  key: CryptoKey,
+  row: Omit<UkurAntreRow, 'iv' | 'ct' | 'synced'>,
+  secret: UkurAntreSecret,
+): Promise<void> {
+  const env = await encryptJson(key, secret);
+  await db.ukurAntre.put({ ...row, synced: 0, iv: env.iv, ct: env.ct });
+}
+
+export async function bacaAntreUkur(
+  key: CryptoKey | null,
+  pelangganId?: string,
+): Promise<UkurAntreView[]> {
+  const baris = pelangganId
+    ? await db.ukurAntre.where('pelangganId').equals(pelangganId).toArray()
+    : await db.ukurAntre.where('synced').equals(0).toArray();
+  return Promise.all(baris.map(async (r) => {
+    if (!key || !r.iv || !r.ct) return { ...r, secret: null };
+    try {
+      return { ...r, secret: await decryptJson<UkurAntreSecret>(key, { iv: r.iv, ct: r.ct } as Envelope) };
+    } catch {
+      return { ...r, secret: null };
+    }
+  }));
+}
+
 /* ------------------------------- purge ------------------------------- */
 
 /**
@@ -92,6 +171,14 @@ export const LOCAL_RETENTION_HOURS = 24;
  */
 export async function purgeSynced(retentionHours = LOCAL_RETENTION_HOURS): Promise<number> {
   const cutoff = new Date(Date.now() - retentionHours * 3_600_000).toISOString();
+
+  // Cermin ikut tunduk pada retensi yang sama — isinya identitas orang lain,
+  // dan tidak ada alasan ia bertahan lebih lama daripada record sendiri.
+  // Dihapus utuh, bukan disisakan cangkangnya: cermin adalah salinan, bukan
+  // catatan, jadi tidak ada hitungan yang bergantung pada barisnya.
+  const cerminBasi = await db.cermin.filter((c) => c.diambilPada < cutoff).primaryKeys();
+  if (cerminBasi.length) await db.cermin.bulkDelete(cerminBasi);
+
   const stale = await db.participants.where('synced').equals(1).toArray();
   const target = stale.filter((p) => p.ct !== null && p.updatedAt < cutoff);
   if (!target.length) return 0;
@@ -111,10 +198,11 @@ export async function wipeAll(): Promise<void> {
 /* ------------------------------- antrean ------------------------------- */
 
 export async function pendingCount(): Promise<number> {
-  const [e, p, a] = await Promise.all([
+  const [e, p, a, u] = await Promise.all([
     db.events.where('synced').equals(0).count(),
     db.participants.where('synced').equals(0).count(),
     db.anonTallies.where('synced').equals(0).count(),
+    db.ukurAntre.where('synced').equals(0).count(),
   ]);
-  return e + p + a;
+  return e + p + a + u;
 }

@@ -1894,3 +1894,11 @@ button { cursor: pointer; font-family: inherit; }
   color: var(--teal-800); font-variant-numeric: tabular-nums;
 }
 .produk-peringatan { color: var(--danger-700); }
+
+/* Pengukuran yang masih di antrean perangkat. Ditandai tenang, bukan sebagai
+   galat: angkanya tersimpan dan akan terkirim sendiri — yang belum terjadi
+   hanyalah perjalanannya ke server. */
+.riwayat-antre {
+  font-style: normal; font-size: 11.5px; font-weight: var(--fw-medium);
+  color: var(--accent-700, var(--text-muted));
+}

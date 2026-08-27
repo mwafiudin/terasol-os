@@ -5,6 +5,7 @@ import {
   type DaftarTerhapus, type JenisTransaksi, type KatalogRow,
   type PengukuranRow, type TransaksiRow,
 } from '../lib/api';
+import { antreUkur, bacaAntreUkur } from '../lib/db';
 import { angka, bangunDeret, fmtNilai, type Deret } from '../lib/deret';
 import { dec, fmtTanggal, fmtWaktu, fmtWaktuSingkat, num, rp } from '../lib/domain';
 import {
@@ -12,6 +13,7 @@ import {
   type Gender, type JenisUkur, type KategoriUkur, type KonteksGula,
 } from '../lib/rujukan';
 import { useApp } from '../lib/store';
+import { isOnline, refreshPending } from '../lib/sync';
 import { PapanUkur, PilihGrup, type Grup } from './PapanUkur';
 
 const KATEGORI_URUT: KategoriUkur[] = ['antropometri', 'tensi', 'darah'];
@@ -28,7 +30,7 @@ export function TabPengukuran({ pelangganId, participantId, gender, nama, onUbah
   nama: string;
   onUbah?: () => void;
 }) {
-  const { user, say } = useApp();
+  const { user, say, key } = useApp();
   const [rows, setRows] = useState<PengukuranRow[] | null>(null);
   const [rekan, setRekan] = useState<Rekan[]>([]);
   // Berisi kunci deret, bukan jenis: gula darah punya satu baris per konteks.
@@ -45,11 +47,40 @@ export function TabPengukuran({ pelangganId, participantId, gender, nama, onUbah
   const [gagal, setGagal] = useState<string | null>(null);
   const bolehHapus = user?.role === 'koordinator' || user?.role === 'admin_pusat';
 
+  /**
+   * Riwayat server DITAMBAH antrean lokal.
+   *
+   * Tanpa penggabungan ini, pengukuran yang dicatat saat offline tidak muncul
+   * di mana pun sampai sinyal kembali — petugas menyangka simpanannya gagal
+   * dan mengukur ulang, memakai strip kedua untuk angka yang sudah ada.
+   */
   const muat = useCallback(async () => {
     setGagal(null);
-    try { setRows((await api.pengukuran(pelangganId)).pengukuran); }
-    catch { setGagal('Gagal memuat riwayat pengukuran. Periksa koneksi.'); setRows([]); }
-  }, [pelangganId]);
+    const antre = (await bacaAntreUkur(key, pelangganId))
+      .filter((u) => u.synced === 0 && u.secret)
+      .map<PengukuranRow>((u) => ({
+        id: u.clientId,
+        jenis: u.jenis as JenisUkur,
+        konteks: (u.secret!.konteks as KonteksGula | null) ?? null,
+        nilai: String(u.secret!.nilai),
+        outOfRange: u.secret!.outOfRange,
+        catatan: u.secret!.catatan,
+        diukurPada: u.diukurPada,
+        participantId: u.participantId,
+        diukurOleh: null,
+        diukurOlehNama: null,
+        eventNama: null,
+        antre: true,
+      }));
+    try {
+      setRows([...(await api.pengukuran(pelangganId)).pengukuran, ...antre]);
+    } catch {
+      // Offline: antrean lokal adalah satu-satunya yang kita punya, dan itu
+      // bukan kegagalan — hanya riwayat servernya yang belum terjangkau.
+      if (antre.length) setRows(antre);
+      else { setGagal('Gagal memuat riwayat pengukuran. Periksa koneksi.'); setRows([]); }
+    }
+  }, [pelangganId, key]);
 
   useEffect(() => { void muat(); }, [muat]);
   useEffect(() => {
@@ -178,14 +209,45 @@ export function TabPengukuran({ pelangganId, participantId, gender, nama, onUbah
           beratAcuan={terbaru('berat')}
           onBatal={() => setCatat(null)}
           onSimpan={async (isi) => {
+            // Satu waktu ukur untuk seluruh kelompok: ketiganya memang
+            // diambil dalam satu sesi, dan waktu yang identik itulah yang
+            // nanti memasangkan sistolik dengan diastoliknya.
+            const diukurPada = new Date().toISOString();
+
+            /**
+             * Tanpa jaringan, pengukuran masuk antrean terenkripsi dan dikirim
+             * sendiri saat sinyal kembali. Sebelum ini menekan Simpan di luar
+             * jangkauan hanya memunculkan "Gagal menyimpan" dan angkanya hilang
+             * — di aplikasi yang dibangun justru untuk bekerja tanpa jaringan,
+             * dan pada alat yang stripnya sudah terpakai.
+             */
+            if (!isOnline() || !key) {
+              if (!key) { say('Buka kunci dengan PIN dulu supaya data bisa dienkripsi.'); return; }
+              for (const x of isi) {
+                await antreUkur(key, {
+                  clientId: crypto.randomUUID(),
+                  pelangganId, participantId,
+                  jenis: x.slot.jenis,
+                  diukurPada,
+                }, {
+                  nilai: x.nilai,
+                  konteks: x.slot.konteks,
+                  outOfRange: x.outOfRange,
+                  catatan: null,
+                });
+              }
+              await refreshPending();
+              say(`${isi.length} pengukuran masuk antrean — terkirim saat ada sinyal.`);
+              setCatat(null);
+              await muat(); onUbah?.();
+              return;
+            }
+
             try {
-              // Satu waktu ukur untuk seluruh kelompok: ketiganya memang
-              // diambil dalam satu sesi, dan waktu yang identik itulah yang
-              // nanti memasangkan sistolik dengan diastoliknya.
-              const diukurPada = new Date().toISOString();
               for (const x of isi) {
                 await api.createPengukuran({
                   pelangganId, participantId,
+                  clientId: crypto.randomUUID(),
                   jenis: x.slot.jenis,
                   konteks: x.slot.konteks,
                   nilai: x.nilai,
@@ -196,7 +258,28 @@ export function TabPengukuran({ pelangganId, participantId, gender, nama, onUbah
               say(`${isi.length} pengukuran tercatat.`);
               setCatat(null);
               await muat(); onUbah?.();
-            } catch { say('Gagal menyimpan. Periksa koneksi.'); }
+            } catch {
+              // Jaringan sempat ada saat tombol ditekan lalu putus di tengah.
+              // Angkanya tetap tidak boleh hilang.
+              if (key) {
+                for (const x of isi) {
+                  await antreUkur(key, {
+                    clientId: crypto.randomUUID(),
+                    pelangganId, participantId,
+                    jenis: x.slot.jenis, diukurPada,
+                  }, {
+                    nilai: x.nilai, konteks: x.slot.konteks,
+                    outOfRange: x.outOfRange, catatan: null,
+                  });
+                }
+                await refreshPending();
+                say('Koneksi terputus — pengukuran masuk antrean dan akan dikirim ulang.');
+                setCatat(null);
+                await muat(); onUbah?.();
+              } else {
+                say('Gagal menyimpan. Periksa koneksi.');
+              }
+            }
           }} />
       )}
 
@@ -293,7 +376,11 @@ function BarisUkur({
           )}
 
           <div className="riwayat-list">
-            {deret.titik.map((t) => (
+            {deret.titik.map((t) => {
+              // Selama masih di antrean, baris ini belum punya id server —
+              // mengubah atau menghapusnya akan menyasar id yang tidak ada.
+              const antre = t.rekaman.every((r) => r.antre);
+              return (
               <div className="riwayat-baris" key={t.waktu}>
                 <div className="riwayat-isi">
                   <b>{t.tampil} {deret.satuan}</b>
@@ -302,12 +389,13 @@ function BarisUkur({
                     {t.oleh ? ` · ${t.oleh}` : ''}
                     {t.event ? ` · ${t.event}` : ''}
                   </span>
+                  {antre && <em className="riwayat-antre">Menunggu terkirim</em>}
                   {t.catatan && <em>{t.catatan}</em>}
                 </div>
                 <div className="riwayat-aksi">
                   {/* Tensi ditopang dua rekaman, jadi tombolnya diberi nama
                       angka mana yang akan diubah — tanpa itu petugas menebak. */}
-                  {t.rekaman.map((r) => (
+                  {!antre && t.rekaman.map((r) => (
                     <button key={r.id} className="ikon-btn"
                       aria-label={t.rekaman.length > 1 ? `Ubah ${UKUR[r.jenis].label}` : 'Ubah'}
                       title={t.rekaman.length > 1 ? UKUR[r.jenis].singkat : 'Ubah'}
@@ -317,7 +405,7 @@ function BarisUkur({
                         : <Icon d={ICONS.pencil} size={16} />}
                     </button>
                   ))}
-                  {bolehHapus && konfirmHapus !== t.waktu && (
+                  {!antre && bolehHapus && konfirmHapus !== t.waktu && (
                     <button className="ikon-btn bahaya" aria-label="Hapus"
                       onClick={() => onMintaHapus(t.waktu)}>
                       <Icon d={ICONS.trash} size={16} />
@@ -333,7 +421,8 @@ function BarisUkur({
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

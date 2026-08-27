@@ -29,6 +29,10 @@ export default async function participantRoutes(app: FastifyInstance) {
         `select p.id, p.client_id as "clientId", p.nama, p.gender, p.usia, p.hp,
                 p.needs_review as "needsReview", p.erased_at as "erasedAt",
                 p.tenant_id as "tenantId",
+                -- Ikut dikirim supaya perangkat bisa menyalinnya: tanpa ini,
+                -- pelangganId hanya ada di /participants/:id, dan petugas yang
+                -- offline tidak pernah bisa mencatat pengukuran.
+                p.pelanggan_id as "pelangganId",
                 e.id as "eventId", e.nama as "eventNama",
                 to_char(e.tanggal,'YYYY-MM-DD') as "eventTanggal", e.status as "eventStatus",
                 s.imt, s.params_diambil as "paramsDiambil",

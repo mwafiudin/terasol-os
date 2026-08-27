@@ -1,6 +1,7 @@
 import { api, ApiError, WipeRequired, type SyncParticipant, type SyncPushResult } from './api';
-import { db, getMeta, purgeSynced, readParticipant, setMeta } from './db';
+import { bacaAntreUkur, db, getMeta, purgeSynced, readParticipant, setMeta } from './db';
 import { num } from './domain';
+import type { JenisUkur, KonteksGula } from './rujukan';
 import type { ParamKey, ParticipantRow } from './types';
 
 /**
@@ -45,12 +46,13 @@ function emit(patch: Partial<SyncState>) {
 let forceSync: (() => void) | null = null;
 
 export async function refreshPending() {
-  const [e, p, a] = await Promise.all([
+  const [e, p, a, u] = await Promise.all([
     db.events.where('synced').equals(0).count(),
     db.participants.where('synced').equals(0).count(),
     db.anonTallies.where('synced').equals(0).count(),
+    db.ukurAntre.where('synced').equals(0).count(),
   ]);
-  const pending = e + p + a;
+  const pending = e + p + a + u;
   const overQuota = pending >= MAX_UNSYNCED;
   const naikJadiOverQuota = overQuota && !state.overQuota;
   emit({ pending, overQuota });
@@ -109,6 +111,50 @@ async function buildParticipantPayload(
 }
 
 /**
+ * Mengirim pengukuran yang dicatat saat offline.
+ *
+ * Terpisah dari `/sync/push` karena bentuknya memang berbeda: push mengirim
+ * peserta beserta screening-nya sebagai satu kesatuan, sedangkan ini pengukuran
+ * lepas atas pelanggan yang sudah ada — persis yang terjadi di event
+ * berstasiun, ketika yang mendaftarkan dan yang mengukur bukan orang yang sama.
+ *
+ * Aman diulang: `clientId` tiap baris tetap, dan server melakukan upsert pada
+ * `(tenant_id, client_id)`. Yang gagal ditinggalkan di antrean, tidak dibuang.
+ */
+async function kirimAntreUkur(key: CryptoKey): Promise<number> {
+  const antre = (await bacaAntreUkur(key)).filter((u) => u.synced === 0);
+  if (!antre.length) return 0;
+
+  let terkirim = 0;
+  for (const u of antre) {
+    // Tanpa kunci yang cocok nilainya tidak terbaca. Membuangnya berarti
+    // menghilangkan pengukuran diam-diam, jadi ia ditinggalkan di antrean.
+    if (!u.secret) continue;
+    try {
+      await api.createPengukuran({
+        pelangganId: u.pelangganId,
+        participantId: u.participantId,
+        clientId: u.clientId,
+        jenis: u.jenis as JenisUkur,
+        konteks: (u.secret.konteks as KonteksGula | null) ?? null,
+        nilai: u.secret.nilai,
+        // Waktu ukur sungguhan, bukan waktu unggah — grafik tren dan
+        // perbandingan antar kunjungan bergantung padanya.
+        diukurPada: u.diukurPada,
+        outOfRange: u.secret.outOfRange,
+        catatan: u.secret.catatan,
+      });
+      await db.ukurAntre.update(u.clientId, { synced: 1 });
+      terkirim += 1;
+    } catch { /* biarkan di antrean; dicoba lagi siklus berikutnya */ }
+  }
+  // Yang sudah diterima server tidak perlu disimpan lagi di perangkat.
+  const selesai = await db.ukurAntre.where('synced').equals(1).primaryKeys();
+  await db.ukurAntre.bulkDelete(selesai);
+  return terkirim;
+}
+
+/**
  * Push inkremental. Aman diulang: batchId disimpan sampai server mengonfirmasi,
  * jadi percobaan ulang setelah sinyal putus tidak pernah menggandakan data.
  * Kegagalan tidak menghapus apa pun dan tidak memblokir input baru (US-05).
@@ -124,11 +170,21 @@ export async function syncNow(key: CryptoKey | null, opts: { silent?: boolean } 
     return null;
   }
 
-  const [events, participants, tallies] = await Promise.all([
+  const [events, participants, tallies, ukurTertunda] = await Promise.all([
     db.events.where('synced').equals(0).toArray(),
     db.participants.where('synced').equals(0).toArray(),
     db.anonTallies.where('synced').equals(0).toArray(),
+    db.ukurAntre.where('synced').equals(0).count(),
   ]);
+
+  // Dikirim lebih dulu dan di luar cabang "tidak ada yang dikirim" di bawah.
+  // Petugas stasiun kedua sering TIDAK punya peserta sendiri — antrean
+  // pengukuran adalah satu-satunya isinya, dan cabang itu akan pulang lebih
+  // awal sebelum sempat mengirimnya.
+  if (ukurTertunda > 0) {
+    try { await kirimAntreUkur(key); } catch { /* dilaporkan lewat pending */ }
+  }
+
   if (!events.length && !participants.length && !tallies.length) {
     // `lastSyncAt` TIDAK disentuh di sini. Tidak ada yang dikirim, jadi jawaban
     // atas "kapan data ini terakhir sampai ke server" tidak berubah. Baris ini
@@ -138,6 +194,7 @@ export async function syncNow(key: CryptoKey | null, opts: { silent?: boolean } 
     // ia menjadi janji palsu tentang data yang mungkin belum tersimpan.
     emit({ lastError: null });
     await purgeSynced();
+    await refreshPending();
     return null;
   }
 

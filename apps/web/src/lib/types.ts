@@ -85,4 +85,83 @@ export type AnonTallyRow = {
   synced: 0 | 1;
 };
 
+/* ============================ cermin peserta ============================ */
+
+/**
+ * Salinan lokal peserta yang dicatat PERANGKAT LAIN di event yang sama.
+ *
+ * Ada karena event sering dijalankan berstasiun: satu petugas mendaftarkan,
+ * petugas lain di meja berikutnya yang mengukur. Sebelum ini daftar peserta
+ * dari server hanya digabung saat online lalu dibuang, sehingga petugas kedua
+ * yang kehilangan sinyal tidak melihat peserta pertama sama sekali — di
+ * aplikasi yang justru dibangun untuk bekerja tanpa jaringan.
+ *
+ * Sengaja TABEL TERPISAH dari `participants`. Tabel itu berarti "record yang
+ * dibuat perangkat ini dan harus dikirim"; mencampur salinan server ke dalamnya
+ * akan merusak hitungan antrean, pemilihan `synced === 0` saat push, dan purge
+ * retensi. Cermin tidak pernah dikirim ke mana pun — ia hanya dibaca.
+ */
+export type CerminSecret = {
+  nama: string;
+  gender: 'P' | 'L';
+  usia: string;
+  hp: string;
+  imt: number | null;
+  paramsDiambil: ParamKey[];
+};
+
+/**
+ * Kolom terbuka di sini sengaja bukan data kesehatan, mengikuti aturan yang
+ * sama dengan `ParticipantRow`. Nama, usia, IMT, dan parameter yang diambil ada
+ * di dalam `iv`/`ct`.
+ */
+export type CerminRow = {
+  clientId: string;
+  eventClientId: string;
+  serverId: string;
+  /** Diperlukan untuk mencatat pengukuran; tanpa ini layar peserta read-only. */
+  pelangganId: string | null;
+  berminat: 0 | 1;
+  convStatus: ConvStatus | null;
+  needsReview: 0 | 1;
+  createdAt: string;
+  /** Kapan salinan ini diambil — ditampilkan agar tidak disangka data langsung. */
+  diambilPada: string;
+  iv: Uint8Array | null;
+  ct: ArrayBuffer | null;
+};
+
+export type CerminView = CerminRow & { secret: CerminSecret | null };
+
+/* =========================== antrean pengukuran =========================== */
+
+/** Nilai pengukuran adalah data kesehatan, jadi ia ikut dienkripsi. */
+export type UkurAntreSecret = {
+  nilai: number;
+  konteks: string | null;
+  outOfRange: boolean;
+  catatan: string | null;
+};
+
+/**
+ * Pengukuran yang dicatat saat offline, menunggu dikirim.
+ *
+ * `clientId` dibuat sekali dan tidak berubah: server melakukan upsert pada
+ * `(tenant_id, client_id)`, sehingga percobaan kirim ulang setelah sinyal putus
+ * tidak pernah menggandakan pengukuran.
+ */
+export type UkurAntreRow = {
+  clientId: string;
+  pelangganId: string;
+  participantId: string | null;
+  jenis: string;
+  /** Waktu ukur SUNGGUHAN, bukan waktu unggah — grafik tren bergantung padanya. */
+  diukurPada: string;
+  synced: 0 | 1;
+  iv: Uint8Array | null;
+  ct: ArrayBuffer | null;
+};
+
+export type UkurAntreView = UkurAntreRow & { secret: UkurAntreSecret | null };
+
 export type ParticipantView = ParticipantRow & { secret: ParticipantSecret | null };
