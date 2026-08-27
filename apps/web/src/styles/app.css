@@ -2020,3 +2020,15 @@ button { cursor: pointer; font-family: inherit; }
 }
 
 @media print { .paginasi { display: none !important; } }
+
+/* Kolom yang isinya belum masuk akal. Rangka merah dan pesannya muncul hanya
+   setelah kolom ditinggalkan — memerahi "08" yang baru diketik separuh adalah
+   menegur orang yang belum selesai bicara. */
+.input.salah, .input.salah:focus {
+  border-color: var(--danger-700);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger-700) 14%, transparent);
+}
+.field-salah {
+  display: block; margin-top: 4px;
+  font-size: 12px; color: var(--danger-700);
+}
