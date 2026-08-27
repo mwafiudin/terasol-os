@@ -235,3 +235,65 @@ export function diLuarWajar(jenis: JenisUkur, nilai: number): boolean {
   const w = UKUR[jenis].wajar;
   return nilai < w.min || nilai > w.max;
 }
+
+/* ============================ rentang sasaran ============================ */
+
+/**
+ * Batas angka rentang rujukan, untuk dipakai membandingkan dua kunjungan.
+ *
+ * Ada terpisah dari `nilaiUkur` karena keduanya menjawab pertanyaan berbeda:
+ * yang itu menjawab "angka ini masuk kategori apa", yang ini menjawab "seberapa
+ * jauh dari sasaran". Yang kedua diperlukan untuk menyatakan arah — dan arah
+ * TIDAK BISA disimpulkan dari naik-turunnya angka saja: asam urat yang turun
+ * dari 6,4 ke 2,0 adalah perburukan, bukan perbaikan.
+ *
+ * `null` berarti tidak ada rentang yang pantas dibandingkan, sama seperti
+ * `nilaiUkur` memilih diam ketimbang mengarang.
+ *
+ * PERINGATAN: angka di sini WAJIB sama dengan ambang di fungsi `nilai*` di
+ * atas. Keduanya berdampingan agar berubah bersama-sama; kalau suatu saat
+ * dipisah berkas, keduanya akan menyimpang tanpa ada yang menyadarinya.
+ */
+export function rentangSasaran(
+  jenis: JenisUkur,
+  opsi: { gender?: Gender; konteks?: KonteksGula | null } = {},
+): { min: number | null; max: number | null } | null {
+  switch (jenis) {
+    case 'gula': {
+      const k = opsi.konteks ?? 'sewaktu';
+      const max = k === 'puasa' ? 100 : k === '2jam_pp' ? 140 : 200;
+      return { min: null, max };
+    }
+    case 'kolesterol':
+      return { min: null, max: 200 };
+    case 'asam_urat':
+      return opsi.gender ? RENTANG_ASAM_URAT[opsi.gender] : null;
+    case 'lingkar_perut':
+      return opsi.gender ? { min: null, max: AMBANG_LINGKAR_PERUT[opsi.gender] } : null;
+    // Tensi dinilai dari sepasang angka, jadi jaraknya dihitung pemanggil dari
+    // kedua ambang sekaligus (lihat `jarakTensi` di analisis.ts).
+    case 'sistolik':
+      return { min: null, max: 120 };
+    case 'diastolik':
+      return { min: null, max: 80 };
+    default:
+      return null;
+  }
+}
+
+/** Rentang sasaran IMT Asia-Pasifik — sama dengan ambang di `nilaiImt`. */
+export const SASARAN_IMT = { min: 18.5, max: 23 };
+
+/**
+ * Seberapa jauh sebuah angka berada DI LUAR rentang sasaran. Nol berarti di
+ * dalam. Selalu positif, sehingga mengecil = mendekati sasaran, apa pun arah
+ * penyimpangannya.
+ */
+export function jarakKeSasaran(
+  nilai: number,
+  rentang: { min: number | null; max: number | null },
+): number {
+  if (rentang.max != null && nilai > rentang.max) return nilai - rentang.max;
+  if (rentang.min != null && nilai < rentang.min) return rentang.min - nilai;
+  return 0;
+}

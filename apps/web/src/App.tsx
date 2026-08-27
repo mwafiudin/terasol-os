@@ -14,13 +14,15 @@ import { Login, SetPin, Unlock } from './screens/Auth';
 import { EventForm, Events, Recap } from './screens/Events';
 import { Home } from './screens/Home';
 import { Consent, Done, Register, Screening } from './screens/Participant';
-import { EventPeserta, PesertaDetail } from './screens/Peserta';
+import { EventPeserta, PesertaDetail, type SasaranAnalisis } from './screens/Peserta';
+import { Analisis } from './screens/Analisis';
+import { ProdukKK } from './screens/Produk';
 
 type Screen =
   | 'home' | 'events' | 'outlet' | 'hs'
   | 'eventForm' | 'register' | 'consent' | 'screening' | 'done'
   | 'recap' | 'conflicts' | 'settings' | 'pusat' | 'master'
-  | 'eventPeserta' | 'pesertaDetail';
+  | 'eventPeserta' | 'pesertaDetail' | 'analisis' | 'produk';
 
 const TOP_SCREENS: Screen[] = ['home', 'events', 'outlet', 'hs'];
 
@@ -31,6 +33,7 @@ export default function App() {
   const [recapEvent, setRecapEvent] = useState<EventRow | null>(null);
   const [eventPeserta, setEventPeserta] = useState<EventRow | null>(null);
   const [pesertaTerpilih, setPesertaTerpilih] = useState<PesertaRingkas | null>(null);
+  const [sasaranAnalisis, setSasaranAnalisis] = useState<SasaranAnalisis | null>(null);
   /** Alur peserta bisa dimulai dari Beranda atau dari daftar peserta event. */
   const [asalPeserta, setAsalPeserta] = useState<'home' | 'eventPeserta'>('home');
   const [consentText, setConsentText] = useState<{ versi: string; isi: string } | null>(null);
@@ -119,6 +122,9 @@ export default function App() {
         ...(user?.role === 'admin_pusat' ? [{ id: 'master:cabang', label: 'Cabang' }] : []),
       ],
     }] : []),
+    // Terbuka untuk semua peran: pertanyaan 'ini isinya apa' datang di meja,
+    // bukan di kantor, dan yang ditanya adalah petugas.
+    { id: 'produk', label: 'Produk KK', icon: ICONS.cart },
     { id: 'settings', label: 'Pengaturan', icon: ICONS.gear },
   ];
 
@@ -154,7 +160,11 @@ export default function App() {
         )}
         {screen === 'pesertaDetail' && pesertaTerpilih && (
           <PesertaDetail go={go} peserta={pesertaTerpilih}
-            onUbah={() => setReloadKey((k) => k + 1)} />
+            onUbah={() => setReloadKey((k) => k + 1)}
+            onAnalisis={(s) => { setSasaranAnalisis(s); go('analisis'); }} />
+        )}
+        {screen === 'analisis' && sasaranAnalisis && (
+          <Analisis go={() => go('pesertaDetail')} {...sasaranAnalisis} />
         )}
         {screen === 'eventForm' && <EventForm go={go} onSaved={() => setReloadKey((k) => k + 1)} />}
         {screen === 'register' && <Register go={goAlurPeserta} />}
@@ -172,6 +182,7 @@ export default function App() {
         {screen === 'master' && koordinator && (
           <Master go={go} tab={masterTab} onTab={setMasterTab} />
         )}
+        {screen === 'produk' && <ProdukKK go={go} />}
         {screen === 'outlet' && <Placeholder kind="outlet" />}
         {screen === 'hs' && <Placeholder kind="hs" />}
       </main>
