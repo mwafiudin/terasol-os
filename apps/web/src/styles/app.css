@@ -1046,6 +1046,8 @@ button { cursor: pointer; font-family: inherit; }
   /* Elemen yang memang harus melintang penuh. */
   .app.lebar .screen > .page > .page-head,
   .app.lebar .screen > .page > .recap-sub,
+  .app.lebar .screen > .page > .identitas-baris,
+  .app.lebar .screen > .page > .ukur-grup-judul,
   .app.lebar .screen > .page > .section-title,
   .app.lebar .screen > .page > .segtabs,
   .app.lebar .screen > .page > .cari-kotak,
@@ -1070,6 +1072,11 @@ button { cursor: pointer; font-family: inherit; }
     max-height: min(84vh, 760px); overflow-y: auto;
   }
   .app.lebar .sheet .grab { display: none; }
+
+  /* Papan angka tetap selebar tangan. Numpad selebar 1000px bukan hanya jelek —
+     jarak antartombolnya membuat mengetik justru lebih lambat daripada
+     papan ketik biasa. */
+  .app.lebar .papan { max-width: 520px; width: 100%; margin: 0 auto; }
 
   .app.lebar ::-webkit-scrollbar { display: block; width: 10px; }
   .app.lebar ::-webkit-scrollbar-thumb {
