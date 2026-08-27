@@ -9,7 +9,7 @@ import { installIdleLock, installNetworkWatch, useApp } from './lib/store';
 import { isOnline, startAutoSync } from './lib/sync';
 import type { ConvStatus, EventRow } from './lib/types';
 import { Conflicts, Placeholder, Pusat, Settings } from './screens/Admin';
-import { Master } from './screens/Master';
+import { Master, type MasterTab } from './screens/Master';
 import { Login, SetPin, Unlock } from './screens/Auth';
 import { EventForm, Events, Recap } from './screens/Events';
 import { Home } from './screens/Home';
@@ -36,6 +36,8 @@ export default function App() {
   const [consentText, setConsentText] = useState<{ versi: string; isi: string } | null>(null);
   const [followUp, setFollowUp] = useState<ServerParticipant | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  // Diangkat ke sini supaya sub-menu sidebar bisa mengarahkannya langsung.
+  const [masterTab, setMasterTab] = useState<MasterTab>("katalog");
   const startDraft = useDraft((s) => s.start);
   const restoreDraft = useDraft((s) => s.restore);
 
@@ -109,9 +111,26 @@ export default function App() {
   // Isian sekunder rel navigasi. Hanya muncul mulai tablet; di ponsel keduanya
   // sudah punya rumah sendiri (ikon gigi di kepala, dan kartu menu Beranda).
   const navSekunder = [
-    ...(koordinator ? [{ id: 'master', label: 'Master data', icon: ICONS.tag }] : []),
+    ...(koordinator ? [{
+      id: 'master', label: 'Master data', icon: ICONS.tag,
+      anak: [
+        { id: 'master:katalog', label: 'Produk & layanan' },
+        { id: 'master:tim', label: 'Tim' },
+        ...(user?.role === 'admin_pusat' ? [{ id: 'master:cabang', label: 'Cabang' }] : []),
+      ],
+    }] : []),
     { id: 'settings', label: 'Pengaturan', icon: ICONS.gear },
   ];
+
+  /** `master:katalog` dari sidebar dipetakan ke layar + tabnya. */
+  const pilihNav = (id: string) => {
+    if (id.startsWith('master:')) {
+      setMasterTab(id.slice('master:'.length) as MasterTab);
+      go('master');
+      return;
+    }
+    go(id);
+  };
 
   // Lebar layar yang menentukan bentuk, bukan peran. Petugas yang bekerja dari
   // tablet di meja pendaftaran memerlukan layout yang sama lapangnya dengan
@@ -150,13 +169,16 @@ export default function App() {
         {screen === 'conflicts' && <Conflicts go={go} />}
         {screen === 'settings' && <Settings go={go} />}
         {screen === 'pusat' && user?.role === 'admin_pusat' && <Pusat go={go} />}
-        {screen === 'master' && koordinator && <Master go={go} />}
+        {screen === 'master' && koordinator && (
+          <Master go={go} tab={masterTab} onTab={setMasterTab} />
+        )}
         {screen === 'outlet' && <Placeholder kind="outlet" />}
         {screen === 'hs' && <Placeholder kind="hs" />}
       </main>
 
       <Navigasi active={TOP_SCREENS.includes(screen) ? tab : screen}
-        onSelect={(id) => go(id)} sekunder={navSekunder}
+        anakAktif={'master:' + masterTab}
+        onSelect={pilihNav} sekunder={navSekunder}
         cabang={user?.tenantNama} sembunyiDiPonsel={!showTabs} />
       {toast && <Toast message={toast} />}
       {followUp && (

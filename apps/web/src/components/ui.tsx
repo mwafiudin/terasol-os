@@ -272,7 +272,13 @@ export const TABS = [
 
 export type TabId = (typeof TABS)[number]['id'];
 
-export type ItemNav = { id: string; label: string; icon: (string | [number, number, number])[] };
+export type ItemNav = {
+  id: string;
+  label: string;
+  icon: (string | [number, number, number])[];
+  /** Sub-menu, hanya muncul saat induknya sedang aktif dan sidebar berlabel. */
+  anak?: { id: string; label: string }[];
+};
 
 /**
  * Navigasi utama. Satu komponen, dua bentuk.
@@ -287,20 +293,41 @@ export type ItemNav = { id: string; label: string; icon: (string | [number, numb
  * Di ponsel keduanya sudah punya rumah sendiri, dan memaksakannya ke baris
  * empat tab akan mengorbankan yang dipakai sepanjang hari.
  */
-export function Navigasi({ active, onSelect, sekunder = [], cabang, sembunyiDiPonsel }: {
+export function Navigasi({ active, anakAktif, onSelect, sekunder = [], cabang, sembunyiDiPonsel }: {
   active: string;
+  /** Sub-menu yang sedang terbuka, bila induknya punya anak. */
+  anakAktif?: string;
   onSelect: (id: string) => void;
   sekunder?: ItemNav[];
   cabang?: string;
   sembunyiDiPonsel?: boolean;
 }) {
-  const tombol = (t: ItemNav) => (
-    <button key={t.id} className={`tab ${active === t.id ? 'on' : ''}`}
-      onClick={() => onSelect(t.id)} aria-current={active === t.id ? 'page' : undefined}>
-      <Icon d={t.icon} size={24} />
-      <span>{t.label}</span>
-    </button>
-  );
+  const tombol = (t: ItemNav) => {
+    const aktif = active === t.id;
+    return (
+      <div key={t.id} className="nav-item">
+        <button className={`tab ${aktif ? 'on' : ''}`}
+          onClick={() => onSelect(t.id)} aria-current={aktif && !t.anak ? 'page' : undefined}>
+          <Icon d={t.icon} size={24} />
+          <span>{t.label}</span>
+        </button>
+        {/* Sub-menu hanya dibuka saat bagiannya sedang dipakai. Menampilkan
+            seluruh cabang menu sepanjang waktu membuat rel yang tenang menjadi
+            daftar panjang yang harus dibaca ulang setiap kali. */}
+        {t.anak && aktif && (
+          <div className="nav-anak">
+            {t.anak.map((a) => (
+              <button key={a.id} className={`tab-anak ${anakAktif === a.id ? 'on' : ''}`}
+                onClick={() => onSelect(a.id)}
+                aria-current={anakAktif === a.id ? 'page' : undefined}>
+                {a.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <nav className={`tabbar ${sembunyiDiPonsel ? 'sembunyi-ponsel' : ''}`} aria-label="Navigasi utama">
