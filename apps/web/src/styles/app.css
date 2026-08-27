@@ -2032,3 +2032,12 @@ button { cursor: pointer; font-family: inherit; }
   display: block; margin-top: 4px;
   font-size: 12px; color: var(--danger-700);
 }
+
+/* Kelompok yang sudah terisi pada pemilih registrasi. Ditandai tenang — ini
+   penanda kemajuan, bukan keberhasilan yang perlu dirayakan. */
+.grup-kartu.terisi { border-color: var(--border-brand, var(--teal-700)); }
+.grup-kartu.terisi .grup-ikon { background: var(--brand-soft); color: var(--teal-800); }
+.grup-hitung {
+  flex: 0 0 auto; font-size: 12px; font-weight: var(--fw-semibold);
+  color: var(--text-muted); font-variant-numeric: tabular-nums;
+}

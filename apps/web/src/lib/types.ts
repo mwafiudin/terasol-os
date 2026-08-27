@@ -1,5 +1,9 @@
+import type { KonteksGula } from './rujukan';
+
 export type ParamKey =
-  | 'tinggi' | 'berat' | 'sistolik' | 'diastolik' | 'gula' | 'kolesterol' | 'asam_urat';
+  | 'tinggi' | 'berat' | 'lingkar_perut'
+  | 'sistolik' | 'diastolik' | 'nadi'
+  | 'gula' | 'kolesterol' | 'asam_urat';
 
 export type Role = 'petugas' | 'koordinator' | 'admin_pusat';
 export type ConvStatus = 'baru' | 'dihubungi' | 'membeli' | 'batal';
@@ -50,6 +54,8 @@ export type ParticipantSecret = {
     clientId: string;
     /** Nilai apa adanya seperti diketik petugas (koma sebagai desimal). */
     values: Partial<Record<ParamKey, string>>;
+    /** Tanpa ini, angka gula darah tidak punya rentang rujukan yang benar. */
+    konteksGula?: KonteksGula | null;
     outOfRange: boolean;
     measuredAt: string;
   } | null;

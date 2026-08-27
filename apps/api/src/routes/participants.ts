@@ -87,6 +87,7 @@ export default async function participantRoutes(app: FastifyInstance) {
                 ) end as consent,
                 case when s.id is null then null else json_build_object(
                   'tinggi', s.tinggi, 'berat', s.berat, 'imt', s.imt,
+                  'lingkarPerut', s.lingkar_perut, 'nadi', s.nadi,
                   'sistolik', s.sistolik, 'diastolik', s.diastolik,
                   'gula', s.gula, 'kolesterol', s.kolesterol, 'asamUrat', s.asam_urat,
                   'paramsDiambil', s.params_diambil, 'outOfRange', s.out_of_range,
@@ -176,6 +177,7 @@ export default async function participantRoutes(app: FastifyInstance) {
                   'createdAt', p.created_at,
                   'screening', case when s.id is null then null else json_build_object(
                     'tinggi', s.tinggi, 'berat', s.berat, 'imt', s.imt,
+                  'lingkarPerut', s.lingkar_perut, 'nadi', s.nadi,
                     'sistolik', s.sistolik, 'diastolik', s.diastolik,
                     'gula', s.gula, 'kolesterol', s.kolesterol, 'asamUrat', s.asam_urat,
                     'paramsDiambil', s.params_diambil) end

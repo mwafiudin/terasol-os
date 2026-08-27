@@ -70,7 +70,9 @@ export function isOnline() { return navigator.onLine && !simulatedOffline; }
 function toNumberValues(values: Partial<Record<ParamKey, string>>) {
   return {
     tinggi: num(values.tinggi), berat: num(values.berat),
+    lingkarPerut: num(values.lingkar_perut),
     sistolik: num(values.sistolik), diastolik: num(values.diastolik),
+    nadi: num(values.nadi),
     gula: num(values.gula), kolesterol: num(values.kolesterol),
     asamUrat: num(values.asam_urat),
   };
@@ -98,7 +100,13 @@ async function buildParticipantPayload(
     hp: s.hp,
     updatedAt: row.updatedAt,
     consent: s.consent,
-    screening: sc ? { clientId: sc.clientId, ...toNumberValues(sc.values), paramsDiambil: taken, outOfRange: sc.outOfRange, measuredAt: sc.measuredAt } : null,
+    screening: sc
+      ? {
+        clientId: sc.clientId, ...toNumberValues(sc.values),
+        konteksGula: sc.konteksGula ?? null,
+        paramsDiambil: taken, outOfRange: sc.outOfRange, measuredAt: sc.measuredAt,
+      }
+      : null,
     conversion: row.convStatus
       ? {
         berminat: row.berminat === 1, status: row.convStatus,
