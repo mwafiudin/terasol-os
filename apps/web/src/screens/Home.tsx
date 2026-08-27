@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { Badge, Button, Icon, ICONS } from '../components/ui';
 import { api, type ServerParticipant } from '../lib/api';
 import { getMeta, setMeta } from '../lib/db';
-import { CONV_LABEL, EVENT_STATUS, fmtSejak, fmtTanggal, rp } from '../lib/domain';
-import { activeEvent, countsFor, pullEvents, type EventCounts } from '../lib/events';
+import { CONV_LABEL, fmtSejak, fmtTanggal, rp, statusTampil } from '../lib/domain';
+import { activeEvent, countsFor, eventHariIni, pullEvents, type EventCounts } from '../lib/events';
 import { useInstall } from '../lib/install';
 import { useApp } from '../lib/store';
 import {
@@ -15,6 +15,14 @@ import type { EventRow } from '../lib/types';
 type Props = {
   go: (screen: string) => void;
   onFollowUp: (p: ServerParticipant) => void;
+  /**
+   * Mendaftarkan peserta ke event TERTENTU.
+   *
+   * Wajib membawa event-nya: sejak kartu bisa digeser, "event yang sedang
+   * dilihat" tidak lagi sama dengan "event pertama hari ini", dan menebaknya
+   * di tempat lain akan menaruh peserta di event yang salah.
+   */
+  onDaftar: (ev: EventRow) => void;
   reloadKey: number;
 };
 
@@ -107,11 +115,19 @@ function PeringatanKetahanan({ storagePersisted, install, say }: {
   );
 }
 
-export function Home({ go, onFollowUp, reloadKey }: Props) {
+export function Home({ go, onFollowUp, onDaftar, reloadKey }: Props) {
   const { user, key, say, storagePersisted } = useApp();
   const install = useInstall();
-  const [ev, setEv] = useState<EventRow | null>(null);
-  const [counts, setCounts] = useState<EventCounts>({ peserta: 0, berminat: 0, tally: 0, belumSync: 0 });
+  /**
+   * Event yang ditawarkan di kartu utama.
+   *
+   * Bisa lebih dari satu: satu hari boleh punya beberapa event, dan sebelumnya
+   * hanya satu yang pernah terlihat — yang lain hanya bisa dicapai lewat tab
+   * Event tanpa petunjuk bahwa ia ada.
+   */
+  const [daftarEv, setDaftarEv] = useState<EventRow[]>([]);
+  const [pilih, setPilih] = useState(0);
+  const [counts, setCounts] = useState<Record<string, EventCounts>>({});
   const [sync, setSync] = useState<SyncState | null>(null);
   const [followUps, setFollowUps] = useState<ServerParticipant[]>([]);
   const [conflicts, setConflicts] = useState(0);
@@ -121,9 +137,15 @@ export function Home({ go, onFollowUp, reloadKey }: Props) {
 
   const load = useCallback(async () => {
     try { await pullEvents(); } catch { /* offline: pakai data lokal */ }
-    const e = await activeEvent();
-    setEv(e);
-    if (e) setCounts(await countsFor(e));
+    // Hari ini lebih dulu. Kalau tidak ada satu pun hari ini, jatuh ke event
+    // terdekat supaya kartunya tidak kosong tanpa sebab.
+    const hariIniSaja = await eventHariIni();
+    const daftar = hariIniSaja.length ? hariIniSaja : [await activeEvent()].filter((x): x is EventRow => !!x);
+    setDaftarEv(daftar);
+    setPilih((i) => Math.min(i, Math.max(0, daftar.length - 1)));
+    const isi: Record<string, EventCounts> = {};
+    for (const e of daftar) isi[e.clientId] = await countsFor(e);
+    setCounts(isi);
 
     if (isOnline()) {
       try {
@@ -254,31 +276,66 @@ export function Home({ go, onFollowUp, reloadKey }: Props) {
           petugas keluar layar. */}
       <PeringatanKetahanan storagePersisted={storagePersisted} install={install} say={say} />
 
-      {ev ? (
-        <div className="hero-card">
-          <svg className="deco" viewBox="0 0 200 200" fill="none" aria-hidden="true">
-            <circle cx="100" cy="100" r="82" stroke="rgba(248,245,238,.09)" strokeWidth="9"
-              strokeLinecap="round" strokeDasharray="440 75" transform="rotate(-40 100 100)" />
-            <circle cx="46" cy="152" r="6" fill="rgba(204,156,72,.5)" />
-          </svg>
-          <div className="hero-top">
-            <Badge tone="onbrand" dot>{ev.status === 'active' ? 'Event berlangsung' : `Event ${EVENT_STATUS[ev.status].label.toLowerCase()}`}</Badge>
-            <span className="tipe">{ev.tipe === 'berbayar' ? rp(ev.hargaPaket) : 'Gratis'}</span>
-          </div>
-          <div>
-            <div className="hero-title">{ev.nama}</div>
-            <div className="hero-meta">{fmtTanggal(ev.tanggal)} · {ev.lokasi}</div>
-          </div>
-          <div className="hero-stats">
-            <div className="hero-stat"><b>{counts.peserta}</b><span>Peserta</span></div>
-            <div className="hero-stat"><b>{counts.berminat}</b><span>Berminat</span></div>
-            <div className="hero-stat"><b>{counts.tally}</b><span>Tally anonim</span></div>
-          </div>
-          <Button variant="onbrand" size="lg" full icon={ICONS.userPlus} onClick={() => go('register')}>
-            Registrasi peserta baru
-          </Button>
+      {daftarEv.length > 0 ? (
+        <div className={`hero-deck${daftarEv.length > 1 ? ' geser' : ''}`}
+          onScroll={(e) => {
+            // Halaman aktif dibaca dari posisi gulir, bukan disimpan terpisah:
+            // dengan scroll-snap, gulirlah sumber kebenarannya.
+            const el = e.currentTarget;
+            const i = Math.round(el.scrollLeft / el.clientWidth);
+            if (i !== pilih) setPilih(i);
+          }}>
+          {daftarEv.map((e) => {
+            const st = statusTampil(e);
+            const c = counts[e.clientId] ?? { peserta: 0, berminat: 0, tally: 0, belumSync: 0 };
+            return (
+              <div className="hero-card" key={e.clientId}>
+                <svg className="deco" viewBox="0 0 200 200" fill="none" aria-hidden="true">
+                  <circle cx="100" cy="100" r="82" stroke="rgba(248,245,238,.09)" strokeWidth="9"
+                    strokeLinecap="round" strokeDasharray="440 75" transform="rotate(-40 100 100)" />
+                  <circle cx="46" cy="152" r="6" fill="rgba(204,156,72,.5)" />
+                </svg>
+                <div className="hero-top">
+                  <Badge tone="onbrand" dot={st.hariIni}>Event {st.label.toLowerCase()}</Badge>
+                  <span className="tipe">{e.tipe === 'berbayar' ? rp(e.hargaPaket) : 'Gratis'}</span>
+                </div>
+                <div>
+                  <div className="hero-title">{e.nama}</div>
+                  <div className="hero-meta">{fmtTanggal(e.tanggal)} · {e.lokasi}</div>
+                </div>
+                <div className="hero-stats">
+                  <div className="hero-stat"><b>{c.peserta}</b><span>Peserta</span></div>
+                  <div className="hero-stat"><b>{c.berminat}</b><span>Berminat</span></div>
+                  <div className="hero-stat"><b>{c.tally}</b><span>Tally anonim</span></div>
+                </div>
+                <Button variant="onbrand" size="lg" full icon={ICONS.userPlus}
+                  onClick={() => onDaftar(e)}>
+                  Registrasi peserta baru
+                </Button>
+              </div>
+            );
+          })}
         </div>
-      ) : (
+      ) : null}
+
+      {/* Titik penanda halaman. Hanya muncul bila memang ada lebih dari satu
+          event hari itu — satu titik tunggal tidak memberi tahu apa pun, dan
+          justru menyiratkan ada yang tersembunyi. */}
+      {daftarEv.length > 1 && (
+        <div className="hero-titik" role="tablist" aria-label="Event hari ini">
+          {daftarEv.map((e, i) => (
+            <button key={e.clientId} role="tab" aria-selected={i === pilih}
+              aria-label={e.nama}
+              className={`titik${i === pilih ? ' on' : ''}`}
+              onClick={() => {
+                const dek = document.querySelector('.hero-deck');
+                dek?.scrollTo({ left: i * dek.clientWidth, behavior: 'smooth' });
+              }} />
+          ))}
+        </div>
+      )}
+
+      {daftarEv.length === 0 && (
         <div className="card empty-card">
           <div className="ic"><Icon d={ICONS.calPlus} size={26} /></div>
           <b>Belum ada event</b>

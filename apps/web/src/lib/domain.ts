@@ -75,6 +75,35 @@ export const EVENT_STATUS: Record<EventStatus, { label: string; tone: string }> 
 /** Status yang masih boleh menerima peserta baru. */
 export const bisaTerimaPeserta = (s: EventStatus) => s === 'active' || s === 'planned';
 
+export const hariIni = () => new Date().toISOString().slice(0, 10);
+
+/**
+ * Status yang DITAMPILKAN, diturunkan dari tanggal.
+ *
+ * Status tersimpan ditetapkan sekali saat event dibuat — `active` bila
+ * tanggalnya hari ini atau sudah lewat, `planned` bila masih di depan — dan
+ * setelah itu tidak pernah berubah sendiri. Akibatnya event dua hari lalu
+ * tetap mengaku "Berlangsung", sementara event yang benar-benar berjalan hari
+ * ini masih "Terjadwal" karena begitulah keadaannya saat ia dibuat.
+ *
+ * Yang dijawab di sini adalah pertanyaan tampilan — "apa yang sedang terjadi"
+ * — dan itu pertanyaan tentang TANGGAL. Izin mencatat peserta sengaja TIDAK
+ * ikut diturunkan dari sini dan tetap memakai status tersimpan: petugas yang
+ * merampungkan data keesokan pagi tidak boleh terkunci hanya karena harinya
+ * berganti.
+ *
+ * Event yang diarsipkan tetap diarsipkan, apa pun tanggalnya.
+ */
+export function statusTampil(ev: { tanggal: string; status: EventStatus }): {
+  label: string; tone: string; hariIni: boolean;
+} {
+  if (ev.status === 'archived') return { ...EVENT_STATUS.archived, hariIni: false };
+  const kini = hariIni();
+  if (ev.tanggal === kini) return { ...EVENT_STATUS.active, hariIni: true };
+  if (ev.tanggal < kini) return { ...EVENT_STATUS.done, hariIni: false };
+  return { ...EVENT_STATUS.planned, hariIni: false };
+}
+
 export const rp = (n: number) => 'Rp ' + Math.round(n).toLocaleString('id-ID');
 export const pct = (n: number) => (Math.round(n * 1000) / 10).toLocaleString('id-ID') + '%';
 export const dec = (n: number) => n.toLocaleString('id-ID', { maximumFractionDigits: 1 });
