@@ -1,3 +1,4 @@
+import type { JenisUkur, KonteksGula } from './rujukan';
 import type { ConvStatus, EventRow, EventStatus, EventTipe, ParamKey, Role, User } from './types';
 
 const BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
@@ -105,8 +106,57 @@ const post = <T>(p: string, b?: unknown) =>
   request<T>(p, { method: 'POST', body: b === undefined ? undefined : JSON.stringify(b) });
 const patch = <T>(p: string, b: unknown) =>
   request<T>(p, { method: 'PATCH', body: JSON.stringify(b) });
+const put = <T>(p: string, b: unknown) =>
+  request<T>(p, { method: 'PUT', body: JSON.stringify(b) });
+const del = <T>(p: string) => request<T>(p, { method: 'DELETE' });
 
 /* ------------------------------- tipe ------------------------------- */
+
+export type PelangganRingkas = {
+  id: string; tenantId: string; nama: string; gender: 'P' | 'L'; usia: number | null;
+  hp: string; createdAt: string; kunjungan: number; totalBelanja: string;
+  terakhirDiukur: string | null;
+};
+
+export type PelangganDetail = {
+  id: string; tenantId: string; nama: string; gender: 'P' | 'L'; usia: number | null;
+  hp: string; catatan: string | null; createdAt: string; erasedAt: string | null;
+  kunjungan: {
+    id: string; needsReview: boolean; createdAt: string;
+    eventId: string; eventNama: string; eventTanggal: string; eventStatus: EventStatus;
+    consent: { granted: boolean; versiTeks: string; ts: string } | null;
+    berminat: boolean; convStatus: ConvStatus;
+  }[];
+};
+
+export type PengukuranRow = {
+  id: string; jenis: JenisUkur; konteks: KonteksGula | null; nilai: string;
+  outOfRange: boolean; catatan: string | null; diukurPada: string;
+  participantId: string | null; diukurOleh: string | null;
+  diukurOlehNama: string | null; eventNama: string | null;
+};
+
+export type CabangRingkas = {
+  id: string; nama: string; pelanggan: number; kunjungan: number; pengukuran: number;
+  eventAktif: number; event: number; totalBelanja: string; transaksi: number;
+  petugas: number; perluDitinjau: number;
+};
+
+export type PusatRingkasan = {
+  cabang: CabangRingkas[];
+  total: {
+    cabang: number; pelanggan: number; kunjungan: number; pengukuran: number;
+    eventAktif: number; transaksi: number; totalBelanja: number; perluDitinjau: number;
+  };
+};
+
+export type JenisTransaksi = 'produk' | 'terapi' | 'paket';
+
+export type TransaksiRow = {
+  id: string; jenis: JenisTransaksi; nama: string; jumlah: number;
+  hargaSatuan: string; total: string; tanggal: string; catatan: string | null;
+  dicatatOleh: string | null; dicatatOlehNama: string | null; eventNama: string | null;
+};
 
 export type LoginResult = { accessToken: string; refreshToken: string; user: User };
 
@@ -178,6 +228,7 @@ export type ServerParticipant = {
 export type ParticipantDetail = {
   id: string; clientId: string; nama: string; gender: 'P' | 'L'; usia: number; hp: string;
   needsReview: boolean; erasedAt: string | null; createdAt: string; deviceId: string | null;
+  pelangganId: string | null;
   event: {
     id: string; nama: string; lokasi: string; tanggal: string;
     tipe: EventTipe; hargaPaket: number; status: EventStatus;
@@ -248,6 +299,43 @@ export const api = {
     participants: SyncParticipant[];
     anonTallies: Record<string, unknown>[];
   }) => post<SyncPushResult>('/sync/push', body),
+
+  /* --------------------- pelanggan, pengukuran, belanja --------------------- */
+
+  pelanggan: (cari?: string) =>
+    request<{ pelanggan: PelangganRingkas[] }>(`/pelanggan?${new URLSearchParams(cari ? { cari } : {})}`),
+  pelangganDetail: (id: string) => request<PelangganDetail>(`/pelanggan/${id}`),
+  updatePelanggan: (id: string, body: Partial<{ nama: string; gender: 'P' | 'L'; usia: number | null; hp: string; catatan: string | null }>) =>
+    patch<unknown>(`/pelanggan/${id}`, body),
+
+  pengukuran: (pelangganId: string) =>
+    request<{ pengukuran: PengukuranRow[] }>(`/pelanggan/${pelangganId}/pengukuran`),
+  createPengukuran: (body: {
+    pelangganId: string; participantId?: string | null; jenis: JenisUkur;
+    konteks?: KonteksGula | null; nilai: number; diukurPada?: string;
+    diukurOleh?: string | null; outOfRange?: boolean; catatan?: string | null;
+  }) => post<{ id: string }>('/pengukuran', body),
+  updatePengukuran: (id: string, body: Record<string, unknown>) =>
+    patch<unknown>(`/pengukuran/${id}`, body),
+  deletePengukuran: (id: string) => del<{ ok: true }>(`/pengukuran/${id}`),
+
+  transaksi: (pelangganId: string) =>
+    request<{ transaksi: TransaksiRow[]; total: number }>(`/pelanggan/${pelangganId}/transaksi`),
+  createTransaksi: (body: {
+    pelangganId: string; participantId?: string | null; jenis?: JenisTransaksi;
+    nama: string; jumlah: number; hargaSatuan: number; tanggal?: string; catatan?: string | null;
+  }) => post<{ id: string }>('/transaksi', body),
+  updateTransaksi: (id: string, body: Record<string, unknown>) =>
+    patch<unknown>(`/transaksi/${id}`, body),
+  deleteTransaksi: (id: string) => del<{ ok: true }>(`/transaksi/${id}`),
+
+  pusatRingkasan: () => request<PusatRingkasan>('/pusat/ringkasan'),
+
+  rekan: () => request<{ rekan: { id: string; nama: string; role: Role }[] }>('/rekan'),
+  eventPetugas: (eventId: string) =>
+    request<{ petugas: { id: string; nama: string; role: Role }[] }>(`/events/${eventId}/petugas`),
+  setEventPetugas: (eventId: string, userIds: string[]) =>
+    put<{ ok: true; jumlah: number }>(`/events/${eventId}/petugas`, { userIds }),
 
   users: () => request<{ users: { id: string; nama: string; email: string; role: Role; active: boolean }[] }>('/users'),
   createUser: (u: { nama: string; email: string; password: string; role: 'petugas' | 'koordinator' }) =>

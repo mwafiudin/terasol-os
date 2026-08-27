@@ -8,7 +8,7 @@ import type { PesertaRingkas } from './lib/pesertaEvent';
 import { installIdleLock, installNetworkWatch, useApp } from './lib/store';
 import { isOnline, startAutoSync } from './lib/sync';
 import type { ConvStatus, EventRow } from './lib/types';
-import { Conflicts, Placeholder, Settings } from './screens/Admin';
+import { Conflicts, Placeholder, Pusat, Settings } from './screens/Admin';
 import { Login, SetPin, Unlock } from './screens/Auth';
 import { EventForm, Events, Recap } from './screens/Events';
 import { Home } from './screens/Home';
@@ -18,13 +18,13 @@ import { EventPeserta, PesertaDetail } from './screens/Peserta';
 type Screen =
   | 'home' | 'events' | 'outlet' | 'hs'
   | 'eventForm' | 'register' | 'consent' | 'screening' | 'done'
-  | 'recap' | 'conflicts' | 'settings'
+  | 'recap' | 'conflicts' | 'settings' | 'pusat'
   | 'eventPeserta' | 'pesertaDetail';
 
 const TOP_SCREENS: Screen[] = ['home', 'events', 'outlet', 'hs'];
 
 export default function App() {
-  const { phase, boot, key, toast, say } = useApp();
+  const { phase, boot, key, toast, say, user } = useApp();
   const [screen, setScreen] = useState<Screen>('home');
   const [tab, setTab] = useState<TabId>('home');
   const [recapEvent, setRecapEvent] = useState<EventRow | null>(null);
@@ -104,8 +104,15 @@ export default function App() {
 
   const showTabs = TOP_SCREENS.includes(screen);
 
+  // Layout lebar untuk Koordinator dan Admin Pusat: mereka bekerja dari meja,
+  // menimbang banyak angka sekaligus. Petugas tetap di layout ponsel — di
+  // lapangan yang dibutuhkan adalah satu hal besar per layar, bukan padat data.
+  // Ini kelas, bukan aplikasi terpisah: lebarnya baru berlaku di layar ≥1024px,
+  // jadi Koordinator yang membuka dari HP tetap dapat tampilan yang sama.
+  const lebar = user?.role === 'koordinator' || user?.role === 'admin_pusat';
+
   return (
-    <div className="app">
+    <div className={`app ${lebar ? 'lebar' : ''}`}>
       <main className="screen">
         {screen === 'home' && (
           <Home go={(s) => (s === 'register' ? void mulaiRegistrasi('home') : go(s))}
@@ -137,6 +144,7 @@ export default function App() {
         )}
         {screen === 'conflicts' && <Conflicts go={go} />}
         {screen === 'settings' && <Settings go={go} />}
+        {screen === 'pusat' && user?.role === 'admin_pusat' && <Pusat go={go} />}
         {screen === 'outlet' && <Placeholder kind="outlet" />}
         {screen === 'hs' && <Placeholder kind="hs" />}
       </main>

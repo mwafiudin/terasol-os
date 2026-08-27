@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Badge, Button, Field, Icon, ICONS, PageHead } from '../components/ui';
 import { api, type Recap as RecapData } from '../lib/api';
 import { PARAM_LABEL, fmtTanggal, pct, rp } from '../lib/domain';
-import { localEvents, pullEvents, saveLocalEvent } from '../lib/events';
+import { localEvents, muatRekan, pullEvents, rekanTersimpan, saveLocalEvent, type Rekan } from '../lib/events';
 import { useApp } from '../lib/store';
 import { isOnline, refreshPending, syncNow } from '../lib/sync';
 import type { EventRow } from '../lib/types';
@@ -77,9 +77,13 @@ export function EventForm({ go, onSaved }: { go: Nav; onSaved: () => void }) {
   const { key, say } = useApp();
   const [f, setF] = useState({
     nama: '', lokasi: '', tanggal: new Date().toISOString().slice(0, 10),
-    tipe: 'gratis' as 'gratis' | 'berbayar', hargaPaket: '', petugas: '',
+    tipe: 'gratis' as 'gratis' | 'berbayar', hargaPaket: '',
   });
+  const [rekan, setRekan] = useState<Rekan[]>(rekanTersimpan);
+  const [terpilih, setTerpilih] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => { void muatRekan().then(setRekan); }, []);
 
   async function simpan() {
     if (!f.nama || !f.lokasi) { say('Lengkapi nama event dan lokasi.'); return; }
@@ -89,10 +93,15 @@ export function EventForm({ go, onSaved }: { go: Nav; onSaved: () => void }) {
     setBusy(true);
     try {
       const today = new Date().toISOString().slice(0, 10);
+      const ids = [...terpilih];
+      // Nama ikut disimpan sebagai teks agar event tetap terbaca utuh saat
+      // offline, sebelum penugasan sempat dikirim ke server.
+      const namaPetugas = rekan.filter((r) => terpilih.has(r.id)).map((r) => r.nama).join(', ');
       await saveLocalEvent({
         clientId: crypto.randomUUID(),
         nama: f.nama, lokasi: f.lokasi, tanggal: f.tanggal,
-        tipe: f.tipe, hargaPaket: harga, petugas: f.petugas || null,
+        tipe: f.tipe, hargaPaket: harga,
+        petugas: namaPetugas || null, petugasIds: ids,
         status: f.tanggal > today ? 'planned' : 'active',
       });
       await refreshPending();
@@ -141,10 +150,34 @@ export function EventForm({ go, onSaved }: { go: Nav; onSaved: () => void }) {
         </Field>
       )}
 
-      <Field label="Petugas yang ditugaskan" htmlFor="e-petugas">
-        <input id="e-petugas" className="input" value={f.petugas}
-          onChange={(e) => setF({ ...f, petugas: e.target.value })} placeholder="cth. 2 petugas cabang" />
-      </Field>
+      <div className="field">
+        <label>Petugas yang ditugaskan</label>
+        {rekan.length === 0 ? (
+          <small className="field-bantu">
+            Daftar petugas belum bisa dimuat. Event tetap bisa disimpan, dan
+            penugasan dapat dilengkapi nanti setelah ada koneksi.
+          </small>
+        ) : (
+          <div className="pilih-orang">
+            {rekan.map((r) => (
+              <label key={r.id} className={`orang ${terpilih.has(r.id) ? 'on' : ''}`}>
+                <input type="checkbox" checked={terpilih.has(r.id)}
+                  onChange={() => setTerpilih((s) => {
+                    const n = new Set(s);
+                    if (n.has(r.id)) n.delete(r.id); else n.add(r.id);
+                    return n;
+                  })} />
+                <span className="orang-nama">{r.nama}</span>
+                <span className="orang-role">{r.role === 'koordinator' ? 'Koordinator' : 'Petugas'}</span>
+              </label>
+            ))}
+          </div>
+        )}
+        <small className="field-bantu">
+          Petugas yang dipilih di sini terhubung ke akunnya, sehingga setiap
+          hasil pengukuran bisa ditelusuri ke orang yang benar-benar mengukur.
+        </small>
+      </div>
 
       <Button size="lg" full icon={ICONS.check} disabled={busy} onClick={() => void simpan()}>
         Simpan event

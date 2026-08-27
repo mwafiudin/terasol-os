@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Badge, Button, Field, Icon, ICONS, PageHead } from '../components/ui';
+import { Badge, Button, Field, Icon, ICONS, PageHead, Rujukan, SegTabs } from '../components/ui';
 import { api, type ParticipantDetail } from '../lib/api';
 import { readParticipant } from '../lib/db';
 import { CONV_LABEL, PARAM_LABEL, PARAMS, dec, fmtTanggal, fmtWaktu, imtOf, num, rp } from '../lib/domain';
 import { db } from '../lib/db';
 import { pesertaEvent, rekapSementara, type PesertaRingkas, type RekapSementara } from '../lib/pesertaEvent';
+import { DISCLAIMER, nilaiImt } from '../lib/rujukan';
 import { useApp } from '../lib/store';
 import { isOnline } from '../lib/sync';
 import type { ConvStatus, EventRow, ParamKey } from '../lib/types';
+import { TabBelanja, TabPengukuran } from './Riwayat';
 
 type Nav = (screen: string) => void;
 
@@ -256,6 +258,7 @@ export function PesertaDetail({ go, peserta, onUbah }: {
   const [beliBuka, setBeliBuka] = useState(false);
   const [nilai, setNilai] = useState('');
   const [produk, setProduk] = useState('');
+  const [tab, setTab] = useState<'diri' | 'ukur' | 'belanja'>('diri');
   const koordinator = user?.role === 'koordinator' || user?.role === 'admin_pusat';
 
   const muat = useCallback(async () => {
@@ -323,8 +326,18 @@ export function PesertaDetail({ go, peserta, onUbah }: {
   });
 
   const imtNilai = server?.screening?.imt ?? lokal?.imt?.nilai ?? null;
-  const imtKategori = imtNilai == null ? null
-    : imtNilai < 18.5 ? 'Kurang' : imtNilai < 25 ? 'Normal' : imtNilai < 30 ? 'Berlebih' : 'Obesitas';
+  const imtPenilaian = imtNilai == null ? null : nilaiImt(imtNilai);
+
+  // Riwayat lintas-event hidup di server: ia menyatukan kunjungan-kunjungan
+  // yang di perangkat ini tidak pernah terlihat bersama. Selama peserta belum
+  // tersinkron, tab riwayat memang belum punya apa-apa untuk ditampilkan.
+  const pelangganId = server?.pelangganId ?? null;
+
+  const daftarTab = [
+    { id: 'diri' as const, label: 'Data diri', icon: ICONS.user },
+    { id: 'ukur' as const, label: 'Pengukuran', icon: ICONS.pulse },
+    { id: 'belanja' as const, label: 'Belanja', icon: ICONS.cart },
+  ];
 
   return (
     <div className="page">
@@ -338,8 +351,34 @@ export function PesertaDetail({ go, peserta, onUbah }: {
         </span>
       </span>
 
+      <SegTabs tabs={daftarTab} active={tab} onSelect={setTab} />
+
       {error && <div className="belum-note">{error}</div>}
 
+      {tab !== 'diri' && !pelangganId && (
+        <div className="card empty-card">
+          <div className="ic"><Icon d={ICONS.refresh} size={26} /></div>
+          <b>Riwayat belum tersedia</b>
+          <p>
+            {peserta.belumSync
+              ? 'Peserta ini masih antre dikirim. Setelah tersinkron, seluruh riwayatnya di cabang ini muncul di sini.'
+              : 'Riwayat dibaca dari server dan butuh koneksi. Data pengukuran hari ini tetap aman tersimpan di perangkat.'}
+          </p>
+        </div>
+      )}
+
+      {tab === 'ukur' && pelangganId && (
+        <TabPengukuran pelangganId={pelangganId} participantId={peserta.serverId ?? null}
+          gender={gender} onUbah={() => { onUbah(); void muat(); }} />
+      )}
+
+      {tab === 'belanja' && pelangganId && (
+        <TabBelanja pelangganId={pelangganId} participantId={peserta.serverId ?? null}
+          onUbah={() => { onUbah(); void muat(); }} />
+      )}
+
+      {tab === 'diri' && (
+        <>
       <div className="card consumable-card">
         <b>Persetujuan</b>
         {consent ? (
@@ -357,7 +396,7 @@ export function PesertaDetail({ go, peserta, onUbah }: {
       </div>
 
       <div className="card consumable-card">
-        <b>Hasil pengukuran</b>
+        <b>Pengukuran kunjungan ini</b>
         {barisNilai.map((p) => (
           <div className="consumable-row" key={p.k}>
             <span>{p.label}</span>
@@ -371,7 +410,7 @@ export function PesertaDetail({ go, peserta, onUbah }: {
           <span>IMT</span>
           {imtNilai == null
             ? <span className="muted">belum bisa dihitung</span>
-            : <span>{dec(imtNilai)} — {imtKategori}</span>}
+            : <span>{dec(imtNilai)} — {imtPenilaian!.label}</span>}
         </div>
         {(server?.screening?.measuredAt ?? lokal?.measuredAt) && (
           <small>Diukur {fmtWaktu(server?.screening?.measuredAt ?? lokal?.measuredAt)}</small>
@@ -381,6 +420,7 @@ export function PesertaDetail({ go, peserta, onUbah }: {
             Ada nilai di luar rentang wajar yang dikonfirmasi petugas saat pencatatan.
           </div>
         )}
+        {imtPenilaian && <Rujukan sumber={imtPenilaian.sumber}><span>{DISCLAIMER}</span></Rujukan>}
       </div>
 
       <div className="card consumable-card">
@@ -430,6 +470,8 @@ export function PesertaDetail({ go, peserta, onUbah }: {
           </>
         )}
       </div>
+        </>
+      )}
     </div>
   );
 }

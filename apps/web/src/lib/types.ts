@@ -19,7 +19,17 @@ export type EventRow = {
   tanggal: string;          // YYYY-MM-DD
   tipe: EventTipe;
   hargaPaket: number;
+  /**
+   * Nama petugas sebagai teks. Dipertahankan agar event lama tetap terbaca dan
+   * agar daftar tetap muncul saat offline, tapi bukan lagi sumber kebenaran.
+   */
   petugas: string | null;
+  /**
+   * Petugas yang ditugaskan, sebagai id akun. Inilah yang menghubungkan event
+   * ke orang sungguhan; teks di atas tidak bisa ditelusuri ke siapa pun.
+   * Dikirim ke server begitu event punya serverId.
+   */
+  petugasIds?: string[];
   status: EventStatus;
   /** Hitungan dari server — mencakup peserta yang dicatat perangkat lain. */
   peserta: number;

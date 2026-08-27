@@ -23,6 +23,23 @@ export default async function userRoutes(app: FastifyInstance) {
     });
   });
 
+  /**
+   * Daftar rekan satu cabang, untuk dropdown "diukur oleh". Sengaja terpisah
+   * dari GET /users: petugas perlu memilih siapa yang mengukur, tapi tidak
+   * perlu — dan tidak boleh — melihat email atau status akun rekannya.
+   */
+  app.get('/rekan', { preHandler: requireAuth }, async (req) => {
+    const ctx = ctxOf(req);
+    return withTenant(ctx, async (tx) => {
+      const { rows } = await tx.query(
+        `select id, nama, role from users
+          where active and tenant_id = $1 order by nama`,
+        [ctx.tenantId],
+      );
+      return { rekan: rows };
+    });
+  });
+
   /** Koordinator membuat akun petugas untuk cabangnya sendiri. */
   app.post('/users', { preHandler: requireRole('koordinator', 'admin_pusat') }, async (req, reply) => {
     const parsed = createBody.safeParse(req.body);

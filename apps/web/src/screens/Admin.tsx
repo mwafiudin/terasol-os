@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Badge, Button, Field, Icon, ICONS, PageHead } from '../components/ui';
-import { api, type ConflictGroup } from '../lib/api';
+import { api, type ConflictGroup, type PusatRingkasan } from '../lib/api';
 import { LOCAL_RETENTION_HOURS } from '../lib/db';
-import { PARAM_LABEL, fmtTanggal } from '../lib/domain';
+import { PARAM_LABEL, fmtTanggal, rp } from '../lib/domain';
 import { IDLE_LOCK_MS, REQUIRE_PIN, useApp } from '../lib/store';
 import { isOnline, MAX_UNSYNCED } from '../lib/sync';
 import type { ParamKey } from '../lib/types';
@@ -395,6 +395,117 @@ function PerangkatTab() {
 }
 
 /* ============================== Placeholder ============================== */
+
+/* ==================== Dashboard lintas cabang (Pusat) ==================== */
+
+/**
+ * Perbandingan antarcabang untuk Admin Pusat.
+ *
+ * Sengaja hanya angka. Riwayat pelanggan tetap milik cabangnya masing-masing —
+ * membandingkan performa cabang tidak memerlukan nama satu orang pun, dan
+ * membuka daftar orang lintas cabang di sini akan membatalkan pemisahan yang
+ * justru menjadi alasan RLS ada.
+ */
+export function Pusat({ go }: { go: Nav }) {
+  const [data, setData] = useState<PusatRingkasan | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [urut, setUrut] = useState<'nama' | 'belanja' | 'pelanggan'>('belanja');
+
+  useEffect(() => {
+    void api.pusatRingkasan()
+      .then(setData)
+      .catch(() => setError('Gagal memuat ringkasan cabang. Periksa koneksi.'));
+  }, []);
+
+  if (error) {
+    return (
+      <div className="page">
+        <PageHead title="Semua cabang" onBack={() => go('home')} />
+        <div className="belum-note">{error}</div>
+      </div>
+    );
+  }
+  if (!data) {
+    return (
+      <div className="page">
+        <PageHead title="Semua cabang" onBack={() => go('home')} />
+        <span className="hint">Memuat…</span>
+      </div>
+    );
+  }
+
+  const cabang = [...data.cabang].sort((a, b) => {
+    if (urut === 'nama') return a.nama.localeCompare(b.nama);
+    if (urut === 'pelanggan') return b.pelanggan - a.pelanggan;
+    return Number(b.totalBelanja) - Number(a.totalBelanja);
+  });
+  const tertinggi = Math.max(1, ...cabang.map((c) => Number(c.totalBelanja)));
+
+  return (
+    <div className="page">
+      <PageHead title="Semua cabang" onBack={() => go('home')}
+        right={<Badge tone="accent">Admin Pusat</Badge>} />
+
+      <div className="card consumable-card">
+        <b>Gabungan {data.total.cabang} cabang</b>
+        <div className="stat-grid">
+          <div className="stat-card"><b>{data.total.pelanggan}</b><span>Pelanggan</span></div>
+          <div className="stat-card"><b>{data.total.kunjungan}</b><span>Kunjungan</span></div>
+          <div className="stat-card"><b>{data.total.pengukuran}</b><span>Pengukuran</span></div>
+          <div className="stat-card"><b>{data.total.eventAktif}</b><span>Event aktif</span></div>
+        </div>
+        <div className="consumable-total">
+          <span>Total belanja tercatat</span><span>{rp(data.total.totalBelanja)}</span>
+        </div>
+        {data.total.perluDitinjau > 0 && (
+          <div className="belum-note">
+            {data.total.perluDitinjau} record di seluruh cabang menunggu peninjauan
+            dan belum ikut dihitung.
+          </div>
+        )}
+      </div>
+
+      <div className="chip-baris">
+        {([['belanja', 'Belanja tertinggi'], ['pelanggan', 'Pelanggan terbanyak'], ['nama', 'Urut nama']] as const)
+          .map(([k, label]) => (
+            <button key={k} className={`chip ${urut === k ? 'on' : ''}`} onClick={() => setUrut(k)}>
+              {label}
+            </button>
+          ))}
+      </div>
+
+      <span className="section-title">Per cabang</span>
+
+      {cabang.map((c) => (
+        <div className="card cabang-card" key={c.id}>
+          <div className="cabang-atas">
+            <span className="cabang-nama">{c.nama}</span>
+            {c.eventAktif > 0 && <Badge tone="success" dot>{c.eventAktif} aktif</Badge>}
+            {c.perluDitinjau > 0 && <Badge tone="danger">{c.perluDitinjau} ditinjau</Badge>}
+          </div>
+          <div className="cabang-nilai"><b>{rp(Number(c.totalBelanja))}</b><span>{c.transaksi} transaksi</span></div>
+          {/* Batang perbandingan relatif terhadap cabang tertinggi — bukan
+              target, sekadar agar selisihnya terbaca sekali lihat. */}
+          <div className="cabang-bar">
+            <div style={{ width: `${(Number(c.totalBelanja) / tertinggi) * 100}%` }} />
+          </div>
+          <div className="cabang-angka">
+            <span><b>{c.pelanggan}</b> pelanggan</span>
+            <span><b>{c.kunjungan}</b> kunjungan</span>
+            <span><b>{c.pengukuran}</b> pengukuran</span>
+            <span><b>{c.petugas}</b> akun aktif</span>
+          </div>
+        </div>
+      ))}
+
+      <small className="hint">
+        Halaman ini menampilkan angka agregat saja. Data diri dan riwayat
+        pelanggan tetap terbatas pada cabangnya masing-masing, dan setiap
+        pembukaan halaman ini tercatat di audit log.
+      </small>
+    </div>
+  );
+}
 
 export function Placeholder({ kind }: { kind: 'outlet' | 'hs' }) {
   const outlet = kind === 'outlet';

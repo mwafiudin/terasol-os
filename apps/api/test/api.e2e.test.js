@@ -15,7 +15,7 @@ const API = process.env.API_URL ?? 'http://localhost:3000';
 const EMAIL = process.env.BOOTSTRAP_EMAIL ?? 'admin@terasol.id';
 const PASSWORD = process.env.BOOTSTRAP_PASSWORD;
 
-let token, eventClientId, eventId;
+let token, eventClientId, eventId, pelangganId;
 const pClientA = randomUUID(), pClientB = randomUUID();
 const batchId = randomUUID();
 const HP = '0811' + String(Math.floor(Math.random() * 1e8)).padStart(8, '0');
@@ -51,6 +51,10 @@ after(async () => {
   await c.query('delete from participants where event_id = $1', [eventId]);
   await c.query('delete from anon_tallies where event_id = $1', [eventId]);
   await c.query('delete from events where id = $1', [eventId]);
+  // Pelanggan dibuat otomatis oleh sync, jadi ia juga harus ikut dibersihkan —
+  // kalau tidak, tiap kali uji dijalankan basis data menumpuk satu orang palsu.
+  // Pengukurannya ikut terhapus lewat cascade.
+  if (pelangganId) await c.query('delete from pelanggan where id = $1', [pelangganId]);
   await c.query('commit');
   await c.end();
 });
@@ -320,6 +324,123 @@ describe('Alur API end-to-end', () => {
   it('rekap peserta yang tidak ada mengembalikan 404', async () => {
     const r = await call('/participants/00000000-0000-0000-0000-000000000000');
     assert.equal(r.status, 404);
+  });
+
+  it('sync menautkan peserta ke pelanggan dan mencerminkan screening jadi pengukuran', async () => {
+    // Perangkat lapangan masih mengirim satu objek screening. Server yang
+    // memecahnya jadi baris per parameter, supaya riwayat lintas kunjungan
+    // terbentuk tanpa perangkat perlu tahu soal entitas pelanggan.
+    const list = await call(`/participants?eventId=${eventId}`);
+    const p = list.body.participants[0];
+    const d = await call(`/participants/${p.id}`);
+    assert.ok(d.body.pelangganId, 'peserta hasil sync harus tertaut ke pelanggan');
+    pelangganId = d.body.pelangganId;
+
+    const ukur = await call(`/pelanggan/${pelangganId}/pengukuran`);
+    assert.equal(ukur.status, 200, JSON.stringify(ukur.body));
+    const jenis = ukur.body.pengukuran.map((x) => x.jenis);
+    assert.ok(jenis.includes('tinggi') && jenis.includes('berat') && jenis.includes('gula'));
+
+    const gula = ukur.body.pengukuran.find((x) => x.jenis === 'gula');
+    assert.equal(gula.konteks, 'sewaktu', 'gula tanpa konteks dianggap sewaktu');
+  });
+
+  it('pengukuran bisa dicatat, diubah, dan dihapus', async () => {
+    const buat = await call('/pengukuran', {
+      method: 'POST',
+      body: JSON.stringify({
+        pelangganId, jenis: 'gula', konteks: 'puasa', nilai: 96, outOfRange: false,
+      }),
+    });
+    assert.equal(buat.status, 201, JSON.stringify(buat.body));
+    const id = buat.body.id;
+
+    const ubah = await call(`/pengukuran/${id}`, {
+      method: 'PATCH', body: JSON.stringify({ nilai: 104 }),
+    });
+    assert.equal(ubah.status, 200, JSON.stringify(ubah.body));
+    assert.equal(Number(ubah.body.nilai), 104);
+
+    // Puasa dan sewaktu hidup berdampingan — inilah yang tidak bisa dilakukan
+    // model lama, yang hanya punya satu kolom gula per peserta.
+    const semua = await call(`/pelanggan/${pelangganId}/pengukuran`);
+    const konteks = semua.body.pengukuran
+      .filter((x) => x.jenis === 'gula').map((x) => x.konteks).sort();
+    assert.deepEqual(konteks, ['puasa', 'sewaktu']);
+
+    const hapus = await call(`/pengukuran/${id}`, { method: 'DELETE' });
+    assert.equal(hapus.status, 200);
+    const lagi = await call(`/pengukuran/${id}`, { method: 'DELETE' });
+    assert.equal(lagi.status, 404, 'menghapus dua kali tidak berpura-pura berhasil');
+  });
+
+  it('konteks gula ditolak untuk parameter selain gula darah', async () => {
+    const r = await call('/pengukuran', {
+      method: 'POST',
+      body: JSON.stringify({ pelangganId, jenis: 'berat', konteks: 'puasa', nilai: 61 }),
+    });
+    assert.equal(r.status, 400, JSON.stringify(r.body));
+  });
+
+  it('transaksi tercatat dengan total yang dihitung server', async () => {
+    const r = await call('/transaksi', {
+      method: 'POST',
+      body: JSON.stringify({
+        pelangganId, jenis: 'terapi', nama: '__uji_terapi', jumlah: 2, hargaSatuan: 150000,
+      }),
+    });
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+    assert.equal(Number(r.body.total), 300000, 'total tidak diambil dari input klien');
+
+    const daftar = await call(`/pelanggan/${pelangganId}/transaksi`);
+    assert.ok(daftar.body.total >= 300000);
+
+    await call(`/transaksi/${r.body.id}`, { method: 'DELETE' });
+  });
+
+  it('daftar rekan hanya memuat nama dan peran, bukan email', async () => {
+    const r = await call('/rekan');
+    assert.equal(r.status, 200);
+    assert.ok(r.body.rekan.length > 0);
+    assert.equal(r.body.rekan[0].email, undefined, 'email rekan tidak ikut dibocorkan');
+    assert.ok(r.body.rekan[0].nama);
+  });
+
+  it('penugasan petugas event tersimpan dan bersifat menggantikan', async () => {
+    const rekan = (await call('/rekan')).body.rekan;
+    const ids = rekan.slice(0, 2).map((x) => x.id);
+    const set = await call(`/events/${eventId}/petugas`, {
+      method: 'PUT', body: JSON.stringify({ userIds: ids }),
+    });
+    assert.equal(set.status, 200, JSON.stringify(set.body));
+    assert.equal(set.body.jumlah, ids.length);
+
+    const baca = await call(`/events/${eventId}/petugas`);
+    assert.deepEqual(baca.body.petugas.map((x) => x.id).sort(), [...ids].sort());
+
+    // Mengirim ulang daftar yang lebih pendek harus mengurangi, bukan menumpuk.
+    await call(`/events/${eventId}/petugas`, {
+      method: 'PUT', body: JSON.stringify({ userIds: ids.slice(0, 1) }),
+    });
+    const lagi = await call(`/events/${eventId}/petugas`);
+    assert.equal(lagi.body.petugas.length, 1);
+  });
+
+  it('ringkasan pusat memberi angka agregat, bukan daftar orang', async () => {
+    const r = await call('/pusat/ringkasan');
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.ok(r.body.cabang.length > 0);
+    assert.equal(typeof r.body.total.pelanggan, 'number');
+    // Riwayat tetap per cabang: layar ini tidak boleh membawa identitas apa pun.
+    const teks = JSON.stringify(r.body);
+    assert.ok(!teks.includes('"hp"'), 'nomor HP tidak boleh muncul di ringkasan pusat');
+    assert.ok(!teks.includes('"nama":"' + EMAIL), 'identitas orang tidak ikut');
+
+    const audit = await call('/audit?limit=20');
+    assert.ok(
+      audit.body.entries.some((e) => e.action === 'pusat.ringkasan'),
+      'pembacaan lintas cabang wajib meninggalkan jejak',
+    );
   });
 
   it('US-01 — event berpeserta diarsipkan, bukan dihapus, dan hilang dari daftar', async () => {
