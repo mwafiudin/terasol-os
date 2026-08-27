@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Button, Field, Icon, ICONS, PageHead } from '../components/ui';
 import { db, putParticipant } from '../lib/db';
-import { imtOf, num, PARAMS } from '../lib/domain';
+import { imtOf, normalisasiHp, num, PARAMS, periksaHp, periksaUsia } from '../lib/domain';
 import { draftToRecord, hpSudahAda, useDraft } from '../lib/draft';
 import { useApp } from '../lib/store';
 import { refreshPending, syncNow } from '../lib/sync';
@@ -17,18 +17,39 @@ export function Register({ go }: { go: Nav }) {
   const { draft, patch } = useDraft();
   const [dedupWarn, setDedupWarn] = useState(false);
   const [dedupOk, setDedupOk] = useState(false);
+  /**
+   * Kolom yang sudah pernah ditinggalkan petugas.
+   *
+   * Kesalahan baru ditampilkan sesudahnya, bukan sejak huruf pertama: memerahi
+   * "08" yang baru diketik separuh adalah menegur orang yang belum selesai
+   * bicara. Sesudah menekan Lanjut, keduanya dianggap tersentuh.
+   */
+  const [sentuh, setSentuh] = useState<{ usia?: boolean; hp?: boolean }>({});
 
   if (!draft || !key) return null;
   const set = (p: Parameters<typeof patch>[1]) => void patch(key, p);
 
+  const salahUsia = draft.usia ? periksaUsia(draft.usia) : null;
+  const salahHp = draft.hp ? periksaHp(draft.hp) : null;
+
   async function lanjut() {
     if (!draft || !key) return;
+    setSentuh({ usia: true, hp: true });
     if (!draft.nama || !draft.gender || !draft.usia || !draft.hp) {
       say('Lengkapi nama, jenis kelamin, usia, dan nomor HP.');
       return;
     }
+    // Nomor yang salah bentuk tidak bisa dihubungi saat tindak lanjut, dan
+    // memecah orang yang sama menjadi dua record karena dedup HP tidak cocok.
+    if (periksaUsia(draft.usia) || periksaHp(draft.hp)) return;
+
+    // Disimpan dalam bentuk baku supaya "0812…", "+62812…", dan "62812…"
+    // menjadi satu nomor yang sama bagi pencarian maupun dedup.
+    const baku = normalisasiHp(draft.hp);
+    if (baku !== draft.hp) set({ hp: baku });
+
     // §4.3.2 — deteksi lokal sebelum membuat record baru.
-    if (!dedupOk && await hpSudahAda(key, draft.eventClientId, draft.hp, draft.clientId)) {
+    if (!dedupOk && await hpSudahAda(key, draft.eventClientId, baku, draft.clientId)) {
       setDedupWarn(true);
       return;
     }
@@ -56,14 +77,33 @@ export function Register({ go }: { go: Nav }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: 12 }}>
         <Field label="Usia" htmlFor="p-usia">
-          <input id="p-usia" className="input" inputMode="numeric" value={draft.usia}
+          <input id="p-usia" className={`input${sentuh.usia && salahUsia ? ' salah' : ''}`}
+            inputMode="numeric" value={draft.usia}
+            aria-invalid={!!(sentuh.usia && salahUsia)}
             onChange={(e) => set({ usia: e.target.value.replace(/\D/g, '').slice(0, 3) })}
+            onBlur={() => setSentuh((s) => ({ ...s, usia: true }))}
             placeholder="62" />
+          {sentuh.usia && salahUsia && <small className="field-salah">{salahUsia}</small>}
         </Field>
         <Field label="Nomor HP" htmlFor="p-hp">
-          <input id="p-hp" className="input" inputMode="numeric" value={draft.hp}
-            onChange={(e) => { setDedupWarn(false); setDedupOk(false); set({ hp: e.target.value.replace(/[^\d+]/g, '') }); }}
+          <input id="p-hp" className={`input${sentuh.hp && salahHp ? ' salah' : ''}`}
+            inputMode="tel" value={draft.hp}
+            aria-invalid={!!(sentuh.hp && salahHp)}
+            onChange={(e) => {
+              setDedupWarn(false); setDedupOk(false);
+              // `+` dibiarkan supaya "+62…" bisa diketik apa adanya; pembakuan
+              // ke bentuk 08… dilakukan saat kolomnya ditinggalkan.
+              set({ hp: e.target.value.replace(/[^\d+]/g, '').slice(0, 16) });
+            }}
+            onBlur={() => {
+              setSentuh((s) => ({ ...s, hp: true }));
+              if (draft.hp && !periksaHp(draft.hp)) {
+                const baku = normalisasiHp(draft.hp);
+                if (baku !== draft.hp) set({ hp: baku });
+              }
+            }}
             placeholder="0812…" />
+          {sentuh.hp && salahHp && <small className="field-salah">{salahHp}</small>}
         </Field>
       </div>
 

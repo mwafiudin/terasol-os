@@ -136,3 +136,54 @@ export function fmtWaktu(iso: string | null | undefined): string {
     day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
   });
 }
+
+/* ========================= pemeriksaan isian ========================= */
+
+/**
+ * Menormalkan nomor HP Indonesia ke bentuk `08…`.
+ *
+ * Orang menuliskan nomor yang sama dengan tiga cara — `0812…`, `+62812…`, dan
+ * `62812…` — dan ketiganya harus dikenali sebagai satu nomor. Kalau tidak,
+ * pencarian tidak menemukannya dan pemeriksaan duplikat di dalam satu event
+ * gagal justru pada kasus yang paling mungkin: orang yang sama didaftarkan dua
+ * kali oleh dua petugas yang menulis awalannya berbeda.
+ */
+export function normalisasiHp(raw: string): string {
+  const d = raw.replace(/\D/g, '');
+  if (d.startsWith('62')) return `0${d.slice(2)}`;
+  if (d.startsWith('8')) return `0${d}`;
+  return d;
+}
+
+/** Batas panjang nomor seluler Indonesia, termasuk angka 0 di depan. */
+const HP_MIN = 10;
+const HP_MAKS = 14;
+
+/** Mengembalikan pesan kesalahan, atau null bila nomornya masuk akal. */
+export function periksaHp(raw: string): string | null {
+  const d = normalisasiHp(raw);
+  if (!d) return 'Nomor HP belum diisi.';
+  if (!d.startsWith('08')) return 'Nomor HP seluler diawali 08, +628, atau 628.';
+  if (d.length < HP_MIN || d.length > HP_MAKS) {
+    return `Nomor seluler terdiri dari ${HP_MIN}–${HP_MAKS} angka; yang diketik ${d.length}.`;
+  }
+  return null;
+}
+
+/**
+ * Batas usia. Bukan batas medis, melainkan batas kewajaran pengetikan: 123
+ * hampir pasti salah ketik dari 12 atau 23, dan menyimpannya membuat rerata
+ * usia peserta event itu tidak berarti apa-apa.
+ */
+export const USIA_MIN = 1;
+export const USIA_MAKS = 120;
+
+export function periksaUsia(raw: string): string | null {
+  if (!raw.trim()) return 'Usia belum diisi.';
+  const n = Number(raw);
+  if (!Number.isFinite(n) || !Number.isInteger(n)) return 'Usia diisi angka tahun.';
+  if (n < USIA_MIN || n > USIA_MAKS) {
+    return `Usia di luar rentang wajar (${USIA_MIN}–${USIA_MAKS} tahun).`;
+  }
+  return null;
+}

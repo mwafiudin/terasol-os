@@ -7,7 +7,7 @@ import { api, type ParticipantDetail } from '../lib/api';
 import { readParticipant } from '../lib/db';
 import {
   CONV_LABEL, EVENT_STATUS, PARAM_LABEL, PARAMS, bisaTerimaPeserta,
-  dec, fmtTanggal, fmtWaktu, imtOf, num, rp,
+  dec, fmtTanggal, fmtWaktu, imtOf, normalisasiHp, num, periksaHp, periksaUsia, rp,
 } from '../lib/domain';
 import { db } from '../lib/db';
 import { pesertaEvent, rekapSementara, type PesertaRingkas, type RekapSementara } from '../lib/pesertaEvent';
@@ -596,15 +596,22 @@ function FormDataDiri({ pelangganId, nama, gender, usia, hp, onTutup, onTersimpa
   const [f, setF] = useState({ nama, gender, usia: usia || '', hp, catatan: '' });
   const [busy, setBusy] = useState(false);
 
+  // Pemeriksaan yang sama dengan form registrasi. Kalau hanya dipasang di
+  // sana, layar ini menjadi pintu belakang yang menerima nomor tak berbentuk.
+  const salahHp = f.hp ? periksaHp(f.hp) : null;
+  const salahUsia = f.usia ? periksaUsia(f.usia) : null;
+
   async function simpan() {
     if (!f.nama.trim() || !f.hp.trim()) { say('Nama dan nomor HP tidak boleh kosong.'); return; }
+    if (salahHp) { say(salahHp); return; }
+    if (salahUsia) { say(salahUsia); return; }
     setBusy(true);
     try {
       await api.updatePelanggan(pelangganId, {
         nama: f.nama.trim(),
         gender: f.gender,
         usia: f.usia ? Number(f.usia) : null,
-        hp: f.hp.trim(),
+        hp: normalisasiHp(f.hp),
         catatan: f.catatan.trim() || null,
       });
       say('Data diri diperbarui.');
@@ -630,12 +637,16 @@ function FormDataDiri({ pelangganId, nama, gender, usia, hp, onTutup, onTersimpa
       </div>
       <div className="dua-kolom">
         <Field label="Usia" htmlFor="i-usia">
-          <input id="i-usia" className="input" inputMode="numeric" value={f.usia}
+          <input id="i-usia" className={`input${salahUsia ? ' salah' : ''}`}
+            inputMode="numeric" value={f.usia} aria-invalid={!!salahUsia}
             onChange={(e) => setF({ ...f, usia: e.target.value.replace(/\D/g, '').slice(0, 3) })} />
+          {salahUsia && <small className="field-salah">{salahUsia}</small>}
         </Field>
         <Field label="Nomor HP" htmlFor="i-hp">
-          <input id="i-hp" className="input" inputMode="tel" value={f.hp} maxLength={32}
-            onChange={(e) => setF({ ...f, hp: e.target.value })} />
+          <input id="i-hp" className={`input${salahHp ? ' salah' : ''}`}
+            inputMode="tel" value={f.hp} maxLength={16} aria-invalid={!!salahHp}
+            onChange={(e) => setF({ ...f, hp: e.target.value.replace(/[^\d+]/g, '') })} />
+          {salahHp && <small className="field-salah">{salahHp}</small>}
         </Field>
       </div>
       <div className="belum-note">
