@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Badge, Button, Field, Icon, ICONS, PageHead, SegTabs } from '../components/ui';
+import { Badge, Button, Field, Icon, ICONS, PageHead, SegTabs, Sheet } from '../components/ui';
 import { api, type ParticipantDetail } from '../lib/api';
 import { readParticipant } from '../lib/db';
 import { CONV_LABEL, PARAM_LABEL, PARAMS, dec, fmtTanggal, fmtWaktu, imtOf, num, rp } from '../lib/domain';
@@ -259,6 +259,7 @@ export function PesertaDetail({ go, peserta, onUbah }: {
   const [nilai, setNilai] = useState('');
   const [produk, setProduk] = useState('');
   const [tab, setTab] = useState<'diri' | 'belanja' | 'lain'>('diri');
+  const [ubahDiri, setUbahDiri] = useState(false);
   const koordinator = user?.role === 'koordinator' || user?.role === 'admin_pusat';
 
   const muat = useCallback(async () => {
@@ -347,18 +348,34 @@ export function PesertaDetail({ go, peserta, onUbah }: {
       <PageHead title={nama} onBack={() => go('eventPeserta')}
         right={peserta.belumSync ? <Badge tone="warning">Antre</Badge> : undefined} />
 
-      <span className="recap-sub">
+      {/* Identitas dinyatakan sekali saja, di sini. Kartu "Data diri" dulu
+          mengulang baris ini kata demi kata — nama, usia, jenis kelamin, dan
+          nomor HP yang sama, dua sentimeter di bawahnya. */}
+      <div className="identitas-baris">
         <span>
           {usia ? `${usia} th · ` : ''}{gender === 'P' ? 'Perempuan' : 'Laki-laki'}
           {hp ? ` · ${hp}` : ''}
         </span>
-      </span>
+        {koordinator && pelangganId && (
+          <button className="ikon-btn" aria-label="Ubah data diri"
+            onClick={() => setUbahDiri(true)}>
+            <Icon d={ICONS.pencil} size={16} />
+          </button>
+        )}
+      </div>
+
+      {ubahDiri && pelangganId && (
+        <FormDataDiri pelangganId={pelangganId}
+          nama={nama} gender={gender} usia={usia} hp={hp}
+          onTutup={() => setUbahDiri(false)}
+          onTersimpan={() => { setUbahDiri(false); onUbah(); void muat(); }} />
+      )}
 
       <SegTabs tabs={daftarTab} active={tab} onSelect={setTab} />
 
       {error && <div className="belum-note">{error}</div>}
 
-      {tab !== 'lain' && !pelangganId && (
+      {tab === 'belanja' && !pelangganId && (
         <div className="card empty-card">
           <div className="ic"><Icon d={ICONS.refresh} size={26} /></div>
           <b>Riwayat belum tersedia</b>
@@ -370,46 +387,46 @@ export function PesertaDetail({ go, peserta, onUbah }: {
         </div>
       )}
 
-      {tab === 'diri' && pelangganId && (
-        <>
-          <KartuIdentitas pelangganId={pelangganId}
-            nama={nama} gender={gender} usia={usia} hp={hp}
-            bolehUbah={koordinator}
-            onTersimpan={() => { onUbah(); void muat(); }} />
-
-          {/* Snapshot kunjungan ini, terpisah dari riwayat lintas kunjungan
-              di bawahnya — keduanya mudah tertukar kalau tidak diberi nama. */}
-          <div className="card consumable-card">
-            <b>Pengukuran kunjungan ini</b>
-            {barisNilai.map((p) => (
-              <div className="consumable-row" key={p.k}>
-                <span>{p.label}</span>
-                {p.nilai
-                  ? <span>{p.nilai} {p.unit}</span>
-                  : <span className="muted">tidak diambil</span>}
-              </div>
-            ))}
-            <div className="consumable-sep" />
-            <div className="consumable-total">
-              <span>IMT</span>
-              {imtNilai == null
-                ? <span className="muted">belum bisa dihitung</span>
-                : <span>{dec(imtNilai)} — {imtPenilaian!.label}</span>}
+      {tab === 'diri' && (pelangganId ? (
+        <TabPengukuran pelangganId={pelangganId} participantId={peserta.serverId ?? null}
+          gender={gender} nama={nama} onUbah={() => { onUbah(); void muat(); }} />
+      ) : (
+        /* Tanpa riwayat server, hasil kunjungan ini adalah satu-satunya yang
+           kita punya — dan justru inilah yang paling dibutuhkan petugas yang
+           baru saja mengukurnya. Saat riwayat tersedia, kartu ini tidak
+           ditampilkan: setiap angkanya sudah ada di daftar, dengan tanggalnya. */
+        <div className="card consumable-card">
+          <b>Pengukuran kunjungan ini</b>
+          <small>
+            {peserta.belumSync
+              ? 'Belum tersinkron — riwayat lintas kunjungan muncul setelah terkirim.'
+              : 'Riwayat lintas kunjungan butuh koneksi.'}
+          </small>
+          {barisNilai.map((p) => (
+            <div className="consumable-row" key={p.k}>
+              <span>{p.label}</span>
+              {p.nilai
+                ? <span>{p.nilai} {p.unit}</span>
+                : <span className="muted">tidak diambil</span>}
             </div>
-            {(server?.screening?.measuredAt ?? lokal?.measuredAt) && (
-              <small>Diukur {fmtWaktu(server?.screening?.measuredAt ?? lokal?.measuredAt)}</small>
-            )}
-            {server?.screening?.outOfRange && (
-              <div className="belum-note">
-                Ada nilai di luar rentang wajar yang dikonfirmasi petugas saat pencatatan.
-              </div>
-            )}
+          ))}
+          <div className="consumable-sep" />
+          <div className="consumable-total">
+            <span>IMT</span>
+            {imtNilai == null
+              ? <span className="muted">belum bisa dihitung</span>
+              : <span>{dec(imtNilai)} — {imtPenilaian!.label}</span>}
           </div>
-
-          <TabPengukuran pelangganId={pelangganId} participantId={peserta.serverId ?? null}
-            gender={gender} nama={nama} onUbah={() => { onUbah(); void muat(); }} />
-        </>
-      )}
+          {(server?.screening?.measuredAt ?? lokal?.measuredAt) && (
+            <small>Diukur {fmtWaktu(server?.screening?.measuredAt ?? lokal?.measuredAt)}</small>
+          )}
+          {server?.screening?.outOfRange && (
+            <div className="belum-note">
+              Ada nilai di luar rentang wajar yang dikonfirmasi petugas saat pencatatan.
+            </div>
+          )}
+        </div>
+      ))}
 
       {tab === 'belanja' && pelangganId && (
         <TabBelanja pelangganId={pelangganId} participantId={peserta.serverId ?? null}
@@ -501,24 +518,18 @@ export function PesertaDetail({ go, peserta, onUbah }: {
  * menyatukan kunjungan seseorang, jadi satu digit yang keliru memecah
  * riwayatnya menjadi dua orang yang tidak pernah bertemu.
  */
-function KartuIdentitas({ pelangganId, nama, gender, usia, hp, bolehUbah, onTersimpan }: {
+function FormDataDiri({ pelangganId, nama, gender, usia, hp, onTutup, onTersimpan }: {
   pelangganId: string;
   nama: string;
   gender: 'P' | 'L';
   usia: string;
   hp: string;
-  bolehUbah: boolean;
+  onTutup: () => void;
   onTersimpan: () => void;
 }) {
   const { say } = useApp();
-  const [buka, setBuka] = useState(false);
-  const [f, setF] = useState({ nama, gender, usia, hp, catatan: '' });
+  const [f, setF] = useState({ nama, gender, usia: usia || '', hp, catatan: '' });
   const [busy, setBusy] = useState(false);
-
-  function mulai() {
-    setF({ nama, gender, usia: usia || '', hp, catatan: '' });
-    setBuka(true);
-  }
 
   async function simpan() {
     if (!f.nama.trim() || !f.hp.trim()) { say('Nama dan nomor HP tidak boleh kosong.'); return; }
@@ -532,72 +543,45 @@ function KartuIdentitas({ pelangganId, nama, gender, usia, hp, bolehUbah, onTers
         catatan: f.catatan.trim() || null,
       });
       say('Data diri diperbarui.');
-      setBuka(false);
       onTersimpan();
     } catch { say('Gagal menyimpan. Periksa koneksi.'); }
     finally { setBusy(false); }
   }
 
   return (
-    <div className="card consumable-card">
-      <div className="kartu-judul">
-        <b>Data diri</b>
-        {bolehUbah && !buka && (
-          <button className="ikon-btn" aria-label="Ubah data diri" onClick={mulai}>
-            <Icon d={ICONS.pencil} size={16} />
-          </button>
-        )}
+    <Sheet title="Ubah data diri" subtitle={nama} onClose={onTutup}>
+      <Field label="Nama" htmlFor="i-nama">
+        <input id="i-nama" className="input" value={f.nama} maxLength={160}
+          onChange={(e) => setF({ ...f, nama: e.target.value })} autoFocus />
+      </Field>
+      <div className="field">
+        <label>Jenis kelamin</label>
+        <div className="pill-row">
+          <button className={`pill-choice ${f.gender === 'P' ? 'on' : ''}`}
+            onClick={() => setF({ ...f, gender: 'P' })}>Perempuan</button>
+          <button className={`pill-choice ${f.gender === 'L' ? 'on' : ''}`}
+            onClick={() => setF({ ...f, gender: 'L' })}>Laki-laki</button>
+        </div>
       </div>
-
-      {!buka ? (
-        <>
-          <div className="consumable-row"><span>Nama</span><span>{nama}</span></div>
-          <div className="consumable-row">
-            <span>Jenis kelamin</span><span>{gender === 'P' ? 'Perempuan' : 'Laki-laki'}</span>
-          </div>
-          <div className="consumable-row">
-            <span>Usia</span>
-            {usia ? <span>{usia} th</span> : <span className="muted">belum diisi</span>}
-          </div>
-          <div className="consumable-row"><span>Nomor HP</span><span>{hp}</span></div>
-          {!bolehUbah && <small>Perubahan data diri hanya bisa dilakukan Koordinator.</small>}
-        </>
-      ) : (
-        <>
-          <Field label="Nama" htmlFor="i-nama">
-            <input id="i-nama" className="input" value={f.nama} maxLength={160}
-              onChange={(e) => setF({ ...f, nama: e.target.value })} autoFocus />
-          </Field>
-          <div className="field">
-            <label>Jenis kelamin</label>
-            <div className="pill-row">
-              <button className={`pill-choice ${f.gender === 'P' ? 'on' : ''}`}
-                onClick={() => setF({ ...f, gender: 'P' })}>Perempuan</button>
-              <button className={`pill-choice ${f.gender === 'L' ? 'on' : ''}`}
-                onClick={() => setF({ ...f, gender: 'L' })}>Laki-laki</button>
-            </div>
-          </div>
-          <div className="dua-kolom">
-            <Field label="Usia" htmlFor="i-usia">
-              <input id="i-usia" className="input" inputMode="numeric" value={f.usia}
-                onChange={(e) => setF({ ...f, usia: e.target.value.replace(/\D/g, '').slice(0, 3) })} />
-            </Field>
-            <Field label="Nomor HP" htmlFor="i-hp">
-              <input id="i-hp" className="input" inputMode="tel" value={f.hp} maxLength={32}
-                onChange={(e) => setF({ ...f, hp: e.target.value })} />
-            </Field>
-          </div>
-          <div className="belum-note">
-            Nomor HP adalah kunci yang menyatukan kunjungan orang ini. Mengubahnya
-            memengaruhi bagaimana kunjungan berikutnya dikenali.
-          </div>
-          <Button full icon={ICONS.check} disabled={busy} onClick={() => void simpan()}>
-            Simpan perubahan
-          </Button>
-          <button className="link-btn" onClick={() => setBuka(false)}>Batal</button>
-        </>
-      )}
-    </div>
+      <div className="dua-kolom">
+        <Field label="Usia" htmlFor="i-usia">
+          <input id="i-usia" className="input" inputMode="numeric" value={f.usia}
+            onChange={(e) => setF({ ...f, usia: e.target.value.replace(/\D/g, '').slice(0, 3) })} />
+        </Field>
+        <Field label="Nomor HP" htmlFor="i-hp">
+          <input id="i-hp" className="input" inputMode="tel" value={f.hp} maxLength={32}
+            onChange={(e) => setF({ ...f, hp: e.target.value })} />
+        </Field>
+      </div>
+      <div className="belum-note">
+        Nomor HP adalah kunci yang menyatukan kunjungan orang ini. Mengubahnya
+        memengaruhi bagaimana kunjungan berikutnya dikenali.
+      </div>
+      <Button full icon={ICONS.check} disabled={busy} onClick={() => void simpan()}>
+        Simpan perubahan
+      </Button>
+      <button className="link-btn" onClick={onTutup}>Batal</button>
+    </Sheet>
   );
 }
 

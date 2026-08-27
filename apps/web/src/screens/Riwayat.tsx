@@ -60,7 +60,10 @@ export function TabPengukuran({ pelangganId, participantId, gender, nama, onUbah
     void api.rekan().then((r) => setRekan(r.rekan)).catch(() => setRekan([]));
   }, []);
 
-  const deret = useMemo(() => bangunDeret(rows ?? [], gender), [rows, gender]);
+  const deret = useMemo(
+    () => bangunDeret(rows ?? [], gender, participantId),
+    [rows, gender, participantId],
+  );
 
   const terbaru = (jenis: JenisUkur): number | null => {
     const d = deret.find((x) => x.jenis === jenis);
@@ -83,6 +86,8 @@ export function TabPengukuran({ pelangganId, participantId, gender, nama, onUbah
   const imtNilai = imt == null ? null : nilaiImt(imt);
   const tinggi = terbaru('tinggi');
   const berat = terbaru('berat');
+  // Waktu baru menjadi informasi begitu ada angka dari kunjungan lain.
+  const campuran = deret.some((d) => d.titik.some((t) => !t.kunjunganIni));
 
   return (
     <>
@@ -131,7 +136,7 @@ export function TabPengukuran({ pelangganId, participantId, gender, nama, onUbah
                 layar dengan bobot identik membuat tidak ada yang menonjol. */}
             <div className="card ukur-daftar">
               {isi.map((d) => (
-                <BarisUkur key={d.kunci} deret={d}
+                <BarisUkur key={d.kunci} deret={d} campuran={campuran}
                   terbuka={buka.has(d.kunci)}
                   onToggle={() => setBuka((s) => {
                     const n = new Set(s);
@@ -160,10 +165,7 @@ export function TabPengukuran({ pelangganId, participantId, gender, nama, onUbah
           onClose={() => setCatat(null)}>
           <PilihGrup
             onBatal={() => setCatat(null)}
-            onPilih={(g) => setCatat({
-              tahap: 'papan', grup: g,
-              konteks: g.slot.find((s) => s.jenis === 'gula')?.konteks ?? 'sewaktu',
-            })} />
+            onPilih={(g, konteks) => setCatat({ tahap: 'papan', grup: g, konteks })} />
         </Sheet>
       )}
 
@@ -222,6 +224,8 @@ export function TabPengukuran({ pelangganId, participantId, gender, nama, onUbah
 /** Satu pembacaan pada satu waktu. Bisa ditopang dua rekaman (tensi). */
 type Titik = {
   waktu: string;
+  /** Diambil pada kunjungan yang sedang dibuka. */
+  kunjunganIni: boolean;
   tampil: string;
   /** Nilai tunggal untuk menghitung selisih; null bila berpasangan. */
   nilai: number | null;
@@ -257,7 +261,7 @@ type Deret = {
  *   Gula darah tetap dipisah per konteks. GDP dan GD2PP tidak sebanding, jadi
  *   menyatukannya jadi satu deret akan menghasilkan naik-turun tanpa arti.
  */
-function bangunDeret(rows: PengukuranRow[], gender: Gender): Deret[] {
+function bangunDeret(rows: PengukuranRow[], gender: Gender, kunjungan: string | null): Deret[] {
   const ember = new Map<string, PengukuranRow[]>();
   for (const r of rows) {
     const k = r.jenis === 'gula' ? `gula:${r.konteks ?? 'sewaktu'}`
@@ -288,6 +292,7 @@ function bangunDeret(rows: PengukuranRow[], gender: Gender): Deret[] {
         const utama = sis ?? dia!;
         return {
           waktu,
+          kunjunganIni: kunjungan != null && pasangan.some((r) => r.participantId === kunjungan),
           // Yang tidak terukur ditulis "–", bukan disembunyikan: pembacaan
           // tensi yang hanya separuh adalah fakta yang perlu terlihat.
           tampil: s != null && d != null
@@ -331,6 +336,7 @@ function bangunDeret(rows: PengukuranRow[], gender: Gender): Deret[] {
         const n = angka(r.nilai);
         return {
           waktu: r.diukurPada,
+          kunjunganIni: kunjungan != null && r.participantId === kunjungan,
           tampil: fmtNilai(r.jenis, n),
           nilai: n,
           penilaian: nilaiUkur(r.jenis, n, { gender, konteks: r.konteks }),
@@ -350,9 +356,11 @@ function bangunDeret(rows: PengukuranRow[], gender: Gender): Deret[] {
 /* ------------------------------ satu baris ------------------------------ */
 
 function BarisUkur({
-  deret, terbuka, onToggle, bolehHapus, konfirmHapus, onUbah, onMintaHapus, onHapus,
+  deret, campuran, terbuka, onToggle, bolehHapus, konfirmHapus, onUbah, onMintaHapus, onHapus,
 }: {
   deret: Deret;
+  /** Ada angka dari kunjungan lain, sehingga waktu menjadi pembeda. */
+  campuran: boolean;
   terbuka: boolean;
   onToggle: () => void;
   bolehHapus: boolean;
@@ -384,7 +392,13 @@ function BarisUkur({
               <span className={`vonis vonis-${kini.penilaian.nada}`}>{kini.penilaian.singkat}</span>
             )}
             {kini.outOfRange && <span className="vonis vonis-tinggi">Di luar rentang wajar</span>}
-            <span>{fmtWaktuSingkat(kini.waktu)}</span>
+            {/* Waktu hanya ditulis kalau ia membedakan sesuatu. Bila seluruh
+                angka berasal dari kunjungan yang sedang dibuka, baik tanggal
+                maupun tanda "Kunjungan ini" mengatakan hal yang sudah jelas
+                dari konteks layar — empat kali berturut-turut. */}
+            {campuran && (
+              <span>{kini.kunjunganIni ? 'Kunjungan ini' : fmtWaktuSingkat(kini.waktu)}</span>
+            )}
           </span>
         </span>
 
