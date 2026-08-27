@@ -1222,6 +1222,8 @@ button { cursor: pointer; font-family: inherit; }
     border-top: 0; border-right: 1px solid var(--border-hairline);
   }
   .nav-utama { flex-direction: column; flex: 0 0 auto; gap: 4px; }
+  /* Pada rel tegak, tiap butir setinggi isinya — bukan membagi tinggi rel. */
+  .nav-item { flex: 0 0 auto; }
   .nav-sekunder {
     display: flex; flex-direction: column; gap: 4px;
     margin-top: auto; padding-top: 10px;
@@ -1321,7 +1323,6 @@ button { cursor: pointer; font-family: inherit; }
 
   /* Daftar yang panjang dibaca sebagai satu kolom penuh, bukan diperas ke
      separuh lebar sementara separuh lainnya menganggur. */
-  .screen > .page > .master-grup,
   .screen > .page > .panel,
   .screen > .page > .ukur-grup { grid-column: 1 / -1; }
 
@@ -1336,23 +1337,6 @@ button { cursor: pointer; font-family: inherit; }
   .ukur-item-head { padding: 15px 16px; }
 }
 
-/* ============================= Master data ============================= */
-
-.master-baris {
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  padding: 12px 16px;
-}
-.master-baris + .master-baris { border-top: 1px solid var(--border-hairline); }
-.master-isi { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
-.master-isi b {
-  font-size: 14.5px; font-weight: var(--fw-semibold); color: var(--text-body);
-}
-.master-isi span { font-size: 12px; color: var(--text-muted); }
-.master-isi em { font-size: 12px; font-style: normal; color: var(--text-subtle); }
-/* Yang nonaktif diredam, bukan dicoret: ia masih harus terbaca jelas untuk
-   diputuskan apakah perlu diaktifkan lagi. */
-.master-baris.nonaktif .master-isi b { color: var(--text-muted); font-weight: var(--fw-medium); }
-.master-baris > .hapus-konfirm { flex-basis: 100%; }
 
 @media (min-width: 1100px) {
   /* Kepala Beranda memuat merek, nama cabang, dan ikon pengaturan — ketiganya
@@ -1436,7 +1420,6 @@ button { cursor: pointer; font-family: inherit; }
   font-size: 13.5px; line-height: 1.6; color: var(--text-muted);
   max-width: 42ch; margin: 0 auto;
 }
-.master-baris + .panel-grup { border-top: 1px solid var(--border-hairline); }
 
 /* Baris alat yang memang berdiri sendiri (daftar kartu, bukan baris). */
 .toolbar-lepas { padding: 0 2px; }
@@ -1449,7 +1432,11 @@ button { cursor: pointer; font-family: inherit; }
 
 /* ===================== Sub-menu sidebar & krom halaman ===================== */
 
-.nav-item { display: flex; flex-direction: column; }
+/* Pembungkus `.nav-item` ditambahkan untuk menampung sub-menu. Ia harus ikut
+   membagi lebar: `flex: 1` pada `.tab` kini berlaku di dalam pembungkus ini,
+   bukan lagi di dalam `.tabbar`, sehingga tanpa aturan ini keempat tab
+   menyusut ke lebar teksnya dan menggerombol di tepi kiri. */
+.nav-item { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .nav-anak { display: none; }
 
 @media (min-width: 768px) {
@@ -1485,3 +1472,93 @@ button { cursor: pointer; font-family: inherit; }
   .page-master > .page-head,
   .page-master > .segtabs { display: none; }
 }
+
+/* ============================== Tabel data ==============================
+   Satu markup, dua bentuk. Di lebar meja ia tabel berkolom; di bawah 1100px
+   CSS memecahnya jadi kartu berlabel. Memakai <table> sungguhan, bukan grid,
+   karena hubungan kolom-ke-sel itu yang dibacakan pembaca layar — dan itu
+   hilang begitu tabel dipalsukan dengan div. */
+
+.tabel { width: 100%; border-collapse: collapse; }
+
+/* ---- Bentuk kartu (di bawah 1100px) ---- */
+@media (max-width: 1099px) {
+  .tabel, .tabel tbody, .tabel tr, .tabel td { display: block; width: 100%; }
+  .tabel thead { display: none; }
+  .tabel tr { padding: 12px 16px; }
+  .tabel tbody tr:not(:first-child),
+  .tabel tbody + tbody tr:first-child { border-top: 1px solid var(--border-hairline); }
+  .tabel td {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 14px; padding: 3px 0; font-size: 13.5px;
+  }
+  /* Label kolom dibawa turun jadi label baris — bentuk yang sama dengan
+     daftar ringkasan di layar lain, sehingga tak terasa sebagai pola baru. */
+  .tabel td::before {
+    content: attr(data-label);
+    color: var(--text-muted); font-size: 12.5px; flex: 0 0 auto;
+  }
+  .tabel td:not([data-label]) { justify-content: flex-end; }
+  .tabel .kol-nama { display: block; padding-bottom: 6px; }
+  .tabel .kol-nama::before { display: none; }
+  .tabel .kol-aksi { padding-top: 8px; }
+  /* Baris kelompok jadi sub-judul kartu. */
+  .tabel .baris-grup { padding: 0; border: 0; }
+  .tabel .baris-grup td {
+    padding: 10px 16px 4px; justify-content: flex-start;
+    font-size: 11.5px; font-weight: var(--fw-semibold); letter-spacing: .07em;
+    text-transform: uppercase; color: var(--text-muted);
+  }
+  .tabel .baris-cabang td {
+    background: var(--brand-tint); color: var(--teal-800); padding: 8px 16px;
+  }
+}
+
+/* ---- Bentuk tabel (mulai 1100px) ---- */
+@media (min-width: 1100px) {
+  .tabel th {
+    text-align: left; padding: 9px 16px;
+    font-size: 11px; font-weight: var(--fw-semibold);
+    letter-spacing: .07em; text-transform: uppercase; color: var(--text-muted);
+    border-bottom: 1px solid var(--border-hairline);
+    white-space: nowrap;
+  }
+  .tabel td {
+    padding: 11px 16px; vertical-align: middle; font-size: 13.5px;
+    border-bottom: 1px solid var(--border-hairline);
+  }
+  .tabel tbody:last-child tr:last-child td { border-bottom: 0; }
+  .tabel tbody tr:hover td { background: var(--brand-tint); }
+
+  /* Kolom sempit menyusut ke isinya; sisa lebar jatuh ke kolom Nama. Inilah
+     yang menghabiskan ruang hampa: bukan diregangkan, tapi diisi kolom yang
+     memang punya sesuatu untuk dikatakan. */
+  .tabel .kol-sempit, .tabel .kol-angka, .tabel .kol-aksi {
+    width: 1%; white-space: nowrap;
+  }
+  .tabel .kol-angka { text-align: right; font-variant-numeric: tabular-nums; }
+  .tabel .kol-aksi { text-align: right; }
+  .tabel .kol-aksi .riwayat-aksi { justify-content: flex-end; }
+
+  .tabel .baris-grup td {
+    padding: 9px 16px; background: var(--surface-sunken);
+    font-size: 11px; font-weight: var(--fw-semibold);
+    letter-spacing: .07em; text-transform: uppercase; color: var(--text-muted);
+  }
+  .tabel .baris-cabang td { background: var(--brand-tint); color: var(--teal-800); }
+  .tabel .baris-grup:hover td { background: var(--surface-sunken); }
+  .tabel .baris-cabang:hover td { background: var(--brand-tint); }
+}
+
+.tabel .kol-nama b {
+  display: block; font-size: 14px;
+  font-weight: var(--fw-semibold); color: var(--text-body);
+}
+.tabel .kol-nama em {
+  display: block; font-style: normal; font-size: 12px; color: var(--text-subtle);
+}
+/* Yang nonaktif diredam, bukan dicoret: ia masih harus terbaca jelas untuk
+   diputuskan apakah perlu diaktifkan lagi. */
+.tabel tr.nonaktif .kol-nama b { color: var(--text-muted); font-weight: var(--fw-medium); }
+.tabel .muted { color: var(--text-subtle); }
+.tabel .hapus-konfirm { justify-content: flex-end; }
