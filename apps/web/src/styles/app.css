@@ -1834,13 +1834,22 @@ button { cursor: pointer; font-family: inherit; }
   display: flex; flex-direction: column;
   border: 1px solid var(--border-hairline); border-radius: var(--radius-card);
   background: var(--surface-card); overflow: hidden;
-  transition: border-color var(--dur-fast) var(--ease-calm);
+  transition: border-color var(--dur-fast) var(--ease-calm),
+              box-shadow var(--dur-fast) var(--ease-calm);
 }
-.produk-kartu.buka { border-color: var(--border-brand, var(--teal-700)); }
+.produk-kartu:hover { border-color: var(--border-default); }
+.produk-kartu.buka {
+  border-color: var(--border-brand, var(--teal-700));
+  box-shadow: var(--shadow-sm);
+}
 
 .produk-kepala {
   display: flex; align-items: center; gap: 10px; width: 100%;
   padding: 12px 14px; text-align: left; background: none; color: inherit;
+  /* Proyek ini tidak punya reset border global — tiap kelas tombol
+     menyetelnya sendiri. Tanpa baris ini, border bawaan peramban muncul dan
+     kartunya terbaca sebagai dua kotak bertumpuk. */
+  border: none;
 }
 .produk-tx { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 .produk-tx b { font-size: 14px; font-weight: var(--fw-semibold); color: var(--text-body); }
@@ -1870,3 +1879,18 @@ button { cursor: pointer; font-family: inherit; }
 .produk-isi ul { margin: 0; padding-left: 16px; display: flex; flex-direction: column; gap: 2px; }
 .produk-isi li, .produk-isi p { font-size: 13px; color: var(--text-body); margin: 0; }
 .produk-isi > div > a { align-self: flex-start; }
+
+/* Ukuran kemasan dan harga daftar: dinyatakan di ringkasan, bukan di dalam
+   lipatan. Keduanya yang membedakan dua SKU yang namanya nyaris sama
+   ("Supergreen 150 tabs" dan "600 tabs"), jadi menyembunyikannya membuat
+   kartunya terbaca kembar. */
+.produk-meta {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  padding: 0 14px 10px; margin-top: -4px;
+}
+.produk-ukuran { font-size: 12px; color: var(--text-muted); }
+.produk-harga {
+  margin-left: auto; font-size: 13px; font-weight: var(--fw-semibold);
+  color: var(--teal-800); font-variant-numeric: tabular-nums;
+}
+.produk-peringatan { color: var(--danger-700); }
