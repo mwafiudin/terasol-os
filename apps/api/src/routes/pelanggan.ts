@@ -29,6 +29,12 @@ const transaksiBody = z.object({
   clientId: z.string().uuid().optional(),
   pelangganId: z.string().uuid(),
   participantId: z.string().uuid().nullish(),
+  /**
+   * Asal katalog, bila dipilih dari daftar. Boleh kosong: barang di luar
+   * katalog tetap harus bisa dicatat — menolak mencatat penjualan yang sudah
+   * terjadi adalah kehilangan data, bukan penegakan disiplin.
+   */
+  katalogId: z.string().uuid().nullish(),
   jenis: z.enum(['produk', 'terapi', 'paket']).default('produk'),
   nama: z.string().min(1).max(200),
   jumlah: z.number().int().min(1).default(1),
@@ -344,16 +350,19 @@ export default async function pelangganRoutes(app: FastifyInstance) {
     const hasil = await withTenant(ctx, async (tx) => {
       const { rows } = await tx.query(
         `insert into transaksi (tenant_id, pelanggan_id, participant_id, client_id, jenis,
-                                nama, jumlah, harga_satuan, tanggal, dicatat_oleh, catatan)
-         values ($1,$2,$3,$4,$5::jenis_transaksi,$6,$7,$8,coalesce($9::date, current_date),$10,$11)
+                                nama, jumlah, harga_satuan, tanggal, dicatat_oleh, catatan,
+                                katalog_id)
+         values ($1,$2,$3,$4,$5::jenis_transaksi,$6,$7,$8,coalesce($9::date, current_date),$10,$11,$12)
          on conflict (tenant_id, client_id) do update
             set nama = excluded.nama, jumlah = excluded.jumlah,
                 harga_satuan = excluded.harga_satuan, tanggal = excluded.tanggal,
-                jenis = excluded.jenis, catatan = excluded.catatan
+                jenis = excluded.jenis, catatan = excluded.catatan,
+                katalog_id = excluded.katalog_id
          returning id, jenis, nama, jumlah, harga_satuan as "hargaSatuan", total,
                    to_char(tanggal,'YYYY-MM-DD') as tanggal`,
         [ctx.tenantId, t.pelangganId, t.participantId ?? null, t.clientId ?? crypto.randomUUID(),
-         t.jenis, t.nama, t.jumlah, t.hargaSatuan, t.tanggal ?? null, ctx.userId, t.catatan ?? null],
+         t.jenis, t.nama, t.jumlah, t.hargaSatuan, t.tanggal ?? null, ctx.userId, t.catatan ?? null,
+         t.katalogId ?? null],
       );
       await audit(tx, ctx, 'transaksi.create', 'transaksi', rows[0]!.id, { nama: t.nama, total: rows[0]!.total });
       return rows[0];

@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge, Button, Field, Icon, ICONS, Rujukan, Sheet } from '../components/ui';
 import {
   api,
-  type DaftarTerhapus, type JenisTransaksi, type PengukuranRow, type TransaksiRow,
+  type DaftarTerhapus, type JenisTransaksi, type KatalogRow,
+  type PengukuranRow, type TransaksiRow,
 } from '../lib/api';
 import { dec, fmtTanggal, fmtWaktu, fmtWaktuSingkat, num, rp } from '../lib/domain';
 import {
@@ -96,7 +97,10 @@ export function TabPengukuran({ pelangganId, participantId, gender, nama, onUbah
     <>
       {gagal && <div className="belum-note">{gagal}</div>}
 
-      {rows.length === 0 ? (
+      {/* Keadaan kosong hanya sah bila pemuatannya berhasil. "Gagal memuat"
+          berdampingan dengan "belum ada" mengatakan dua hal yang bertentangan,
+          dan yang kedua adalah dugaan yang tidak kita ketahui. */}
+      {rows.length === 0 && !gagal ? (
         <div className="card empty-card">
           <div className="ic"><Icon d={ICONS.pulse} size={26} /></div>
           <b>Belum ada pengukuran</b>
@@ -642,7 +646,7 @@ export function TabBelanja({ pelangganId, participantId, onUbah }: {
         Catat pembelian
       </Button>
 
-      {rows.length === 0 ? (
+      {rows.length === 0 && !gagal ? (
         <div className="card empty-card">
           <div className="ic"><Icon d={ICONS.cart} size={26} /></div>
           <b>Belum ada pembelian</b>
@@ -737,7 +741,28 @@ function FormTransaksi({ awal, onTutup, onSimpan }: {
   const [harga, setHarga] = useState(awal ? String(Number(awal.hargaSatuan)) : '');
   const [tanggal, setTanggal] = useState(awal?.tanggal ?? new Date().toISOString().slice(0, 10));
   const [catatan, setCatatan] = useState(awal?.catatan ?? '');
+  const [katalogId, setKatalogId] = useState<string | null>(null);
+  const [katalog, setKatalog] = useState<KatalogRow[]>([]);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    void api.katalog({ aktif: true }).then((r) => setKatalog(r.katalog)).catch(() => setKatalog([]));
+  }, []);
+
+  const pilihan = katalog.filter((k) => k.jenis === jenis);
+
+  /**
+   * Memilih dari katalog mengisi nama dan harga, tetapi keduanya tetap bisa
+   * diubah sesudahnya: harga katalog adalah acuan, sedangkan yang benar-benar
+   * dibayar hari itu bisa berbeda karena diskon atau kesepakatan.
+   */
+  function pilihKatalog(id: string) {
+    const k = katalog.find((x) => x.id === id);
+    if (!k) { setKatalogId(null); return; }
+    setKatalogId(k.id);
+    setNama(k.nama);
+    setHarga(String(Number(k.harga)));
+  }
 
   const j = Number(jumlah) || 0;
   const h = Number(harga) || 0;
@@ -749,10 +774,26 @@ function FormTransaksi({ awal, onTutup, onSimpan }: {
 
       <Field label="Jenis" htmlFor="t-jenis">
         <select id="t-jenis" className="input" value={jenis}
-          onChange={(e) => setJenis(e.target.value as JenisTransaksi)}>
+          onChange={(e) => { setJenis(e.target.value as JenisTransaksi); setKatalogId(null); }}>
           {JENIS_TRX.map((x) => <option key={x.k} value={x.k}>{x.label}</option>)}
         </select>
       </Field>
+
+      {!awal && pilihan.length > 0 && (
+        <Field label="Pilih dari katalog" htmlFor="t-katalog">
+          <select id="t-katalog" className="input" value={katalogId ?? ''}
+            onChange={(e) => pilihKatalog(e.target.value)}>
+            <option value="">— ketik sendiri —</option>
+            {pilihan.map((k) => (
+              <option key={k.id} value={k.id}>{k.nama} · {rp(Number(k.harga))}</option>
+            ))}
+          </select>
+          <small className="field-bantu">
+            Memilih dari katalog membuat riwayat belanja bisa dilaporkan per
+            produk. Barang di luar katalog tetap boleh diketik sendiri.
+          </small>
+        </Field>
+      )}
 
       <Field label="Nama produk atau terapi" htmlFor="t-nama">
         <input id="t-nama" className="input" value={nama} maxLength={120}
@@ -792,6 +833,10 @@ function FormTransaksi({ awal, onTutup, onSimpan }: {
           void onSimpan({
             jenis, nama: nama.trim(), jumlah: j, hargaSatuan: h,
             tanggal, catatan: catatan.trim() || null,
+            // Hanya ikut bila namanya masih sama dengan yang dipilih; begitu
+            // diketik ulang jadi barang lain, tautannya berhenti benar.
+            katalogId: katalog.find((k) => k.id === katalogId)?.nama === nama.trim()
+              ? katalogId : null,
           }).finally(() => setBusy(false));
         }}>
         {awal ? 'Simpan perubahan' : 'Simpan pembelian'}

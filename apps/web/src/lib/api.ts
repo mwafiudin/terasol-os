@@ -161,6 +161,17 @@ export type DaftarTerhapus = {
   }[];
 };
 
+export type KatalogRow = {
+  id: string; tenantId: string; tenantNama: string;
+  jenis: JenisTransaksi; nama: string; harga: string;
+  catatan: string | null; aktif: boolean; terpakai: number;
+};
+
+export type CabangRow = {
+  id: string; nama: string; status: string; createdAt: string;
+  pengguna: number; event: number; pelanggan: number;
+};
+
 export type JenisTransaksi = 'produk' | 'terapi' | 'paket';
 
 export type TransaksiRow = {
@@ -346,6 +357,24 @@ export const api = {
     request<DaftarTerhapus>(`/pelanggan/${pelangganId}/terhapus`),
 
   pusatRingkasan: () => request<PusatRingkasan>('/pusat/ringkasan'),
+
+  /* ----------------------------- master data ----------------------------- */
+
+  katalog: (opsi: { semua?: boolean; aktif?: boolean } = {}) => {
+    const s = new URLSearchParams();
+    if (opsi.semua) s.set('semua', 'true');
+    if (opsi.aktif) s.set('aktif', 'true');
+    return request<{ katalog: KatalogRow[]; lintasCabang: boolean }>(`/katalog?${s}`);
+  },
+  createKatalog: (b: { jenis: JenisTransaksi; nama: string; harga: number; catatan?: string | null; tenantId?: string }) =>
+    post<KatalogRow>('/katalog', b),
+  updateKatalog: (id: string, b: Record<string, unknown>) => patch<KatalogRow>(`/katalog/${id}`, b),
+  deleteKatalog: (id: string) => del<{ ok: true }>(`/katalog/${id}`),
+
+  cabang: () => request<{ cabang: CabangRow[] }>('/cabang'),
+  createCabang: (nama: string) => post<CabangRow>('/cabang', { nama }),
+  updateCabang: (id: string, b: { nama?: string; status?: 'active' | 'inactive' }) =>
+    patch<CabangRow>(`/cabang/${id}`, b),
 
   rekan: () => request<{ rekan: { id: string; nama: string; role: Role }[] }>('/rekan'),
   eventPetugas: (eventId: string) =>
