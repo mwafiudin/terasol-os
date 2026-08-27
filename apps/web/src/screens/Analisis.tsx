@@ -173,6 +173,11 @@ export function Analisis({ go, pelangganId, nama, gender, usia, hp }: {
   if (gagal) return <span className="hint">{gagal}</span>;
 
   const kosong = !hasil || hasil.penanda.length === 0;
+  // Tiap sumber sekali saja, dengan urutan kemunculannya di lembar.
+  const sumber = [...new Set([
+    ...(hasil?.imt ? [hasil.imt.penilaian.sumber] : []),
+    ...(hasil?.penanda ?? []).map((p) => p.terbaru.penilaian?.sumber).filter((s): s is string => !!s),
+  ])];
 
   return (
     <div className="page page-analisis">
@@ -222,7 +227,29 @@ export function Analisis({ go, pelangganId, nama, gender, usia, hp }: {
         )}
 
         <footer className="lembar-kaki">
+          {/* Sumber rujukan dikumpulkan sekali di kaki halaman, bukan diulang
+              di tiap baris. Di layar pengulangan itu berguna sebagai konteks;
+              di kertas ia menjadi tujuh baris kecil yang mengatakan hal yang
+              sama dan mendorong isi sesungguhnya turun satu halaman. */}
+          {sumber.length > 0 && (
+            <div className="hanya-cetak lembar-sumber">
+              <h2>Sumber rujukan</h2>
+              <ol>{sumber.map((s) => <li key={s}>{s}</li>)}</ol>
+            </div>
+          )}
+
           <Rujukan>{DISCLAIMER}</Rujukan>
+
+          {/* Kertas beredar tanpa aplikasi di sekitarnya: siapa yang mencetak
+              dan kapan harus terbaca dari lembarnya sendiri. */}
+          <div className="hanya-cetak lembar-tanda">
+            <span>
+              Dicetak {fmtTanggal(new Date().toISOString())}
+              {user?.nama ? ` · ${user.nama}` : ''}
+              {user?.tenantNama ? ` · ${user.tenantNama}` : ''}
+            </span>
+            <span>Terasol OS</span>
+          </div>
         </footer>
       </div>
     </div>
