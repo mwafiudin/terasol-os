@@ -37,6 +37,10 @@ export function TabPengukuran({ pelangganId, participantId, gender, onUbah }: {
   const [rekan, setRekan] = useState<Rekan[]>([]);
   const [buka, setBuka] = useState<Set<JenisUkur>>(new Set());
   const [form, setForm] = useState<{ mode: 'baru' } | { mode: 'ubah'; row: PengukuranRow } | null>(null);
+  // Konfirmasi hapus dibuat di dalam aplikasi, bukan lewat `confirm()` bawaan
+  // browser: dialog itu tampak asing di PWA terpasang, dan sebagian browser
+  // meredamnya diam-diam — penghapusan yang tampak tidak terjadi apa-apa.
+  const [konfirmHapus, setKonfirmHapus] = useState<string | null>(null);
   const [gagal, setGagal] = useState<string | null>(null);
   const bolehHapus = user?.role === 'koordinator' || user?.role === 'admin_pusat';
 
@@ -79,8 +83,7 @@ export function TabPengukuran({ pelangganId, participantId, gender, onUbah }: {
   const imt = hitungImt(terbaru('tinggi'), terbaru('berat'));
 
   async function hapus(row: PengukuranRow) {
-    const l = UKUR[row.jenis].label;
-    if (!confirm(`Hapus ${l} ${fmtNilai(row.jenis, angka(row.nilai))} ${UKUR[row.jenis].satuan} yang diukur ${fmtWaktu(row.diukurPada)}?`)) return;
+    setKonfirmHapus(null);
     try {
       await api.deletePengukuran(row.id);
       say('Pengukuran dihapus.');
@@ -137,7 +140,9 @@ export function TabPengukuran({ pelangganId, participantId, gender, onUbah }: {
                   const n = new Set(s); n.has(d.jenis) ? n.delete(d.jenis) : n.add(d.jenis); return n;
                 })}
                 bolehHapus={bolehHapus}
+                konfirmHapus={konfirmHapus}
                 onUbah={(row) => setForm({ mode: 'ubah', row })}
+                onMintaHapus={setKonfirmHapus}
                 onHapus={(row) => void hapus(row)} />
             ))}
           </div>
@@ -174,14 +179,19 @@ export function TabPengukuran({ pelangganId, participantId, gender, onUbah }: {
   );
 }
 
-function KartuUkur({ deret, gender, pasangan, terbuka, onToggle, bolehHapus, onUbah, onHapus }: {
+function KartuUkur({
+  deret, gender, pasangan, terbuka, onToggle,
+  bolehHapus, konfirmHapus, onUbah, onMintaHapus, onHapus,
+}: {
   deret: { jenis: JenisUkur; konteks: KonteksGula | null; baris: PengukuranRow[] };
   gender: Gender;
   pasangan: number | null;
   terbuka: boolean;
   onToggle: () => void;
   bolehHapus: boolean;
+  konfirmHapus: string | null;
   onUbah: (r: PengukuranRow) => void;
+  onMintaHapus: (id: string | null) => void;
   onHapus: (r: PengukuranRow) => void;
 }) {
   const { jenis, konteks, baris } = deret;
@@ -243,16 +253,25 @@ function KartuUkur({ deret, gender, pasangan, terbuka, onToggle, bolehHapus, onU
                 </span>
                 {r.catatan && <em>{r.catatan}</em>}
               </div>
-              <div className="riwayat-aksi">
-                <button className="ikon-btn" aria-label="Ubah" onClick={() => onUbah(r)}>
-                  <Icon d={ICONS.pencil} size={16} />
-                </button>
-                {bolehHapus && (
-                  <button className="ikon-btn bahaya" aria-label="Hapus" onClick={() => onHapus(r)}>
-                    <Icon d={ICONS.trash} size={16} />
+              {konfirmHapus === r.id ? (
+                <div className="hapus-konfirm">
+                  <span>Hapus?</span>
+                  <button className="link-btn sm bahaya" onClick={() => onHapus(r)}>Ya, hapus</button>
+                  <button className="link-btn sm" onClick={() => onMintaHapus(null)}>Batal</button>
+                </div>
+              ) : (
+                <div className="riwayat-aksi">
+                  <button className="ikon-btn" aria-label="Ubah" onClick={() => onUbah(r)}>
+                    <Icon d={ICONS.pencil} size={16} />
                   </button>
-                )}
-              </div>
+                  {bolehHapus && (
+                    <button className="ikon-btn bahaya" aria-label="Hapus"
+                      onClick={() => onMintaHapus(r.id)}>
+                      <Icon d={ICONS.trash} size={16} />
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -404,6 +423,7 @@ export function TabBelanja({ pelangganId, participantId, onUbah }: {
   const [rows, setRows] = useState<TransaksiRow[] | null>(null);
   const [total, setTotal] = useState(0);
   const [form, setForm] = useState<{ mode: 'baru' } | { mode: 'ubah'; row: TransaksiRow } | null>(null);
+  const [konfirmHapus, setKonfirmHapus] = useState<string | null>(null);
   const [gagal, setGagal] = useState<string | null>(null);
   const bolehHapus = user?.role === 'koordinator' || user?.role === 'admin_pusat';
 
@@ -418,7 +438,7 @@ export function TabBelanja({ pelangganId, participantId, onUbah }: {
   useEffect(() => { void muat(); }, [muat]);
 
   async function hapus(row: TransaksiRow) {
-    if (!confirm(`Hapus "${row.nama}" senilai ${rp(Number(row.total))}?`)) return;
+    setKonfirmHapus(null);
     try {
       await api.deleteTransaksi(row.id);
       say('Catatan belanja dihapus.');
@@ -470,16 +490,25 @@ export function TabBelanja({ pelangganId, participantId, onUbah }: {
                 {t.eventNama ? ` · ${t.eventNama}` : ''}
               </small>
               {t.catatan && <em className="trx-catatan">{t.catatan}</em>}
-              <div className="riwayat-aksi">
-                <button className="ikon-btn" aria-label="Ubah" onClick={() => setForm({ mode: 'ubah', row: t })}>
-                  <Icon d={ICONS.pencil} size={16} />
-                </button>
-                {bolehHapus && (
-                  <button className="ikon-btn bahaya" aria-label="Hapus" onClick={() => void hapus(t)}>
-                    <Icon d={ICONS.trash} size={16} />
+              {konfirmHapus === t.id ? (
+                <div className="hapus-konfirm">
+                  <span>Hapus catatan {rp(Number(t.total))} ini?</span>
+                  <button className="link-btn sm bahaya" onClick={() => void hapus(t)}>Ya, hapus</button>
+                  <button className="link-btn sm" onClick={() => setKonfirmHapus(null)}>Batal</button>
+                </div>
+              ) : (
+                <div className="riwayat-aksi">
+                  <button className="ikon-btn" aria-label="Ubah" onClick={() => setForm({ mode: 'ubah', row: t })}>
+                    <Icon d={ICONS.pencil} size={16} />
                   </button>
-                )}
-              </div>
+                  {bolehHapus && (
+                    <button className="ikon-btn bahaya" aria-label="Hapus"
+                      onClick={() => setKonfirmHapus(t.id)}>
+                      <Icon d={ICONS.trash} size={16} />
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </>

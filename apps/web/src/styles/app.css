@@ -1027,3 +1027,15 @@ button { cursor: pointer; font-family: inherit; }
   font-weight: var(--fw-semibold); color: var(--text-body);
   font-variant-numeric: tabular-nums;
 }
+
+/* Konfirmasi hapus di dalam kartu. Menggantikan `confirm()` bawaan browser,
+   yang tampak asing di PWA terpasang dan bisa diredam diam-diam — penghapusan
+   yang tampak tidak terjadi apa-apa lebih buruk daripada tidak ada tombolnya. */
+.hapus-konfirm {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 8px 10px; border-radius: var(--radius-sm);
+  background: var(--danger-100); color: var(--danger-700);
+  font-size: 13px; font-weight: var(--fw-medium);
+}
+.hapus-konfirm > span { flex: 1; min-width: 0; }
+.link-btn.bahaya { color: var(--danger-700); font-weight: var(--fw-semibold); }
