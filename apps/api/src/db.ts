@@ -51,6 +51,15 @@ export type Tx = pg.PoolClient;
  * SET LOCAL membuat konteks otomatis hilang saat transaksi selesai, jadi
  * koneksi yang kembali ke pool tidak pernah membawa tenant sebelumnya.
  */
+/**
+ * Menjalankan `fn` dalam satu transaksi dengan konteks tenant tersetel.
+ *
+ * JANGAN memanggil `reply.send()` di dalam `fn`. `commit` baru dijalankan
+ * setelah `fn` selesai, sehingga balasan yang dikirim dari dalam mendahului
+ * commit-nya sendiri: klien menerima 201, langsung meminta baris itu lewat
+ * koneksi lain, dan mendapat 404 karena transaksinya belum mendarat. Kembalikan
+ * datanya, lalu kirim balasan setelah `withTenant` selesai.
+ */
 export async function withTenant<T>(ctx: RequestContext, fn: (tx: Tx) => Promise<T>): Promise<T> {
   const client = await appPool.connect();
   try {
