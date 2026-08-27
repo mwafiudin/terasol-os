@@ -2,6 +2,8 @@ import { api } from './api';
 import { bacaCermin, db, getMeta, readParticipants, setMeta, tulisCermin } from './db';
 import { num } from './domain';
 import { isOnline } from './sync';
+import type { NilaiRingkas } from './analisis';
+import type { KonteksGula } from './rujukan';
 import type { ConvStatus, EventRow, ParamKey } from './types';
 
 /**
@@ -19,6 +21,8 @@ export type PesertaRingkas = {
   hp: string;
   imt: number | null;
   paramsDiambil: ParamKey[];
+  /** Nilai pemeriksaan, untuk menyaring daftar menurut temuannya. */
+  nilai: NilaiRingkas;
   berminat: boolean;
   convStatus: ConvStatus | null;
   needsReview: boolean;
@@ -50,6 +54,23 @@ export type RekapSementara = {
   estimasiConsumable: number | null;
   paramTerpakai: { param: ParamKey; jumlah: number }[];
 };
+
+/**
+ * Nilai pemeriksaan dari draft lokal, yang menyimpannya sebagai teks apa adanya
+ * seperti diketik petugas (koma sebagai desimal).
+ */
+function nilaiDariDraft(
+  v: Partial<Record<ParamKey, string>> | undefined,
+  konteksGula: KonteksGula | null,
+  imt: number | null,
+): NilaiRingkas {
+  const a = (k: ParamKey) => num(v?.[k]);
+  return {
+    sistolik: a('sistolik'), diastolik: a('diastolik'),
+    gula: a('gula'), kolesterol: a('kolesterol'), asamUrat: a('asam_urat'),
+    lingkarPerut: a('lingkar_perut'), imt, konteksGula,
+  };
+}
 
 /** IMT dihitung ulang untuk record lokal; nilai resmi tetap dari basis data. */
 function imtLokal(v: Partial<Record<ParamKey, string>>): number | null {
@@ -92,6 +113,8 @@ export async function pesertaEvent(
       ? (Object.keys(p.secret.screening.values) as ParamKey[])
         .filter((k) => (p.secret!.screening!.values[k] ?? '') !== '')
       : [],
+    nilai: nilaiDariDraft(p.secret?.screening?.values, p.secret?.screening?.konteksGula ?? null,
+      p.secret?.screening ? imtLokal(p.secret.screening.values) : null),
     berminat: p.berminat === 1,
     convStatus: p.convStatus,
     needsReview: p.needsReview === 1,
@@ -130,6 +153,11 @@ export async function pesertaEvent(
           createdAt: s.createdAt,
           pelangganId: s.pelangganId ?? null,
           dariCermin: null,
+          nilai: {
+            sistolik: s.sistolik, diastolik: s.diastolik, gula: s.gula,
+            kolesterol: s.kolesterol, asamUrat: s.asamUrat,
+            lingkarPerut: s.lingkarPerut, imt: s.imt, konteksGula: s.konteksGula,
+          },
         });
       }
 
@@ -153,6 +181,12 @@ export async function pesertaEvent(
             secret: {
               nama: s.nama, gender: s.gender, usia: String(s.usia), hp: s.hp,
               imt: s.imt, paramsDiambil: (s.paramsDiambil ?? []) as ParamKey[],
+              // Ikut disalin supaya penyaring temuan tetap bekerja offline.
+              nilai: {
+                sistolik: s.sistolik, diastolik: s.diastolik, gula: s.gula,
+                kolesterol: s.kolesterol, asamUrat: s.asamUrat,
+                lingkarPerut: s.lingkarPerut, imt: s.imt, konteksGula: s.konteksGula,
+              },
             },
           })));
         } catch { /* cermin gagal ditulis; tampilan tetap benar */ }
@@ -185,6 +219,10 @@ export async function pesertaEvent(
         createdAt: c.createdAt,
         pelangganId: c.pelangganId,
         dariCermin: c.diambilPada,
+        nilai: c.secret?.nilai ?? {
+          sistolik: null, diastolik: null, gula: null, kolesterol: null,
+          asamUrat: null, lingkarPerut: null, imt: c.secret?.imt ?? null, konteksGula: null,
+        },
       });
     }
   }

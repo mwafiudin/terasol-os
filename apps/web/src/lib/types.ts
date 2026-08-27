@@ -1,3 +1,4 @@
+import type { NilaiRingkas } from './analisis';
 import type { KonteksGula } from './rujukan';
 
 export type ParamKey =
@@ -114,6 +115,8 @@ export type CerminSecret = {
   hp: string;
   imt: number | null;
   paramsDiambil: ParamKey[];
+  /** Nilai pemeriksaan, agar penyaring temuan tetap bekerja tanpa jaringan. */
+  nilai?: NilaiRingkas;
 };
 
 /**
