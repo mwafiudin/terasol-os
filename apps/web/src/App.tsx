@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Badge, Button, Field, ICONS, Navigasi, Sheet, Toast, type TabId } from './components/ui';
+import { Badge, Button, Field, ICONS, InputRupiah, Navigasi, Sheet, Toast, type TabId } from './components/ui';
 import { api, type ServerParticipant } from './lib/api';
 import { CONV_LABEL, fmtTanggal, fmtWaktu } from './lib/domain';
 import { useDraft } from './lib/draft';
@@ -242,8 +242,7 @@ function FollowUpSheet({ participant, onClose, onDone }: {
       ) : (
         <>
           <Field label="Nilai transaksi" htmlFor="f-nilai">
-            <input id="f-nilai" className="input" inputMode="numeric" value={nilai}
-              onChange={(e) => setNilai(e.target.value.replace(/\D/g, ''))} placeholder="cth. 1400000" />
+            <InputRupiah id="f-nilai" value={nilai} onChange={setNilai} placeholder="1.400.000" />
           </Field>
           <Field label="Produk yang dibeli" htmlFor="f-produk">
             <input id="f-produk" className="input" value={produk}

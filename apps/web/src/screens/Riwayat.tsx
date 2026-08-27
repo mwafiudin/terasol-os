@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Badge, Button, Field, Icon, ICONS, Rujukan, Sheet } from '../components/ui';
+import { Badge, Button, Field, Icon, ICONS, InputRupiah, Rujukan, Sheet } from '../components/ui';
 import {
   api,
   type DaftarTerhapus, type JenisTransaksi, type KatalogRow,
@@ -806,8 +806,7 @@ function FormTransaksi({ awal, onTutup, onSimpan }: {
             onChange={(e) => setJumlah(e.target.value.replace(/\D/g, ''))} />
         </Field>
         <Field label="Harga satuan" htmlFor="t-harga">
-          <input id="t-harga" className="input" inputMode="numeric" value={harga}
-            onChange={(e) => setHarga(e.target.value.replace(/\D/g, ''))} placeholder="cth. 350000" />
+          <InputRupiah id="t-harga" value={harga} onChange={setHarga} placeholder="350.000" />
         </Field>
       </div>
 

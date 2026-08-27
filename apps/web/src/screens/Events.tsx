@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Badge, Button, Field, Icon, ICONS, PageHead } from '../components/ui';
+import { Badge, Button, Field, Icon, ICONS, InputRupiah, PageHead } from '../components/ui';
 import { api, type Recap as RecapData } from '../lib/api';
 import { PARAM_LABEL, ROLE_LABEL, fmtTanggal, pct, rp } from '../lib/domain';
 import { localEvents, muatRekan, pullEvents, rekanTersimpan, saveLocalEvent, type Rekan } from '../lib/events';
@@ -145,8 +145,8 @@ export function EventForm({ go, onSaved }: { go: Nav; onSaved: () => void }) {
 
       {f.tipe === 'berbayar' && (
         <Field label="Harga paket" htmlFor="e-harga">
-          <input id="e-harga" className="input" inputMode="numeric" value={f.hargaPaket}
-            onChange={(e) => setF({ ...f, hargaPaket: e.target.value })} placeholder="cth. 35000" />
+          <InputRupiah id="e-harga" value={f.hargaPaket}
+            onChange={(v) => setF({ ...f, hargaPaket: v })} placeholder="35.000" />
         </Field>
       )}
 
