@@ -1196,3 +1196,21 @@ button { cursor: pointer; font-family: inherit; }
   border: 1px solid var(--border-hairline);
 }
 .ikon-btn:has(.ikon-teks):hover { border-color: var(--border-brand); }
+
+/* Identitas peserta: dinyatakan sekali di bawah judul, dengan tombol ubahnya
+   melekat di sana — bukan diulang lagi sebagai kartu di bawahnya. */
+.identitas-baris {
+  display: flex; align-items: center; gap: 8px; margin-top: -8px;
+}
+.identitas-baris > span {
+  flex: 1; min-width: 0; font-size: 13.5px; color: var(--text-muted);
+}
+
+/* Kode pemeriksaan (GDS/GDP/GD2PP) sebagai penanda kartu, menggantikan ikon:
+   kodenya sendiri yang dikenali petugas, bukan gambar apa pun. */
+.grup-kode {
+  display: flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  min-width: 58px; height: 38px; padding: 0 8px; border-radius: var(--radius-sm);
+  background: var(--surface-brand-soft); color: var(--teal-800);
+  font-size: 12px; font-weight: var(--fw-semibold); letter-spacing: .03em;
+}

@@ -69,40 +69,54 @@ export function grupUntuk(konteksGula: KonteksGula): Grup[] {
 /* ============================= pilih grup ============================= */
 
 export function PilihGrup({ onPilih, onBatal }: {
-  onPilih: (g: Grup) => void;
+  onPilih: (g: Grup, konteks: KonteksGula) => void;
   onBatal: () => void;
 }) {
-  const [konteks, setKonteks] = useState<KonteksGula>('sewaktu');
-  const grup = grupUntuk(konteks);
-  const kodeGulaTerpilih = KONTEKS_GULA.find((k) => k.k === konteks)!;
+  // Jenis gula darah ditanya sebagai langkah kedua, bukan sebagai kolom yang
+  // menggantung di bawah daftar. Ia hanya berlaku untuk satu kelompok, jadi
+  // menampilkannya sebelum kelompok dipilih adalah pertanyaan yang belum tentu
+  // perlu dijawab — dan sesudah angkanya diketik, sudah terlambat.
+  const [tahapGula, setTahapGula] = useState(false);
+
+  if (tahapGula) {
+    return (
+      <div className="pilih-grup">
+        <p className="pilih-grup-tanya">Gula darah yang mana?</p>
+        {KONTEKS_GULA.map((k) => (
+          <button key={k.k} className="grup-kartu"
+            onClick={() => onPilih(grupUntuk(k.k).find((g) => g.id === 'darah')!, k.k)}>
+            <span className="grup-kode">{k.kode}</span>
+            <span className="grup-tx">
+              <b>{k.label}</b>
+              <span>{k.syarat}</span>
+            </span>
+            <Icon d={ICONS.chevR} size={18} />
+          </button>
+        ))}
+        <button className="link-btn" onClick={() => setTahapGula(false)}>Kembali</button>
+      </div>
+    );
+  }
 
   return (
     <div className="pilih-grup">
       <p className="pilih-grup-tanya">Kelompok mana yang diukur sekarang?</p>
 
-      {grup.map((g) => (
-        <button key={g.id} className="grup-kartu" onClick={() => onPilih(g)}>
+      {grupUntuk('sewaktu').map((g) => (
+        <button key={g.id} className="grup-kartu"
+          onClick={() => (g.id === 'darah' ? setTahapGula(true) : onPilih(g, 'sewaktu'))}>
           <span className="grup-ikon"><Icon d={g.ikon} size={20} /></span>
           <span className="grup-tx">
             <b>{g.label}</b>
-            <span>{g.slot.map((s) => namaUbin(s, kodeGulaTerpilih.kode)).join(' · ')}</span>
+            <span>
+              {g.id === 'darah'
+                ? 'Gula darah · Kolesterol total · Asam urat'
+                : g.slot.map((s) => namaUbin(s, 'GDS')).join(' · ')}
+            </span>
           </span>
           <Icon d={ICONS.chevR} size={18} />
         </button>
       ))}
-
-      {/* Konteks gula darah dipilih di sini, sebelum angkanya diketik. Sesudah
-          angka masuk, pertanyaan "tadi puasa atau tidak?" sudah terlambat. */}
-      <div className="field">
-        <label htmlFor="g-konteks">Jenis pemeriksaan gula darah</label>
-        <select id="g-konteks" className="input" value={konteks}
-          onChange={(e) => setKonteks(e.target.value as KonteksGula)}>
-          {KONTEKS_GULA.map((k) => (
-            <option key={k.k} value={k.k}>{k.kode} — {k.label}</option>
-          ))}
-        </select>
-        <small className="field-bantu">{kodeGulaTerpilih.syarat}</small>
-      </div>
 
       <button className="link-btn" onClick={onBatal}>Batal</button>
     </div>
@@ -234,9 +248,10 @@ export function PapanUkur({ judul, grup, konteksGula, tinggiAcuan, beratAcuan, o
             {/* Rentang wajar parameter yang sedang diketik. Petugas tahu angka
                 itu masuk akal atau tidak sebelum menekan Lanjut, bukan sesudah
                 diperingatkan. */}
+            {/* Nama lengkap parameternya, bukan nama ubin: kode seperti GDP
+                adalah singkatan resmi dan tidak boleh diturunkan hurufnya. */}
             <p className="papan-rentang">
-              Rentang wajar {namaUbin(kini, kodeGula.kode).toLowerCase()}:{' '}
-              {meta.wajar.min}–{meta.wajar.max} {meta.satuan}
+              Rentang wajar {meta.label.toLowerCase()}: {meta.wajar.min}–{meta.wajar.max} {meta.satuan}
             </p>
 
             {warn === aktif && (
