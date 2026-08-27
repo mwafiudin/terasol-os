@@ -141,6 +141,7 @@ export function Home({ go, onFollowUp, reloadKey }: Props) {
   useEffect(() => { void load(); }, [load, reloadKey]);
 
   const online = isOnline();
+  const koordinator = user?.role === 'koordinator' || user?.role === 'admin_pusat';
   const pending = sync?.pending ?? 0;
 
   /**
@@ -298,6 +299,21 @@ export function Home({ go, onFollowUp, reloadKey }: Props) {
           <span className="tx"><b>Rekap event</b><span>Akses Koordinator</span></span>
           <Icon d={ICONS.chevR} />
         </button>
+        {/* Di ponsel rel navigasi tidak punya isian sekunder, jadi Master data
+            harus punya jalan masuk di sini — tanpa ini ia sama sekali tidak
+            terjangkau dari ponsel. */}
+        {koordinator && (
+          <>
+            <div className="menu-sep" />
+            <button className="menu-item" onClick={() => go('master')}>
+              <span className="ic"><Icon d={ICONS.tag} size={19} /></span>
+              <span className="tx">
+                <b>Master data</b><span>Produk & layanan, tim, cabang</span>
+              </span>
+              <Icon d={ICONS.chevR} />
+            </button>
+          </>
+        )}
         {user?.role === 'admin_pusat' && (
           <>
             <div className="menu-sep" />

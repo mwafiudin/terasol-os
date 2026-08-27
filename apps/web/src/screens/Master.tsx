@@ -190,14 +190,14 @@ function TabKatalog({ pusat }: { pusat: boolean }) {
                           <b>{k.nama}</b>
                           {k.catatan && <em>{k.catatan}</em>}
                         </td>
-                        <td data-label="Jenis" className="kol-sempit">{j.label}</td>
-                        <td data-label="Harga acuan" className="kol-angka">{rp(Number(k.harga))}</td>
-                        <td data-label="Dipakai" className="kol-angka">
-                          {k.terpakai > 0
-                            ? `${k.terpakai}×`
-                            : <span className="muted">belum</span>}
+                        <td data-label="Jenis" className="kol-sempit ringkas">{j.label}</td>
+                        <td data-label="Harga acuan" className="kol-angka ringkas">{rp(Number(k.harga))}</td>
+                        <td data-label="Dipakai" className="kol-angka ringkas">
+                          {k.terpakai > 0 ? (
+                            <><span className="hanya-kartu">dipakai </span>{k.terpakai}×</>
+                          ) : <span className="muted">belum dipakai</span>}
                         </td>
-                        <td data-label="Status" className="kol-sempit">
+                        <td data-label="Status" className="kol-sempit ringkas">
                           <span className={`vonis ${k.aktif ? 'vonis-normal' : 'vonis-netral'}`}>
                             {k.aktif ? 'Aktif' : 'Nonaktif'}
                           </span>
@@ -442,9 +442,9 @@ function TabTim() {
                   <b>{u.nama}</b>
                   {u.id === user?.id && <em>Akun Anda</em>}
                 </td>
-                <td data-label="Email">{u.email}</td>
-                <td data-label="Peran" className="kol-sempit">{ROLE_LABEL[u.role] ?? u.role}</td>
-                <td data-label="Status" className="kol-sempit">
+                <td data-label="Email" className="ringkas">{u.email}</td>
+                <td data-label="Peran" className="kol-sempit ringkas">{ROLE_LABEL[u.role] ?? u.role}</td>
+                <td data-label="Status" className="kol-sempit ringkas">
                   <span className={`vonis ${u.active ? 'vonis-normal' : 'vonis-netral'}`}>
                     {u.active ? 'Aktif' : 'Nonaktif'}
                   </span>
@@ -493,12 +493,6 @@ function TabCabang({ tenantSaya }: { tenantSaya: string | null }) {
 
   return (
     <>
-      <div className="toolbar toolbar-lepas">
-        <span className="toolbar-judul">{rows.length} cabang</span>
-        {!buka && (
-          <Button size="sm" icon={ICONS.plus} onClick={() => setBuka(true)}>Tambah</Button>
-        )}
-      </div>
 
       {buka && (
         <div className="card consumable-card">
@@ -526,6 +520,16 @@ function TabCabang({ tenantSaya }: { tenantSaya: string | null }) {
       )}
 
       <div className="card panel">
+        <div className="panel-head">
+          <span className="toolbar-judul">
+            {rows.length} cabang
+            {rows.some((c) => c.status !== 'active')
+              ? ` · ${rows.filter((c) => c.status !== 'active').length} nonaktif` : ''}
+          </span>
+          {!buka && (
+            <Button size="sm" icon={ICONS.plus} onClick={() => setBuka(true)}>Tambah</Button>
+          )}
+        </div>
         <table className="tabel">
           <thead>
             <tr>
@@ -551,10 +555,11 @@ function TabCabang({ tenantSaya }: { tenantSaya: string | null }) {
                     </>
                   )}
                 </td>
-                <td data-label="Pelanggan" className="kol-angka">{c.pelanggan}</td>
-                <td data-label="Event" className="kol-angka">{c.event}</td>
-                <td data-label="Akun aktif" className="kol-angka">{c.pengguna}</td>
-                <td data-label="Dibuat" className="kol-sempit">
+                <td data-label="Pelanggan" className="kol-angka ringkas">{c.pelanggan}<span className="hanya-kartu"> pelanggan</span></td>
+                <td data-label="Event" className="kol-angka ringkas">{c.event}<span className="hanya-kartu"> event</span></td>
+                <td data-label="Akun aktif" className="kol-angka ringkas">{c.pengguna}<span className="hanya-kartu"> akun</span></td>
+                <td data-label="Dibuat" className="kol-sempit ringkas">
+                  <span className="hanya-kartu">dibuat </span>
                   {fmtTanggal(c.createdAt.slice(0, 10), { day: 'numeric', month: 'short', year: 'numeric' })}
                 </td>
                 <td className="kol-aksi">
