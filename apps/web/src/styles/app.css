@@ -1562,3 +1562,16 @@ button { cursor: pointer; font-family: inherit; }
 .tabel tr.nonaktif .kol-nama b { color: var(--text-muted); font-weight: var(--fw-medium); }
 .tabel .muted { color: var(--text-subtle); }
 .tabel .hapus-konfirm { justify-content: flex-end; }
+
+/* Tombol utama sheet tetap terjangkau di ponsel.
+   Form yang isinya lebih tinggi dari sheet memotong tombolnya di tepi bawah,
+   tanpa isyarat apa pun bahwa masih ada lanjutan — terbaca sebagai rusak,
+   bukan sebagai "gulir lagi". Sticky membuatnya selalu ada sementara isian
+   bergulir di belakangnya. */
+@media (max-width: 767px) {
+  .sheet { max-height: 86%; }
+  .sheet > .btn-full {
+    position: sticky; bottom: 0; z-index: 1;
+    box-shadow: 0 -10px 18px -6px var(--surface-card);
+  }
+}

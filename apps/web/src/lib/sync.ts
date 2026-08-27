@@ -130,7 +130,13 @@ export async function syncNow(key: CryptoKey | null, opts: { silent?: boolean } 
     db.anonTallies.where('synced').equals(0).toArray(),
   ]);
   if (!events.length && !participants.length && !tallies.length) {
-    emit({ lastError: null, lastSyncAt: state.lastSyncAt ?? new Date().toISOString() });
+    // `lastSyncAt` TIDAK disentuh di sini. Tidak ada yang dikirim, jadi jawaban
+    // atas "kapan data ini terakhir sampai ke server" tidak berubah. Baris ini
+    // dulu mengarang `new Date()` saat nilainya belum ada — perangkat yang
+    // belum pernah mengirim apa pun mengaku baru saja tersinkron. Selama waktu
+    // itu tidak ditampilkan, kebohongannya tidak terlihat; begitu ditampilkan,
+    // ia menjadi janji palsu tentang data yang mungkin belum tersimpan.
+    emit({ lastError: null });
     await purgeSynced();
     return null;
   }
