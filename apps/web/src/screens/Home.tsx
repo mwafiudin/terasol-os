@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Badge, Button, Icon, ICONS } from '../components/ui';
 import { api, type ServerParticipant } from '../lib/api';
 import { getMeta, setMeta } from '../lib/db';
-import { CONV_LABEL, fmtSejak, fmtTanggal, rp } from '../lib/domain';
+import { CONV_LABEL, EVENT_STATUS, fmtSejak, fmtTanggal, rp } from '../lib/domain';
 import { activeEvent, countsFor, pullEvents, type EventCounts } from '../lib/events';
 import { useInstall } from '../lib/install';
 import { useApp } from '../lib/store';
@@ -262,7 +262,7 @@ export function Home({ go, onFollowUp, reloadKey }: Props) {
             <circle cx="46" cy="152" r="6" fill="rgba(204,156,72,.5)" />
           </svg>
           <div className="hero-top">
-            <Badge tone="onbrand" dot>{ev.status === 'active' ? 'Event berlangsung' : 'Event terpilih'}</Badge>
+            <Badge tone="onbrand" dot>{ev.status === 'active' ? 'Event berlangsung' : `Event ${EVENT_STATUS[ev.status].label.toLowerCase()}`}</Badge>
             <span className="tipe">{ev.tipe === 'berbayar' ? rp(ev.hargaPaket) : 'Gratis'}</span>
           </div>
           <div>

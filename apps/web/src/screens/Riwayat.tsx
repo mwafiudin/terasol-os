@@ -179,7 +179,8 @@ export function TabPengukuran({ pelangganId, participantId, gender, nama, onUbah
       {catat?.tahap === 'papan' && (
         <PapanUkur
           judul={nama}
-          grup={catat.grup}
+          slot={catat.grup.slot}
+          label={catat.grup.label}
           konteksGula={catat.konteks}
           tinggiAcuan={terbaru('tinggi')}
           beratAcuan={terbaru('berat')}

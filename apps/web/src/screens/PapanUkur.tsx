@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Button, Icon, ICONS } from '../components/ui';
-import { dec, num } from '../lib/domain';
+import { PARAMS, dec, num } from '../lib/domain';
 import {
   KONTEKS_GULA, UKUR, diLuarWajar, hitungImt, nilaiImt,
   type JenisUkur, type KonteksGula,
@@ -33,7 +33,10 @@ const slot = (jenis: JenisUkur, konteks: KonteksGula | null = null): Slot => ({
  * kelompok Tekanan darah, kata itu sudah menjadi judulnya.
  */
 export function namaUbin(s: Slot, kodeGula: string): string {
-  if (s.jenis === 'gula') return `Gula · ${kodeGula}`;
+  // Kode hanya ditulis bila konteksnya memang sudah dipilih. Alur registrasi
+  // tidak menanyakannya, jadi menempelkan "GDS" di sana mengklaim sesuatu yang
+  // belum ditetapkan siapa pun.
+  if (s.jenis === 'gula') return s.konteks ? `Gula · ${kodeGula}` : 'Gula darah';
   const label = UKUR[s.jenis].label;
   const awalan = 'Tensi — ';
   if (!label.startsWith(awalan)) return label;
@@ -42,6 +45,13 @@ export function namaUbin(s: Slot, kodeGula: string): string {
 }
 
 export type Grup = { id: string; label: string; ikon: (string | [number, number, number])[]; slot: Slot[] };
+
+/**
+ * Tujuh parameter alur registrasi. Diturunkan dari PARAMS, bukan diketik ulang:
+ * kuncinya harus sama persis dengan kunci draft agar nilai yang sudah diketik
+ * tidak tercecer ke slot yang tidak pernah dibaca.
+ */
+export const SLOT_REGISTRASI: Slot[] = PARAMS.map((p) => slot(p.k as JenisUkur));
 
 /**
  * Alat di lapangan datang per kelompok, bukan per parameter: timbangan dan
@@ -132,27 +142,67 @@ export function PilihGrup({ onPilih, onBatal }: {
  * sudah hafal satu papan tidak perlu belajar papan kedua, dan angka yang
  * diketik dengan ibu jari sambil berdiri tidak cocok dengan form biasa.
  */
-export function PapanUkur({ judul, grup, konteksGula, tinggiAcuan, beratAcuan, onBatal, onSimpan }: {
+export function PapanUkur({
+  judul, subjudul, kanan, slot, label, konteksGula = 'sewaktu',
+  tinggiAcuan = null, beratAcuan = null, labelSimpan, bolehKosong = false,
+  nilai: nilaiLuar, onNilai, onBatal, onSimpan,
+}: {
   judul: string;
-  grup: Grup;
-  konteksGula: KonteksGula;
+  /** Menggantikan baris "KELOMPOK · N DARI M TERISI" bila diisi. */
+  subjudul?: string;
+  /** Isian di sudut kanan kepala, mis. penanda tersimpan. */
+  kanan?: ReactNode;
+  slot: Slot[];
+  /** Nama kelompok, dipakai pada baris langkah dan label dialog. */
+  label: string;
+  konteksGula?: KonteksGula;
   /** Nilai terbaru yang sudah tercatat, supaya IMT tetap bisa dihitung. */
-  tinggiAcuan: number | null;
-  beratAcuan: number | null;
+  tinggiAcuan?: number | null;
+  beratAcuan?: number | null;
+  labelSimpan?: string;
+  /** Boleh menyelesaikan tanpa satu pun nilai terisi (alur registrasi). */
+  bolehKosong?: boolean;
+  /**
+   * Mode terkendali. Alur registrasi menyimpan tiap ketukan ke draft
+   * terenkripsi (US-03) — aplikasi yang tertutup mendadak di lapangan tidak
+   * boleh menghilangkan pengukuran yang sudah diambil. Tanpa kedua prop ini,
+   * papan mengurus nilainya sendiri di memori.
+   */
+  nilai?: Record<string, string>;
+  /**
+   * Menerima FUNGSI PENGUBAH, bukan nilai jadi. Pemanggil yang menyelesaikannya
+   * terhadap state terbarunya sendiri — kalau papan yang menyelesaikan, ia
+   * memakai nilai dari closure render, dan tiga ketukan beruntun akan membaca
+   * isi yang sama sehingga dua di antaranya hilang tanpa jejak.
+   */
+  onNilai?: (kunci: string, ubah: (lama: string) => string) => void;
   onBatal: () => void;
   onSimpan: (nilai: { slot: Slot; nilai: number; outOfRange: boolean }[]) => Promise<void>;
 }) {
-  const [nilai, setNilai] = useState<Record<string, string>>({});
-  const [aktif, setAktif] = useState(grup.slot[0]!.kunci);
+  const [nilaiDalam, setNilaiDalam] = useState<Record<string, string>>({});
+  const terkendali = nilaiLuar != null && onNilai != null;
+  const nilai = terkendali ? nilaiLuar : nilaiDalam;
+  /**
+   * Satu jalan tulis untuk kedua mode.
+   *
+   * Bentuknya fungsional bukan kebetulan: petugas mengetik tiga angka lebih
+   * cepat daripada React sempat merender ulang, dan handler yang membaca nilai
+   * dari closure akan membuang dua di antaranya tanpa jejak.
+   */
+  const tulis = (kunci: string, ubah: (lama: string) => string) => {
+    if (terkendali) { onNilai(kunci, ubah); return; }
+    setNilaiDalam((prev) => ({ ...prev, [kunci]: ubah(prev[kunci] ?? '') }));
+  };
+  const [aktif, setAktif] = useState(slot[0]!.kunci);
   const [warn, setWarn] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const idx = grup.slot.findIndex((s) => s.kunci === aktif);
-  const kini = grup.slot[idx]!;
+  const idx = slot.findIndex((s) => s.kunci === aktif);
+  const kini = slot[idx]!;
   const meta = UKUR[kini.jenis];
-  const terakhir = idx >= grup.slot.length - 1;
+  const terakhir = idx >= slot.length - 1;
 
-  const terisi = grup.slot.filter((s) => (nilai[s.kunci] ?? '') !== '').length;
+  const terisi = slot.filter((s) => (nilai[s.kunci] ?? '') !== '').length;
 
   // IMT ikut hidup selagi mengetik: kalau tinggi dan berat baru saja diukur,
   // angkanya dipakai; kalau hanya salah satu, sisanya diambil dari yang
@@ -164,7 +214,7 @@ export function PapanUkur({ judul, grup, konteksGula, tinggiAcuan, beratAcuan, o
   function maju() {
     setWarn(null);
     if (terakhir) return;
-    setAktif(grup.slot[idx + 1]!.kunci);
+    setAktif(slot[idx + 1]!.kunci);
   }
 
   function lanjut() {
@@ -187,24 +237,23 @@ export function PapanUkur({ judul, grup, konteksGula, tinggiAcuan, beratAcuan, o
    */
   function ketik(d: string) {
     setWarn(null);
-    setNilai((prev) => {
-      const cur = prev[aktif] ?? '';
-      if (d === ',' && (!meta.desimal || !cur || cur.includes(','))) return prev;
-      if (cur.length >= 5) return prev;
-      return { ...prev, [aktif]: cur + d };
+    tulis(aktif, (cur) => {
+      if (d === ',' && (!meta.desimal || !cur || cur.includes(','))) return cur;
+      if (cur.length >= 5) return cur;
+      return cur + d;
     });
   }
 
   function hapusDigit() {
-    setNilai((prev) => ({ ...prev, [aktif]: (prev[aktif] ?? '').slice(0, -1) }));
+    tulis(aktif, (cur) => cur.slice(0, -1));
   }
 
   async function simpan() {
-    const isi = grup.slot
+    const isi = slot
       .map((s) => ({ slot: s, n: num(nilai[s.kunci] ?? '') }))
       .filter((x): x is { slot: Slot; n: number } => x.n != null)
       .map((x) => ({ slot: x.slot, nilai: x.n, outOfRange: diLuarWajar(x.slot.jenis, x.n) }));
-    if (isi.length === 0) return;
+    if (isi.length === 0 && !bolehKosong) return;
     setBusy(true);
     try { await onSimpan(isi); } finally { setBusy(false); }
   }
@@ -212,7 +261,7 @@ export function PapanUkur({ judul, grup, konteksGula, tinggiAcuan, beratAcuan, o
   const kodeGula = KONTEKS_GULA.find((k) => k.k === konteksGula)!;
 
   return (
-    <div className="papan-veil" role="dialog" aria-modal="true" aria-label={`Catat ${grup.label}`}>
+    <div className="papan-veil" role="dialog" aria-modal="true" aria-label={`Catat ${label}`}>
       <div className="papan">
         <div className="scr-head">
           <button className="back-btn" onClick={onBatal} aria-label="Batal">
@@ -221,15 +270,16 @@ export function PapanUkur({ judul, grup, konteksGula, tinggiAcuan, beratAcuan, o
           <div className="tx">
             <span className="name">{judul}</span>
             <span className="step-label">
-              {grup.label.toUpperCase()} · {terisi} DARI {grup.slot.length} TERISI
+              {subjudul ?? `${label.toUpperCase()} · ${terisi} DARI ${slot.length} TERISI`}
             </span>
           </div>
+          {kanan}
         </div>
 
         <div className="papan-isi">
           <div className="papan-tengah">
             <div className="papan-ubin">
-              {grup.slot.map((s) => {
+              {slot.map((s) => {
                 const v = nilai[s.kunci] ?? '';
                 const isAktif = s.kunci === aktif;
                 return (
@@ -263,7 +313,7 @@ export function PapanUkur({ judul, grup, konteksGula, tinggiAcuan, beratAcuan, o
             {/* Hanya di kelompok yang benar-benar mengubahnya. Saat mengukur
                 tensi, IMT bukan umpan balik — ia sekadar angka yang kebetulan
                 ada di layar. */}
-            {imt != null && grup.slot.some((s) => s.jenis === 'tinggi' || s.jenis === 'berat') && (
+            {imt != null && slot.some((s) => s.jenis === 'tinggi' || s.jenis === 'berat') && (
               <div className="imt-chip">
                 <b>IMT otomatis:</b>
                 <span>{dec(imt)} — {nilaiImt(imt).label}</span>
@@ -277,15 +327,15 @@ export function PapanUkur({ judul, grup, konteksGula, tinggiAcuan, beratAcuan, o
             {terakhir ? (
               <>
                 <Button variant="ghost" onClick={onBatal}>Batal</Button>
-                <Button style={{ flex: 1 }} icon={ICONS.check} disabled={busy || terisi === 0}
+                <Button style={{ flex: 1 }} icon={ICONS.check} disabled={busy || (terisi === 0 && !bolehKosong)}
                   onClick={() => void simpan()}>
-                  Simpan {terisi > 0 ? `${terisi} nilai` : ''}
+                  {labelSimpan ?? `Simpan${terisi > 0 ? ` ${terisi} nilai` : ''}`}
                 </Button>
               </>
             ) : (
               <>
                 <Button variant="ghost"
-                  onClick={() => { setNilai((p) => ({ ...p, [aktif]: '' })); maju(); }}>Lewati</Button>
+                  onClick={() => { tulis(aktif, () => ''); maju(); }}>Lewati</Button>
                 <Button style={{ flex: 1 }} onClick={lanjut}>Lanjut</Button>
               </>
             )}

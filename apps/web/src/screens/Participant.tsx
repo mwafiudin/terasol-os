@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Button, Field, Icon, ICONS, PageHead } from '../components/ui';
 import { db, putParticipant } from '../lib/db';
-import { imtOf, num, outOfRange, PARAMS } from '../lib/domain';
+import { imtOf, num, PARAMS } from '../lib/domain';
 import { draftToRecord, hpSudahAda, useDraft } from '../lib/draft';
 import { useApp } from '../lib/store';
 import { refreshPending, syncNow } from '../lib/sync';
 import type { ParamKey } from '../lib/types';
+import { PapanUkur, SLOT_REGISTRASI } from './PapanUkur';
 
 type Nav = (screen: string) => void;
 
@@ -149,112 +150,43 @@ export function Consent({ go, consentText }: { go: Nav; consentText: { versi: st
 
 /* ============================ 3. Input hasil ============================ */
 
+/**
+ * Input hasil pengukuran saat registrasi.
+ *
+ * Memakai papan yang sama persis dengan "Catat pengukuran" di layar peserta.
+ * Sebelumnya keduanya adalah dua tampilan berbeda untuk pekerjaan yang sama —
+ * baris memanjang di sini, ubin di sana — dan petugas yang hafal salah satunya
+ * tetap harus mempelajari yang lain.
+ *
+ * Bedanya hanya penyimpanan: di sini tiap ketukan masuk ke draft terenkripsi
+ * (US-03), supaya aplikasi yang tertutup mendadak di lapangan tidak
+ * menghilangkan pengukuran yang sudah diambil.
+ */
 export function Screening({ go }: { go: Nav }) {
   const { key } = useApp();
-  const { draft, active, warn, setActive, setValue, setWarn } = useDraft();
+  const { draft, setValue } = useDraft();
   if (!draft || !key) return null;
 
-  const idx = PARAMS.findIndex((p) => p.k === active);
-  const param = PARAMS[idx]!;
-  const imt = imtOf(draft.values);
-  const terakhir = idx >= PARAMS.length - 1;
-
-  function maju() {
-    if (terakhir) { go('done'); return; }
-    setActive(PARAMS[idx + 1]!.k);
-  }
-
-  function lanjut() {
-    const raw = draft!.values[active];
-    // US-03: nilai di luar rentang wajar minta konfirmasi ulang, bukan ditolak.
-    if (raw && outOfRange(active, raw) && warn !== active) {
-      setWarn(active);
-      return;
-    }
-    maju();
-  }
-
-  /**
-   * Nilai berjalan dibaca dari store, BUKAN dari `draft` hasil render.
-   *
-   * Petugas mengetik tiga angka lebih cepat daripada React sempat merender
-   * ulang. Dengan `draft` dari closure, ketiga ketukan itu membaca isi yang
-   * sama dan hanya yang terakhir tersimpan: "156" menjadi "6", tanpa satu pun
-   * tanda bahwa ada digit yang hilang. `getState()` selalu mengembalikan yang
-   * terbaru karena zustand menulisnya secara sinkron.
-   */
-  function nilaiKini(): string {
-    return useDraft.getState().draft?.values[active] ?? '';
-  }
-
-  function ketik(d: string) {
-    const cur = nilaiKini();
-    if (d === ',' && (!param.dec || !cur || cur.includes(','))) return;
-    if (cur.length >= 5) return;
-    void setValue(key!, active, cur + d);
-  }
+  const terisi = PARAMS.filter((p) => (draft.values[p.k] ?? '') !== '').length;
 
   return (
-    <div className="scr-wrap">
-      <div className="scr-head">
-        <button className="back-btn" onClick={() => go('consent')} aria-label="Kembali">
-          <Icon d={ICONS.back} size={24} />
-        </button>
-        <div className="tx">
-          <span className="name">{draft.nama || 'Peserta'}{draft.usia ? ` · ${draft.usia} th` : ''}</span>
-          <span className="step-label">LANGKAH 3 DARI 3 · PARAMETER {idx + 1} DARI {PARAMS.length}</span>
-        </div>
-        <span className="saved-chip"><Icon d={ICONS.check} size={14} sw={2.2} />Tersimpan</span>
-      </div>
-
-      <div className="scr-rows">
-        {PARAMS.map((p) => {
-          const v = draft.values[p.k] ?? '';
-          const isActive = p.k === active;
-          const cls = `param-row${isActive ? ' active' : v ? ' filled' : ''}`;
-          return (
-            <button key={p.k} className={cls} onClick={() => setActive(p.k)}>
-              <span className="tx">
-                <b>{p.label}</b>
-                <span>{p.unit} · rentang {String(p.min).replace('.', ',')}–{String(p.max).replace('.', ',')}</span>
-              </span>
-              <span className="val">{v || (isActive ? '' : '–')}</span>
-            </button>
-          );
-        })}
-
-        {warn === active && (
-          <div className="range-warn">
-            Nilai di luar rentang wajar ({param.min}–{param.max} {param.unit}).
-            Ketuk Lanjut sekali lagi untuk konfirmasi.
-          </div>
-        )}
-        {imt && (
-          <div className="imt-chip">
-            <b>IMT otomatis:</b>
-            <span>{imt.nilai.toLocaleString('id-ID')} — {imt.kategori}</span>
-          </div>
-        )}
-      </div>
-
-      <div className="keypad-dock">
-        <div className="keypad-actions">
-          <Button variant="ghost" onClick={() => { void setValue(key, active, ''); maju(); }}>Lewati</Button>
-          <Button style={{ flex: 1 }} onClick={lanjut}>{terakhir ? 'Selesai' : 'Lanjut'}</Button>
-        </div>
-        <div className="keypad">
-          {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
-            <button key={d} className="key" onClick={() => ketik(d)}>{d}</button>
-          ))}
-          <button className="key" onClick={() => ketik(',')}>,</button>
-          <button className="key" onClick={() => ketik('0')}>0</button>
-          <button className="key" aria-label="Hapus"
-            onClick={() => void setValue(key, active, nilaiKini().slice(0, -1))}>
-            <Icon d={ICONS.backspace} size={24} />
-          </button>
-        </div>
-      </div>
-    </div>
+    <PapanUkur
+      judul={`${draft.nama || 'Peserta'}${draft.usia ? ` · ${draft.usia} th` : ''}`}
+      subjudul={`LANGKAH 3 DARI 3 · ${terisi} DARI ${PARAMS.length} TERISI`}
+      kanan={<span className="saved-chip"><Icon d={ICONS.check} size={14} sw={2.2} />Tersimpan</span>}
+      slot={SLOT_REGISTRASI}
+      label="Pengukuran"
+      labelSimpan="Selesai"
+      nilai={draft.values as Record<string, string>}
+      onNilai={(kunci: string, ubah: (lama: string) => string) => {
+        // Dibaca dari store, BUKAN dari draft hasil render: zustand menulisnya
+        // sinkron, jadi ketukan beruntun tetap menumpuk dengan benar.
+        const cur = useDraft.getState().draft?.values[kunci as ParamKey] ?? '';
+        void setValue(key, kunci as ParamKey, ubah(cur));
+      }}
+      onBatal={() => go('consent')}
+      onSimpan={async () => { go('done'); }}
+    />
   );
 }
 

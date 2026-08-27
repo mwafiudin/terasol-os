@@ -2,7 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Badge, Button, Field, Icon, ICONS, InputRupiah, PageHead, SegTabs, Sheet } from '../components/ui';
 import { api, type ParticipantDetail } from '../lib/api';
 import { readParticipant } from '../lib/db';
-import { CONV_LABEL, PARAM_LABEL, PARAMS, dec, fmtTanggal, fmtWaktu, imtOf, num, rp } from '../lib/domain';
+import {
+  CONV_LABEL, EVENT_STATUS, PARAM_LABEL, PARAMS, bisaTerimaPeserta,
+  dec, fmtTanggal, fmtWaktu, imtOf, num, rp,
+} from '../lib/domain';
 import { db } from '../lib/db';
 import { pesertaEvent, rekapSementara, type PesertaRingkas, type RekapSementara } from '../lib/pesertaEvent';
 import { nilaiImt } from '../lib/rujukan';
@@ -68,7 +71,11 @@ export function EventPeserta({ go, event, onBuka, onTambah, reloadKey }: {
 
   useEffect(() => { void muat(); }, [muat, reloadKey]);
 
-  const berlangsung = event.status === 'active';
+  const status = EVENT_STATUS[event.status];
+  // Peserta masih boleh dicatat pada event yang dijadwalkan: orang datang lebih
+  // awal, dan menutup jalannya tanpa penjelasan lebih buruk daripada terlalu
+  // longgar. Event selesai dan diarsipkan tidak lagi menerima.
+  const bisaTambah = bisaTerimaPeserta(event.status);
 
   // Hitungan chip mengikuti kata pencarian, supaya angkanya selalu sesuai
   // dengan apa yang benar-benar akan muncul kalau chip itu diketuk.
@@ -83,9 +90,7 @@ export function EventPeserta({ go, event, onBuka, onTambah, reloadKey }: {
   return (
     <div className="page">
       <PageHead title={event.nama} onBack={() => go('events')}
-        right={berlangsung
-          ? <Badge tone="success" dot>Berlangsung</Badge>
-          : <Badge tone="sage">Selesai</Badge>} />
+        right={<Badge tone={status.tone} dot={event.status === 'active'}>{status.label}</Badge>} />
 
       <span className="recap-sub">
         <span>
@@ -137,7 +142,7 @@ export function EventPeserta({ go, event, onBuka, onTambah, reloadKey }: {
         </div>
       )}
 
-      {berlangsung && (
+      {bisaTambah && (
         <Button size="lg" full icon={ICONS.userPlus} onClick={onTambah}>
           Tambah peserta baru
         </Button>
@@ -184,9 +189,9 @@ export function EventPeserta({ go, event, onBuka, onTambah, reloadKey }: {
           <div className="ic"><Icon d={ICONS.users} size={26} /></div>
           <b>Belum ada peserta</b>
           <p>
-            {berlangsung
+            {bisaTambah
               ? 'Ketuk "Tambah peserta baru" untuk mulai mencatat.'
-              : 'Event ini selesai tanpa peserta tercatat.'}
+              : 'Event ini berakhir tanpa peserta tercatat.'}
           </p>
         </div>
       )}
