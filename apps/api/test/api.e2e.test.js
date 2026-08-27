@@ -374,6 +374,28 @@ describe('Alur API end-to-end', () => {
     assert.equal(lagi.status, 404, 'menghapus dua kali tidak berpura-pura berhasil');
   });
 
+  it('data yang baru dibuat langsung bisa dibaca kembali (balapan commit)', async () => {
+    // Regresi: balasan 201 pernah dikirim dari DALAM transaksi, sementara
+    // `withTenant` baru meng-commit setelah callback selesai. Klien yang
+    // langsung menindaklanjuti 201-nya bisa mendapat 404 atas barisnya sendiri
+    // — dan di lapangan itu berarti pengukuran yang tampak tersimpan lalu
+    // hilang. Uji ini menembak celah itu: baca tanpa jeda apa pun.
+    for (let i = 0; i < 5; i++) {
+      const buat = await call('/pengukuran', {
+        method: 'POST',
+        body: JSON.stringify({ pelangganId, jenis: 'nadi', nilai: 70 + i }),
+      });
+      assert.equal(buat.status, 201, JSON.stringify(buat.body));
+
+      const baca = await call(`/pengukuran/${buat.body.id}`, {
+        method: 'PATCH', body: JSON.stringify({ nilai: 80 + i }),
+      });
+      assert.equal(baca.status, 200, `percobaan ${i}: ${JSON.stringify(baca.body)}`);
+
+      await call(`/pengukuran/${buat.body.id}`, { method: 'DELETE' });
+    }
+  });
+
   it('konteks gula ditolak untuk parameter selain gula darah', async () => {
     const r = await call('/pengukuran', {
       method: 'POST',

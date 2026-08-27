@@ -48,7 +48,10 @@ export default async function eventRoutes(app: FastifyInstance) {
     const e = parsed.data;
     const ctx = ctxOf(req);
 
-    return withTenant(ctx, async (tx) => {
+    // Balasan sengaja dikirim setelah transaksi selesai — lihat catatan di
+    // db.ts: commit terjadi setelah callback, jadi 201 yang dikirim dari dalam
+    // bisa mendahului commit-nya sendiri.
+    const id = await withTenant(ctx, async (tx) => {
       const { rows } = await tx.query<{ id: string }>(
         `insert into events (tenant_id, client_id, nama, lokasi, tanggal, tipe, harga_paket, petugas, status, created_by)
          values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
@@ -58,8 +61,9 @@ export default async function eventRoutes(app: FastifyInstance) {
          e.hargaPaket, e.petugas ?? null, e.status, ctx.userId],
       );
       await audit(tx, ctx, 'event.create', 'event', rows[0]!.id, { nama: e.nama });
-      return reply.code(201).send({ id: rows[0]!.id, clientId: e.clientId });
+      return rows[0]!.id;
     });
+    return reply.code(201).send({ id, clientId: e.clientId });
   });
 
   /**

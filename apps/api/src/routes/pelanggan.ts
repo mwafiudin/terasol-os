@@ -171,7 +171,10 @@ export default async function pelangganRoutes(app: FastifyInstance) {
     const m = parsed.data;
     const ctx = ctxOf(req);
 
-    return withTenant(ctx, async (tx) => {
+    // Balasan dikirim SETELAH withTenant selesai, bukan di dalamnya. Lihat
+    // catatan di db.ts: commit terjadi setelah callback, jadi mengirim 201 dari
+    // dalam berarti klien bisa langsung meminta baris yang belum ter-commit.
+    const hasil = await withTenant(ctx, async (tx) => {
       const { rows } = await tx.query(
         `insert into pengukuran (tenant_id, pelanggan_id, participant_id, client_id, jenis,
                                  konteks, nilai, diukur_pada, diukur_oleh, out_of_range, catatan)
@@ -186,8 +189,9 @@ export default async function pelangganRoutes(app: FastifyInstance) {
          m.diukurOleh ?? ctx.userId, m.outOfRange, m.catatan ?? null],
       );
       await audit(tx, ctx, 'pengukuran.create', 'pengukuran', rows[0]!.id, { jenis: m.jenis });
-      return reply.code(201).send(rows[0]);
+      return rows[0];
     });
+    return reply.code(201).send(hasil);
   });
 
   app.patch('/pengukuran/:id', { preHandler: requireAuth }, async (req, reply) => {
@@ -274,7 +278,7 @@ export default async function pelangganRoutes(app: FastifyInstance) {
     const t = parsed.data;
     const ctx = ctxOf(req);
 
-    return withTenant(ctx, async (tx) => {
+    const hasil = await withTenant(ctx, async (tx) => {
       const { rows } = await tx.query(
         `insert into transaksi (tenant_id, pelanggan_id, participant_id, client_id, jenis,
                                 nama, jumlah, harga_satuan, tanggal, dicatat_oleh, catatan)
@@ -289,8 +293,9 @@ export default async function pelangganRoutes(app: FastifyInstance) {
          t.jenis, t.nama, t.jumlah, t.hargaSatuan, t.tanggal ?? null, ctx.userId, t.catatan ?? null],
       );
       await audit(tx, ctx, 'transaksi.create', 'transaksi', rows[0]!.id, { nama: t.nama, total: rows[0]!.total });
-      return reply.code(201).send(rows[0]);
+      return rows[0];
     });
+    return reply.code(201).send(hasil);
   });
 
   app.patch('/transaksi/:id', { preHandler: requireAuth }, async (req, reply) => {

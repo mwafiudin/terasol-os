@@ -47,7 +47,10 @@ export default async function userRoutes(app: FastifyInstance) {
     const u = parsed.data;
     const ctx = ctxOf(req);
 
-    return withTenant(ctx, async (tx) => {
+    // Balasan dikirim setelah transaksi selesai — lihat catatan di db.ts:
+    // commit terjadi setelah callback, jadi 201 dari dalam bisa mendahului
+    // commit-nya, dan klien yang langsung memakai akun baru itu akan gagal.
+    const hasil = await withTenant(ctx, async (tx) => {
       const { rows } = await tx.query(
         `insert into users (tenant_id, email, password_hash, nama, role)
          values ($1,$2,$3,$4,$5::user_role)
@@ -55,8 +58,9 @@ export default async function userRoutes(app: FastifyInstance) {
         [ctx.tenantId, u.email, await hashPassword(u.password), u.nama, u.role],
       );
       await audit(tx, ctx, 'user.create', 'user', rows[0]!.id, { role: u.role });
-      return reply.code(201).send(rows[0]);
+      return rows[0];
     });
+    return reply.code(201).send(hasil);
   });
 
   app.patch('/users/:id', { preHandler: requireRole('koordinator', 'admin_pusat') }, async (req, reply) => {
