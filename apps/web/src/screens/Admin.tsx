@@ -93,7 +93,7 @@ export function Conflicts({ go }: { go: Nav }) {
 
 export function Settings({ go }: { go: Nav }) {
   const { user, lock, logout, say } = useApp();
-  const [tab, setTab] = useState<'akun' | 'tim' | 'biaya' | 'perangkat'>('akun');
+  const [tab, setTab] = useState<'akun' | 'biaya' | 'perangkat'>('akun');
 
   return (
     <div className="page">
@@ -110,17 +110,29 @@ export function Settings({ go }: { go: Nav }) {
       </div>
 
       <div className="seg">
-        {(['akun', 'tim', 'biaya', 'perangkat'] as const).map((t) => (
+        {(['akun', 'biaya', 'perangkat'] as const).map((t) => (
           <button key={t} className={`seg-btn ${tab === t ? 'on' : ''}`} onClick={() => setTab(t)}>
-            {t === 'akun' ? 'Akun' : t === 'tim' ? 'Tim' : t === 'biaya' ? 'Biaya' : 'Perangkat'}
+            {t === 'akun' ? 'Akun' : t === 'biaya' ? 'Biaya' : 'Perangkat'}
           </button>
         ))}
       </div>
 
       {tab === 'akun' && <AkunTab />}
-      {tab === 'tim' && <TimTab />}
       {tab === 'biaya' && <BiayaTab />}
       {tab === 'perangkat' && <PerangkatTab />}
+
+      {/* Pengelolaan akun tim pindah ke Master data. Dua tempat untuk pekerjaan
+          yang sama membuat perubahan di salah satunya tampak tidak berlaku. */}
+      {(user?.role === 'koordinator' || user?.role === 'admin_pusat') && (
+        <button className="card menu-card menu-item" onClick={() => go('master')}>
+          <span className="ic"><Icon d={ICONS.tag} size={19} /></span>
+          <span className="tx">
+            <b>Master data</b>
+            <span>Akun tim, produk &amp; layanan, cabang</span>
+          </span>
+          <Icon d={ICONS.chevR} />
+        </button>
+      )}
 
       <div className="card consumable-card">
         <b>Keamanan data di perangkat</b>
@@ -276,82 +288,6 @@ function BiayaTab() {
         <Button full disabled={busy} onClick={() => void simpan()}>Simpan harga</Button>
       )}
       {dimuat && !bolehUbah && <small>Hanya Koordinator yang bisa mengubah harga.</small>}
-    </div>
-  );
-}
-
-function TimTab() {
-  const { user, say } = useApp();
-  const [users, setUsers] = useState<{ id: string; nama: string; email: string; role: string; active: boolean }[]>([]);
-  const [form, setForm] = useState({ nama: '', email: '', password: '', role: 'petugas' as 'petugas' | 'koordinator' });
-  const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
-
-  const load = useCallback(async () => {
-    try { setUsers((await api.users()).users); } catch { /* butuh koneksi */ }
-  }, []);
-  useEffect(() => { void load(); }, [load]);
-
-  if (user?.role === 'petugas') {
-    return <div className="card consumable-card"><small>Manajemen tim hanya untuk Koordinator.</small></div>;
-  }
-
-  async function tambah() {
-    if (form.password.length < 8) { say('Kata sandi minimal 8 karakter.'); return; }
-    setBusy(true);
-    try {
-      await api.createUser(form);
-      setForm({ nama: '', email: '', password: '', role: 'petugas' });
-      setOpen(false);
-      say('Akun dibuat.');
-      await load();
-    } catch {
-      say('Gagal membuat akun — email mungkin sudah dipakai.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="card consumable-card">
-      <b>Tim cabang</b>
-      {users.map((u) => (
-        <div className="consumable-row" key={u.id}>
-          <span>{u.nama} · {u.role}</span>
-          <button className="link-btn sm"
-            onClick={() => void api.setUserActive(u.id, !u.active).then(load)}>
-            {u.active ? 'Nonaktifkan' : 'Aktifkan'}
-          </button>
-        </div>
-      ))}
-      {users.length === 0 && <small>Belum ada akun lain, atau perlu koneksi untuk memuat.</small>}
-
-      {!open
-        ? <Button variant="secondary" size="sm" icon={ICONS.plus} onClick={() => setOpen(true)}>Tambah akun</Button>
-        : (
-          <>
-            <Field label="Nama" htmlFor="u-nama">
-              <input id="u-nama" className="input" value={form.nama}
-                onChange={(e) => setForm({ ...form, nama: e.target.value })} />
-            </Field>
-            <Field label="Email" htmlFor="u-email">
-              <input id="u-email" className="input" type="email" value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })} />
-            </Field>
-            <Field label="Kata sandi awal" htmlFor="u-pass">
-              <input id="u-pass" className="input" type="text" value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })} />
-            </Field>
-            <div className="pill-row">
-              <button className={`pill-choice ${form.role === 'petugas' ? 'on' : ''}`}
-                onClick={() => setForm({ ...form, role: 'petugas' })}>Petugas</button>
-              <button className={`pill-choice ${form.role === 'koordinator' ? 'on' : ''}`}
-                onClick={() => setForm({ ...form, role: 'koordinator' })}>Koordinator</button>
-            </div>
-            <Button full disabled={busy} onClick={() => void tambah()}>Buat akun</Button>
-            <button className="link-btn" onClick={() => setOpen(false)}>Batal</button>
-          </>
-        )}
     </div>
   );
 }
