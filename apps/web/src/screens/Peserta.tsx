@@ -9,7 +9,7 @@ import { nilaiImt } from '../lib/rujukan';
 import { useApp } from '../lib/store';
 import { isOnline } from '../lib/sync';
 import type { ConvStatus, EventRow, ParamKey } from '../lib/types';
-import { TabBelanja, TabPengukuran } from './Riwayat';
+import { KartuTerhapus, TabBelanja, TabPengukuran } from './Riwayat';
 
 type Nav = (screen: string) => void;
 
@@ -435,6 +435,11 @@ export function PesertaDetail({ go, peserta, onUbah }: {
 
       {tab === 'lain' && (
         <>
+      {koordinator && pelangganId && (
+        <KartuTerhapus pelangganId={pelangganId}
+          onUbah={() => { onUbah(); void muat(); }} />
+      )}
+
       <div className="card consumable-card">
         <b>Persetujuan</b>
         {consent ? (
