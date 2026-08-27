@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import { Badge, Button, Field, Icon, ICONS, InputRupiah, PageHead, SegTabs, Sheet } from '../components/ui';
 import { api, ApiError, type CabangRow, type JenisTransaksi, type KatalogRow } from '../lib/api';
 import { ROLE_LABEL, fmtTanggal, rp } from '../lib/domain';
@@ -155,61 +155,92 @@ function TabKatalog({ pusat }: { pusat: boolean }) {
           </div>
         )}
 
-        {grup.map((namaGrup) => (
-          <div key={namaGrup}>
-            {namaGrup && <div className="panel-cabang">{namaGrup}</div>}
-            {JENIS.map((j) => {
-              const isi = rows.filter((k) => kunciGrup(k) === namaGrup && k.jenis === j.k);
-              if (isi.length === 0) return null;
-              return (
-                <div key={j.k}>
-                  <div className="panel-grup">{j.label}</div>
-                  {isi.map((k) => (
-                    <div className={`master-baris ${k.aktif ? '' : 'nonaktif'}`} key={k.id}>
-                      <div className="master-isi">
-                        <b>{k.nama}</b>
-                        <span>
-                          {rp(Number(k.harga))}
-                          {k.terpakai > 0 ? ` · dipakai ${k.terpakai}×` : ' · belum pernah dipakai'}
-                          {!k.aktif && ' · nonaktif'}
-                        </span>
-                        {k.catatan && <em>{k.catatan}</em>}
-                      </div>
-                      {konfirmHapus === k.id ? (
-                        <div className="hapus-konfirm">
-                          <span>Hapus "{k.nama}" dari katalog?</span>
-                          <button className="link-btn sm bahaya" onClick={() => void hapus(k)}>Ya, hapus</button>
-                          <button className="link-btn sm" onClick={() => setKonfirmHapus(null)}>Batal</button>
-                        </div>
-                      ) : (
-                        <div className="riwayat-aksi">
-                          <button className="ikon-btn" aria-label={`Ubah ${k.nama}`}
-                            onClick={() => setForm({ awal: k })}>
-                            <Icon d={ICONS.pencil} size={16} />
-                          </button>
-                          <button className="ikon-btn" aria-label={k.aktif ? 'Nonaktifkan' : 'Aktifkan'}
-                            title={k.aktif ? 'Nonaktifkan' : 'Aktifkan'}
-                            onClick={() => void setAktif(k, !k.aktif)}>
-                            <Icon d={k.aktif ? ICONS.x : ICONS.check} size={16} />
-                          </button>
-                          {/* Yang sudah menempel pada transaksi tidak ditawari
-                              hapus sama sekali: menawarkan lalu menolak hanya
-                              memindahkan penjelasan ke saat yang lebih buruk. */}
-                          {k.terpakai === 0 && (
-                            <button className="ikon-btn bahaya" aria-label={`Hapus ${k.nama}`}
-                              onClick={() => setKonfirmHapus(k.id)}>
-                              <Icon d={ICONS.trash} size={16} />
-                            </button>
-                          )}
-                        </div>
+        {/* Tabel sungguhan, bukan daftar yang diregangkan. Di bawah 1100px
+            CSS memecahnya jadi kartu berlabel — satu markup, dua bentuk, dan
+            hubungan kolom-ke-sel tetap utuh bagi pembaca layar. */}
+        {rows.length > 0 && (
+          <table className="tabel">
+            <thead>
+              <tr>
+                <th>Nama</th>
+                <th className="kol-sempit">Jenis</th>
+                <th className="kol-angka">Harga acuan</th>
+                <th className="kol-angka">Dipakai</th>
+                <th className="kol-sempit">Status</th>
+                <th className="kol-aksi"><span className="sr-only">Aksi</span></th>
+              </tr>
+            </thead>
+            {grup.map((namaGrup) => (
+              <tbody key={namaGrup || 'tunggal'}>
+                {namaGrup && (
+                  <tr className="baris-grup baris-cabang">
+                    <td colSpan={6}>{namaGrup}</td>
+                  </tr>
+                )}
+                {JENIS.map((j) => {
+                  const isi = rows.filter((k) => kunciGrup(k) === namaGrup && k.jenis === j.k);
+                  if (isi.length === 0) return null;
+                  return isi.map((k, i) => (
+                    <Fragment key={k.id}>
+                      {i === 0 && (
+                        <tr className="baris-grup"><td colSpan={6}>{j.label}</td></tr>
                       )}
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
-          </div>
-        ))}
+                      <tr className={k.aktif ? '' : 'nonaktif'}>
+                        <td data-label="Nama" className="kol-nama">
+                          <b>{k.nama}</b>
+                          {k.catatan && <em>{k.catatan}</em>}
+                        </td>
+                        <td data-label="Jenis" className="kol-sempit">{j.label}</td>
+                        <td data-label="Harga acuan" className="kol-angka">{rp(Number(k.harga))}</td>
+                        <td data-label="Dipakai" className="kol-angka">
+                          {k.terpakai > 0
+                            ? `${k.terpakai}×`
+                            : <span className="muted">belum</span>}
+                        </td>
+                        <td data-label="Status" className="kol-sempit">
+                          <span className={`vonis ${k.aktif ? 'vonis-normal' : 'vonis-netral'}`}>
+                            {k.aktif ? 'Aktif' : 'Nonaktif'}
+                          </span>
+                        </td>
+                        <td className="kol-aksi">
+                          {konfirmHapus === k.id ? (
+                            <div className="hapus-konfirm">
+                              <span>Hapus "{k.nama}"?</span>
+                              <button className="link-btn sm bahaya" onClick={() => void hapus(k)}>Ya</button>
+                              <button className="link-btn sm" onClick={() => setKonfirmHapus(null)}>Batal</button>
+                            </div>
+                          ) : (
+                            <div className="riwayat-aksi">
+                              <button className="ikon-btn" aria-label={`Ubah ${k.nama}`}
+                                onClick={() => setForm({ awal: k })}>
+                                <Icon d={ICONS.pencil} size={16} />
+                              </button>
+                              <button className="ikon-btn"
+                                aria-label={`${k.aktif ? 'Nonaktifkan' : 'Aktifkan'} ${k.nama}`}
+                                title={k.aktif ? 'Nonaktifkan' : 'Aktifkan'}
+                                onClick={() => void setAktif(k, !k.aktif)}>
+                                <Icon d={k.aktif ? ICONS.x : ICONS.check} size={16} />
+                              </button>
+                              {/* Yang sudah menempel pada transaksi tidak ditawari
+                                  hapus sama sekali: menawarkan lalu menolak hanya
+                                  memindahkan penjelasan ke saat yang lebih buruk. */}
+                              {k.terpakai === 0 && (
+                                <button className="ikon-btn bahaya" aria-label={`Hapus ${k.nama}`}
+                                  onClick={() => setKonfirmHapus(k.id)}>
+                                  <Icon d={ICONS.trash} size={16} />
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    </Fragment>
+                  ));
+                })}
+              </tbody>
+            ))}
+          </table>
+        )}
       </div>
 
       {rows.length > 0 && (
@@ -394,24 +425,46 @@ function TabTim() {
             <Button size="sm" icon={ICONS.userPlus} onClick={() => setBuka(true)}>Tambah</Button>
           )}
         </div>
-        {rows.map((u) => (
-          <div className={`master-baris ${u.active ? '' : 'nonaktif'}`} key={u.id}>
-            <div className="master-isi">
-              <b>{u.nama}{u.id === user?.id ? ' (Anda)' : ''}</b>
-              <span>{u.email} · {ROLE_LABEL[u.role] ?? u.role}{u.active ? '' : ' · nonaktif'}</span>
-            </div>
-            {/* Menonaktifkan akun sendiri ditolak server; tombolnya tidak
-                ditampilkan sekalian agar tidak perlu dijelaskan dua kali. */}
-            {u.id !== user?.id && (
-              <Button size="sm" variant="secondary"
-                onClick={() => void api.setUserActive(u.id, !u.active)
-                  .then(() => { say(u.active ? 'Akun dinonaktifkan.' : 'Akun diaktifkan.'); return muat(); })
-                  .catch(() => say('Gagal menyimpan. Periksa koneksi.'))}>
-                {u.active ? 'Nonaktifkan' : 'Aktifkan'}
-              </Button>
-            )}
-          </div>
-        ))}
+        <table className="tabel">
+          <thead>
+            <tr>
+              <th>Nama</th>
+              <th>Email</th>
+              <th className="kol-sempit">Peran</th>
+              <th className="kol-sempit">Status</th>
+              <th className="kol-aksi"><span className="sr-only">Aksi</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((u) => (
+              <tr className={u.active ? '' : 'nonaktif'} key={u.id}>
+                <td data-label="Nama" className="kol-nama">
+                  <b>{u.nama}</b>
+                  {u.id === user?.id && <em>Akun Anda</em>}
+                </td>
+                <td data-label="Email">{u.email}</td>
+                <td data-label="Peran" className="kol-sempit">{ROLE_LABEL[u.role] ?? u.role}</td>
+                <td data-label="Status" className="kol-sempit">
+                  <span className={`vonis ${u.active ? 'vonis-normal' : 'vonis-netral'}`}>
+                    {u.active ? 'Aktif' : 'Nonaktif'}
+                  </span>
+                </td>
+                <td className="kol-aksi">
+                  {/* Menonaktifkan akun sendiri ditolak server; tombolnya tidak
+                      ditampilkan sekalian agar tidak perlu dijelaskan dua kali. */}
+                  {u.id !== user?.id && (
+                    <Button size="sm" variant="secondary"
+                      onClick={() => void api.setUserActive(u.id, !u.active)
+                        .then(() => { say(u.active ? 'Akun dinonaktifkan.' : 'Akun diaktifkan.'); return muat(); })
+                        .catch(() => say('Gagal menyimpan. Periksa koneksi.'))}>
+                      {u.active ? 'Nonaktifkan' : 'Aktifkan'}
+                    </Button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       <small className="hint">
@@ -472,46 +525,73 @@ function TabCabang({ tenantSaya }: { tenantSaya: string | null }) {
         </div>
       )}
 
-      {rows.map((c) => (
-        <div className="card cabang-card" key={c.id}>
-          <div className="cabang-atas">
-            <span className="cabang-nama">{c.nama}</span>
-            {c.id === tenantSaya && <Badge tone="brand">Cabang Anda</Badge>}
-            {c.status !== 'active' && <Badge tone="sage">Nonaktif</Badge>}
-          </div>
-          <div className="cabang-angka">
-            <span><b>{c.pelanggan}</b> pelanggan</span>
-            <span><b>{c.event}</b> event</span>
-            <span><b>{c.pengguna}</b> akun aktif</span>
-            <span>dibuat {fmtTanggal(c.createdAt.slice(0, 10), { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-          </div>
-
-          {ubah?.id === c.id ? (
-            <div className="warn-aksi">
-              <input className="input" value={ubah.nama} autoFocus maxLength={160}
-                onChange={(e) => setUbah({ ...ubah, nama: e.target.value })} />
-              <Button size="sm" icon={ICONS.check} disabled={!ubah.nama.trim()}
-                onClick={() => void api.updateCabang(c.id, { nama: ubah.nama.trim() })
-                  .then(() => { say('Nama cabang diperbarui.'); setUbah(null); return muat(); })
-                  .catch(() => say('Gagal menyimpan.'))}>Simpan</Button>
-              <button className="link-btn sm" onClick={() => setUbah(null)}>Batal</button>
-            </div>
-          ) : (
-            <div className="warn-aksi">
-              <Button size="sm" variant="secondary" icon={ICONS.pencil}
-                onClick={() => setUbah({ id: c.id, nama: c.nama })}>Ubah nama</Button>
-              {c.id !== tenantSaya && (
-                <button className="link-btn sm"
-                  onClick={() => void api.updateCabang(c.id, { status: c.status === 'active' ? 'inactive' : 'active' })
-                    .then(() => { say('Status cabang diperbarui.'); return muat(); })
-                    .catch(() => say('Gagal menyimpan.'))}>
-                  {c.status === 'active' ? 'Nonaktifkan' : 'Aktifkan'}
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      ))}
+      <div className="card panel">
+        <table className="tabel">
+          <thead>
+            <tr>
+              <th>Nama</th>
+              <th className="kol-angka">Pelanggan</th>
+              <th className="kol-angka">Event</th>
+              <th className="kol-angka">Akun aktif</th>
+              <th className="kol-sempit">Dibuat</th>
+              <th className="kol-aksi"><span className="sr-only">Aksi</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((c) => (
+              <tr className={c.status === 'active' ? '' : 'nonaktif'} key={c.id}>
+                <td data-label="Nama" className="kol-nama">
+                  {ubah?.id === c.id ? (
+                    <input className="input" value={ubah.nama} autoFocus maxLength={160}
+                      onChange={(e) => setUbah({ ...ubah, nama: e.target.value })} />
+                  ) : (
+                    <>
+                      <b>{c.nama}</b>
+                      {c.id === tenantSaya && <em>Cabang Anda</em>}
+                    </>
+                  )}
+                </td>
+                <td data-label="Pelanggan" className="kol-angka">{c.pelanggan}</td>
+                <td data-label="Event" className="kol-angka">{c.event}</td>
+                <td data-label="Akun aktif" className="kol-angka">{c.pengguna}</td>
+                <td data-label="Dibuat" className="kol-sempit">
+                  {fmtTanggal(c.createdAt.slice(0, 10), { day: 'numeric', month: 'short', year: 'numeric' })}
+                </td>
+                <td className="kol-aksi">
+                  {ubah?.id === c.id ? (
+                    <div className="riwayat-aksi">
+                      <Button size="sm" icon={ICONS.check} disabled={!ubah.nama.trim()}
+                        onClick={() => void api.updateCabang(c.id, { nama: ubah.nama.trim() })
+                          .then(() => { say('Nama cabang diperbarui.'); setUbah(null); return muat(); })
+                          .catch(() => say('Gagal menyimpan.'))}>Simpan</Button>
+                      <button className="link-btn sm" onClick={() => setUbah(null)}>Batal</button>
+                    </div>
+                  ) : (
+                    <div className="riwayat-aksi">
+                      <button className="ikon-btn" aria-label={`Ubah nama ${c.nama}`}
+                        onClick={() => setUbah({ id: c.id, nama: c.nama })}>
+                        <Icon d={ICONS.pencil} size={16} />
+                      </button>
+                      {/* Cabang sendiri tidak ditawari nonaktif: server menolaknya,
+                          dan menawarkan lalu menolak hanya memindahkan penjelasan. */}
+                      {c.id !== tenantSaya && (
+                        <button className="ikon-btn"
+                          aria-label={`${c.status === 'active' ? 'Nonaktifkan' : 'Aktifkan'} ${c.nama}`}
+                          title={c.status === 'active' ? 'Nonaktifkan' : 'Aktifkan'}
+                          onClick={() => void api.updateCabang(c.id, { status: c.status === 'active' ? 'inactive' : 'active' })
+                            .then(() => { say('Status cabang diperbarui.'); return muat(); })
+                            .catch(() => say('Gagal menyimpan.'))}>
+                          <Icon d={c.status === 'active' ? ICONS.x : ICONS.check} size={16} />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <small className="hint">
         Cabang tidak bisa dihapus — datanya milik pasien yang pernah dilayani
