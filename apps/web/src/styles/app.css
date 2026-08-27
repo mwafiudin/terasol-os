@@ -1379,6 +1379,20 @@ button { cursor: pointer; font-family: inherit; }
   .screen > .page > .panel { grid-column: 1 / -1; }
 
   .screen > .page.page-home { max-width: 1040px; display: grid; }
+
+  /* Halaman yang isinya SUDAH punya grid sendiri keluar dari grid halaman.
+     Membagi 1040px menjadi dua kolom lalu menaruh grid auto-fit di dalam salah
+     satunya membuat kartunya menyempit tanpa alasan — dan kolom cari, yang
+     tidak masuk daftar melintang di atas, terjebak sebagai satu sel sehingga
+     bagian di sebelahnya melompat ke kanan. */
+  .screen > .page.page-produk,
+  .screen > .page.page-analisis {
+    display: flex; flex-direction: column; gap: 14px;
+    /* `align-items: start` diwarisi dari aturan grid di atas, dan pada kolom
+       flex artinya berubah total: anaknya berhenti melebar dan menyusut ke
+       lebar isinya — 348px di dalam halaman 1040px. */
+    align-items: stretch;
+  }
   /* Mengikuti lebar WADAH, bukan lebar layar. Dipaksa empat kolom di dalam
      kolom 464px, tiap kartu tinggal 107px dan labelnya terlipat jadi kartu
      setinggi 254px. */
@@ -1645,3 +1659,214 @@ button { cursor: pointer; font-family: inherit; }
     box-shadow: 0 -10px 18px -6px var(--surface-card);
   }
 }
+
+/* ======================= Analisis & lembar cetak ======================= */
+
+/* Satu susunan untuk layar dan kertas. Lebarnya dikunci pada ukuran yang
+   nyaman dibaca, bukan pada lebar jendela: lembar ini memang berbentuk
+   dokumen, dan barisnya tidak boleh memanjang sampai sulit dilacak mata. */
+.lembar {
+  display: flex; flex-direction: column; gap: 18px;
+  max-width: 760px; width: 100%;
+}
+
+.lembar-kop {
+  display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap;
+  padding-bottom: 12px; border-bottom: 2px solid var(--border-brand, var(--teal-700));
+}
+.lembar-kop h1 {
+  font-family: var(--font-display); font-size: 22px;
+  font-weight: var(--fw-semibold); color: var(--teal-900); margin: 0;
+}
+.lembar-kop p { margin: 2px 0 0; font-size: 13px; color: var(--text-muted); }
+.lembar-kop-kanan {
+  margin-left: auto; display: flex; flex-direction: column; align-items: flex-end;
+  text-align: right; gap: 2px;
+}
+.lembar-kop-kanan b { font-size: 13px; color: var(--teal-800); }
+.lembar-kop-kanan span { font-size: 12px; color: var(--text-muted); }
+
+.lembar-bagian { display: flex; flex-direction: column; gap: 10px; }
+.lembar-bagian > h2 {
+  margin: 0; font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase;
+  font-weight: var(--fw-semibold); color: var(--text-muted);
+}
+.lembar-catatan { font-size: 12.5px; color: var(--text-muted); margin: 0; }
+.lembar-kaki { margin-top: 4px; }
+
+/* ---- ringkasan ---- */
+
+.sorotan { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.sorot {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: baseline;
+  padding: 10px 12px; border-radius: var(--radius-sm);
+  border-left: 3px solid var(--border-default);
+  background: var(--surface-sunken);
+}
+.sorot-nama { font-size: 14px; font-weight: var(--fw-semibold); color: var(--text-body); }
+.sorot-nilai {
+  font-family: var(--font-display); font-size: 19px; color: var(--teal-900);
+  font-variant-numeric: tabular-nums; text-align: right;
+}
+.sorot-nilai small { font-size: 11px; font-weight: 400; color: var(--text-muted); }
+.sorot-vonis { grid-column: 1 / -1; font-size: 12.5px; color: var(--text-muted); }
+
+.sorot.nada-tinggi     { border-left-color: var(--danger-700); background: var(--danger-100); }
+.sorot.nada-rendah     { border-left-color: var(--danger-700); background: var(--danger-100); }
+.sorot.nada-perhatian  { border-left-color: var(--accent-600, var(--warn-600)); background: var(--accent-tint, var(--surface-sunken)); }
+.sorot.nada-membaik    { border-left-color: var(--success-700); background: var(--brand-soft); }
+.sorotan-baik p { margin: 0; font-size: 14px; color: var(--success-700); }
+
+/* ---- IMT ---- */
+
+.imt-blok {
+  display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start;
+  padding: 14px 16px; border-radius: var(--radius-card);
+  background: var(--brand-soft);
+}
+.imt-angka { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.imt-angka > b {
+  font-family: var(--font-display); font-size: 40px; line-height: 1;
+  font-weight: var(--fw-semibold); color: var(--teal-900);
+  font-variant-numeric: tabular-nums;
+}
+.imt-angka > span { font-size: 12px; color: var(--text-muted); }
+.imt-terang { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.imt-terang p { margin: 0; font-size: 13.5px; color: var(--text-body); }
+.imt-terang small { font-size: 11.5px; color: var(--text-subtle); }
+
+/* ---- kartu penanda ---- */
+
+.penanda-grid {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+.penanda {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 12px 14px; border-radius: var(--radius-card);
+  border: 1px solid var(--border-hairline); background: var(--surface-card);
+}
+.penanda > header { display: flex; align-items: center; gap: 6px; }
+.penanda-nama { font-size: 13px; font-weight: var(--fw-semibold); color: var(--text-body); }
+.penanda-kode {
+  font-size: 10px; letter-spacing: .05em; padding: 1px 5px; border-radius: 4px;
+  background: var(--surface-sunken); color: var(--text-muted);
+}
+.penanda-nilai { display: flex; align-items: baseline; gap: 5px; }
+.penanda-nilai b {
+  font-family: var(--font-display); font-size: 26px; line-height: 1.05;
+  font-weight: var(--fw-semibold); color: var(--teal-900);
+  font-variant-numeric: tabular-nums;
+}
+.penanda-nilai span { font-size: 11.5px; color: var(--text-muted); }
+.penanda-arah { margin: 0; font-size: 12px; color: var(--text-muted); }
+.penanda-sumber { font-size: 10.5px; color: var(--text-subtle); }
+.penanda.nada-tinggi, .penanda.nada-rendah { border-color: var(--danger-700); }
+.penanda.nada-perhatian { border-color: var(--border-brand, var(--teal-700)); }
+
+/* ---- grafik ---- */
+
+.grafik { margin: 2px 0 0; display: flex; flex-direction: column; gap: 4px; }
+.grafik svg { width: 100%; height: 68px; display: block; overflow: visible; }
+.grafik figcaption { font-size: 10.5px; color: var(--text-subtle); }
+/* Pita rujukan sebagai latar, bukan sebagai garis: yang perlu terbaca adalah
+   "di dalam atau di luar", dan area menyampaikan itu tanpa satu kata pun. */
+.grafik-pita { fill: var(--brand-soft); }
+.grafik-garis {
+  fill: none; stroke: var(--teal-700); stroke-width: 2;
+  stroke-linejoin: round; stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+.grafik-garis.tipis { stroke: var(--text-subtle); stroke-dasharray: 4 3; stroke-width: 1.5; }
+.grafik-titik { fill: var(--teal-800); }
+.grafik-titik.tipis { fill: var(--text-subtle); }
+
+/* ======================= aturan cetak ======================= */
+
+@media print {
+  /* Krom aplikasi tidak ikut tercetak. Yang dipegang pelanggan adalah dokumen,
+     bukan tangkapan layar aplikasi. */
+  .tabbar, .page-head, .toast, .sheet-veil, .papan-veil, .btn { display: none !important; }
+
+  .app, .page, .page-analisis {
+    display: block !important; height: auto !important; overflow: visible !important;
+    background: #fff !important; padding: 0 !important; margin: 0 !important;
+  }
+  .lembar { max-width: none; gap: 14px; }
+
+  /* Warna latar wajib ikut tercetak: pita rujukan dan penanda nada adalah
+     isi, bukan hiasan. Tanpa ini peramban membuangnya dan grafiknya kehilangan
+     satu-satunya hal yang membuatnya sebuah perbandingan. */
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+  /* Kartu tidak boleh terpotong tengah halaman. */
+  .penanda, .imt-blok, .sorot, .rujukan { break-inside: avoid; page-break-inside: avoid; }
+  .lembar-bagian > h2 { break-after: avoid; page-break-after: avoid; }
+  .lembar-kaki { break-before: auto; }
+
+  .penanda-grid { grid-template-columns: repeat(2, 1fr); }
+  .grafik svg { height: 56px; }
+
+  /* Disclaimer justru harus paling terbaca di kertas: lembar cetak adalah
+     artefak yang paling mungkin dibaca sebagai dokumen medis. */
+  .rujukan {
+    border: 1px solid #000 !important; padding: 10px 12px !important;
+    font-size: 11px !important; color: #000 !important;
+  }
+}
+
+@page { margin: 14mm; }
+
+/* ========================= Katalog produk KK ========================= */
+
+.page-produk > .input { width: 100%; }
+
+.produk-seri { display: flex; flex-direction: column; gap: 8px; }
+.produk-seri > .panel-grup { padding: 4px 0 0; }
+.produk-grid {
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  /* Kartu yang terbuka tidak boleh meregangkan tetangganya sebaris. */
+  align-items: start;
+}
+
+.produk-kartu {
+  display: flex; flex-direction: column;
+  border: 1px solid var(--border-hairline); border-radius: var(--radius-card);
+  background: var(--surface-card); overflow: hidden;
+  transition: border-color var(--dur-fast) var(--ease-calm);
+}
+.produk-kartu.buka { border-color: var(--border-brand, var(--teal-700)); }
+
+.produk-kepala {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 12px 14px; text-align: left; background: none; color: inherit;
+}
+.produk-tx { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.produk-tx b { font-size: 14px; font-weight: var(--fw-semibold); color: var(--text-body); }
+.produk-tx > span { font-size: 12.5px; color: var(--text-muted); }
+.produk-chev {
+  display: flex; flex: 0 0 auto; color: var(--text-subtle);
+  transition: transform var(--dur-fast) var(--ease-calm);
+}
+.produk-kartu.buka .produk-chev { transform: rotate(90deg); }
+
+.produk-penanda { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 14px 10px; }
+.produk-tag {
+  font-size: 10.5px; padding: 2px 7px; border-radius: 999px;
+  background: var(--brand-soft); color: var(--teal-800);
+  font-weight: var(--fw-medium);
+}
+
+.produk-isi {
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 2px 14px 14px; border-top: 1px solid var(--border-hairline);
+  margin-top: 2px; padding-top: 12px;
+}
+.produk-isi h3 {
+  margin: 0 0 4px; font-size: 10.5px; letter-spacing: .08em;
+  text-transform: uppercase; font-weight: var(--fw-semibold); color: var(--text-muted);
+}
+.produk-isi ul { margin: 0; padding-left: 16px; display: flex; flex-direction: column; gap: 2px; }
+.produk-isi li, .produk-isi p { font-size: 13px; color: var(--text-body); margin: 0; }
+.produk-isi > div > a { align-self: flex-start; }

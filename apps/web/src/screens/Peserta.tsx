@@ -8,7 +8,7 @@ import {
 } from '../lib/domain';
 import { db } from '../lib/db';
 import { pesertaEvent, rekapSementara, type PesertaRingkas, type RekapSementara } from '../lib/pesertaEvent';
-import { nilaiImt } from '../lib/rujukan';
+import { nilaiImt, type Gender } from '../lib/rujukan';
 import { useApp } from '../lib/store';
 import { isOnline } from '../lib/sync';
 import type { ConvStatus, EventRow, ParamKey } from '../lib/types';
@@ -252,8 +252,13 @@ type DetailLokal = {
   belumSync: boolean;
 };
 
-export function PesertaDetail({ go, peserta, onUbah }: {
+export type SasaranAnalisis = {
+  pelangganId: string; nama: string; gender: Gender; usia: number | null; hp: string | null;
+};
+
+export function PesertaDetail({ go, peserta, onUbah, onAnalisis }: {
   go: Nav; peserta: PesertaRingkas; onUbah: () => void;
+  onAnalisis: (s: SasaranAnalisis) => void;
 }) {
   const { key, user, say } = useApp();
   const [server, setServer] = useState<ParticipantDetail | null>(null);
@@ -351,7 +356,24 @@ export function PesertaDetail({ go, peserta, onUbah }: {
   return (
     <div className="page">
       <PageHead title={nama} onBack={() => go('eventPeserta')}
-        right={peserta.belumSync ? <Badge tone="warning">Antre</Badge> : undefined} />
+        right={
+          <>
+            {/* Butuh pelangganId, yang hanya ada setelah peserta tersinkron:
+                analisis membaca seluruh riwayat lintas kunjungan, dan tanpa itu
+                yang tersaji hanya satu kunjungan yang menyamar sebagai tren. */}
+            {pelangganId && (
+              <Button size="sm" variant="secondary" icon={ICONS.chart}
+                onClick={() => onAnalisis({
+                  pelangganId, nama, gender, hp,
+                  // `usia` di layar ini bisa datang sebagai teks dari server.
+                  usia: usia ? Number(usia) : null,
+                })}>
+                Analisis
+              </Button>
+            )}
+            {peserta.belumSync && <Badge tone="warning">Antre</Badge>}
+          </>
+        } />
 
       {/* Identitas dinyatakan sekali saja, di sini. Kartu "Data diri" dulu
           mengulang baris ini kata demi kata — nama, usia, jenis kelamin, dan

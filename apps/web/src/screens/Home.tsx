@@ -299,9 +299,17 @@ export function Home({ go, onFollowUp, reloadKey }: Props) {
           <span className="tx"><b>Rekap event</b><span>Akses Koordinator</span></span>
           <Icon d={ICONS.chevR} />
         </button>
-        {/* Di ponsel rel navigasi tidak punya isian sekunder, jadi Master data
-            harus punya jalan masuk di sini — tanpa ini ia sama sekali tidak
-            terjangkau dari ponsel. */}
+        {/* Di ponsel rel navigasi tidak punya isian sekunder, jadi apa pun yang
+            hanya tinggal di sana harus punya jalan masuk di sini — tanpa itu ia
+            sama sekali tidak terjangkau dari ponsel. */}
+        <div className="menu-sep" />
+        <button className="menu-item" onClick={() => go('produk')}>
+          <span className="ic"><Icon d={ICONS.cart} size={19} /></span>
+          <span className="tx">
+            <b>Produk KK</b><span>Kandungan dan keterangan produsen</span>
+          </span>
+          <Icon d={ICONS.chevR} />
+        </button>
         {koordinator && (
           <>
             <div className="menu-sep" />
