@@ -3,7 +3,7 @@ import {
   Badge, Button, Field, Icon, ICONS, InputRupiah, PageHead, Paginasi, usePaginasi,
 } from '../components/ui';
 import { api, type Recap as RecapData } from '../lib/api';
-import { EVENT_STATUS, PARAM_LABEL, ROLE_LABEL, bisaTerimaPeserta, fmtTanggal, pct, rp } from '../lib/domain';
+import { PARAM_LABEL, ROLE_LABEL, bisaTerimaPeserta, fmtTanggal, pct, rp, statusTampil } from '../lib/domain';
 import { localEvents, muatRekan, pullEvents, rekanTersimpan, saveLocalEvent, type Rekan } from '../lib/events';
 import { useApp } from '../lib/store';
 import { isOnline, refreshPending, syncNow } from '../lib/sync';
@@ -49,8 +49,8 @@ export function Events({ go, onOpenRecap, onOpenPeserta, reloadKey }: {
       )}
 
       {halaman.potong.map((ev) => {
-        const st = EVENT_STATUS[ev.status];
-        const badge = <Badge tone={st.tone} dot={ev.status === 'active'}>{st.label}</Badge>;
+        const st = statusTampil(ev);
+        const badge = <Badge tone={st.tone} dot={st.hariIni}>{st.label}</Badge>;
         // Event yang masih menerima peserta dibuka ke daftar pesertanya — itu
         // tempat kerja petugas. Event yang sudah berakhir langsung ke rekapnya.
         const berlangsung = bisaTerimaPeserta(ev.status);

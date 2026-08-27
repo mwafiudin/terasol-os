@@ -9,8 +9,8 @@ import {
 import { api, type ParticipantDetail } from '../lib/api';
 import { readParticipant } from '../lib/db';
 import {
-  CONV_LABEL, EVENT_STATUS, PARAM_LABEL, PARAMS, bisaTerimaPeserta,
-  dec, fmtTanggal, fmtWaktu, imtOf, normalisasiHp, num, periksaHp, periksaUsia, rp,
+  CONV_LABEL, PARAM_LABEL, PARAMS, bisaTerimaPeserta,
+  dec, fmtTanggal, fmtWaktu, imtOf, normalisasiHp, num, periksaHp, periksaUsia, rp, statusTampil,
 } from '../lib/domain';
 import { db } from '../lib/db';
 import { pesertaEvent, rekapSementara, type PesertaRingkas, type RekapSementara } from '../lib/pesertaEvent';
@@ -95,7 +95,7 @@ export function EventPeserta({ go, event, onBuka, onTambah, reloadKey }: {
 
   useEffect(() => { void muat(); }, [muat, reloadKey]);
 
-  const status = EVENT_STATUS[event.status];
+  const status = statusTampil(event);
   // Peserta masih boleh dicatat pada event yang dijadwalkan: orang datang lebih
   // awal, dan menutup jalannya tanpa penjelasan lebih buruk daripada terlalu
   // longgar. Event selesai dan diarsipkan tidak lagi menerima.
@@ -118,7 +118,7 @@ export function EventPeserta({ go, event, onBuka, onTambah, reloadKey }: {
   return (
     <div className="page">
       <PageHead title={event.nama} onBack={() => go('events')}
-        right={<Badge tone={status.tone} dot={event.status === 'active'}>{status.label}</Badge>} />
+        right={<Badge tone={status.tone} dot={status.hariIni}>{status.label}</Badge>} />
 
       <span className="recap-sub">
         <span>

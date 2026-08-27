@@ -145,8 +145,8 @@ export default function App() {
     <div className="app">
       <main className="screen">
         {screen === 'home' && (
-          <Home go={(s) => (s === 'register' ? void mulaiRegistrasi('home') : go(s))}
-            onFollowUp={setFollowUp} reloadKey={reloadKey} />
+          <Home go={go} onFollowUp={setFollowUp} reloadKey={reloadKey}
+            onDaftar={(ev) => void mulaiRegistrasi('home', ev)} />
         )}
         {screen === 'events' && (
           <Events go={go} reloadKey={reloadKey}

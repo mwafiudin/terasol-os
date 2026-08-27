@@ -1,5 +1,6 @@
 import { api } from './api';
 import { db } from './db';
+import { hariIni } from './domain';
 import { isOnline } from './sync';
 import type { EventRow } from './types';
 
@@ -57,18 +58,40 @@ export async function pullEvents(): Promise<void> {
   await kirimPenugasan();
 }
 
+/**
+ * Diurutkan menurut TANGGAL, bukan status tersimpan.
+ *
+ * Status dibekukan saat event dibuat dan tidak pernah berubah sendiri, jadi
+ * mengurutkan berdasarkannya menaruh event dua hari lalu di puncak daftar
+ * selamanya. Yang hari ini lebih dulu, lalu yang terdekat.
+ */
 export async function localEvents(): Promise<EventRow[]> {
   const rows = await db.events.toArray();
+  const kini = hariIni();
   return rows.sort((a, b) => {
-    if (a.status === 'active' && b.status !== 'active') return -1;
-    if (b.status === 'active' && a.status !== 'active') return 1;
+    const aKini = a.tanggal === kini, bKini = b.tanggal === kini;
+    if (aKini !== bKini) return aKini ? -1 : 1;
     return b.tanggal.localeCompare(a.tanggal);
   });
 }
 
+/** Event yang benar-benar berjalan hari ini. Bisa lebih dari satu. */
+export async function eventHariIni(): Promise<EventRow[]> {
+  const kini = hariIni();
+  return (await localEvents()).filter((e) => e.tanggal === kini && e.status !== 'archived');
+}
+
+/**
+ * Event yang dipakai saat mendaftarkan peserta dari Beranda.
+ *
+ * Hari ini lebih dulu; kalau tidak ada, yang terdekat dari daftar terurut.
+ * Sebelumnya fungsi ini memilih event pertama berstatus `active` TANPA melihat
+ * tanggal, sehingga peserta baru bisa mendarat di event dua hari lalu.
+ */
 export async function activeEvent(): Promise<EventRow | null> {
   const rows = await localEvents();
-  return rows.find((e) => e.status === 'active') ?? rows[0] ?? null;
+  const kini = hariIni();
+  return rows.find((e) => e.tanggal === kini && e.status !== 'archived') ?? rows[0] ?? null;
 }
 
 export type EventCounts = { peserta: number; berminat: number; tally: number; belumSync: number };

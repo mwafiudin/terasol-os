@@ -2052,3 +2052,29 @@ button { cursor: pointer; font-family: inherit; }
   color: var(--accent-700, var(--text-body));
   font-weight: var(--fw-medium); white-space: nowrap;
 }
+
+/* ===================== Kartu event yang bisa digeser ===================== */
+
+/* Satu hari boleh punya beberapa event. Digulung mendatar dengan scroll-snap,
+   bukan dengan penanganan gestur sendiri: cara ini bekerja untuk sentuhan,
+   trackpad, dan papan ketik sekaligus, tanpa satu baris pun kode gestur yang
+   harus dijaga tetap benar. */
+.hero-deck { display: contents; }
+.hero-deck.geser {
+  display: grid; grid-auto-flow: column; grid-auto-columns: 100%;
+  gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory;
+  /* Kartu tetap menyentuh tepi layar seperti saat tunggal. */
+  scroll-padding: 0; overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.hero-deck.geser::-webkit-scrollbar { display: none; }
+.hero-deck.geser > .hero-card { scroll-snap-align: start; margin: 0; }
+
+.hero-titik { display: flex; justify-content: center; gap: 7px; margin-top: -4px; }
+.hero-titik .titik {
+  width: 7px; height: 7px; padding: 0; border: none; border-radius: 50%;
+  background: var(--border-default); cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-calm),
+              width var(--dur-fast) var(--ease-calm);
+}
+.hero-titik .titik.on { width: 18px; border-radius: 4px; background: var(--teal-700); }
