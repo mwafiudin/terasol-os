@@ -286,8 +286,7 @@ button { cursor: pointer; font-family: inherit; }
 }
 .consent-card small { font-size: 12.5px; color: var(--text-subtle); }
 
-/* ---- Screening ---- */
-.scr-wrap { display: flex; flex-direction: column; height: 100%; min-height: 0; flex: 1; }
+/* ---- Kepala papan ukur ---- */
 /* Safe area sudah ditangani `.screen`, jadi di sini cukup jarak biasa. */
 .scr-head { display: flex; align-items: center; gap: 8px; padding: 18px 20px 8px; flex: none; }
 .scr-head .tx { display: flex; flex-direction: column; flex: 1; min-width: 0; }
@@ -296,24 +295,6 @@ button { cursor: pointer; font-family: inherit; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .saved-chip { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--success-700); flex: none; }
-.scr-rows { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 6px 20px 10px; min-height: 0; }
-.param-row {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 9px 16px; border-radius: var(--radius-md); flex: none;
-  background: var(--ivory-200); border: 2px solid transparent; text-align: left; width: 100%;
-}
-.param-row.filled { background: var(--white); }
-.param-row.active { background: var(--white); border-color: var(--teal-700); box-shadow: var(--shadow-sm); }
-.param-row .tx { display: flex; flex-direction: column; min-width: 0; }
-.param-row .tx b { font-size: 15px; font-weight: var(--fw-semibold); color: var(--ink-800); }
-.param-row .tx span { font-size: 12px; color: var(--text-muted); }
-.param-row .val {
-  font-family: var(--font-display); font-size: 22px; font-weight: var(--fw-semibold);
-  min-width: 52px; text-align: right; color: var(--text-subtle);
-}
-.param-row.filled .val { color: var(--teal-800); }
-.param-row.active .val { color: var(--teal-900); }
-.param-row.active .val::after { content: "|"; opacity: .35; font-weight: 400; }
 
 .range-warn {
   font-size: 13.5px; color: var(--danger-700); background: var(--danger-100);
@@ -1244,7 +1225,6 @@ button { cursor: pointer; font-family: inherit; }
     max-width: 760px; width: 100%; margin: 0 auto;
     padding: 26px 28px 40px;
   }
-  .screen > .scr-wrap { max-width: 760px; width: 100%; margin: 0 auto; }
 
   /* Sheet menjadi dialog tengah. Gestur tarik-ke-bawah tidak berarti apa-apa
      dengan tetikus, dan panel yang menempel di dasar layar tinggi terlihat

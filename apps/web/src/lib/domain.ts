@@ -1,5 +1,5 @@
 import { hitungImt, nilaiImt } from './rujukan';
-import type { ParamKey } from './types';
+import type { EventStatus, ParamKey } from './types';
 
 /**
  * Rentang wajar per parameter (US-03). Nilai di luar rentang tidak ditolak —
@@ -56,6 +56,22 @@ export const ROLE_LABEL: Record<string, string> = {
   koordinator: 'Koordinator',
   admin_pusat: 'Admin Pusat',
 };
+
+/**
+ * Nama status event. Ada EMPAT status, dan memperlakukannya sebagai dua —
+ * "berlangsung" versus "selesai" — membuat event yang dijadwalkan besok
+ * ditandai sudah selesai, lengkap dengan kalimat "selesai tanpa peserta
+ * tercatat" untuk event yang bahkan belum dimulai.
+ */
+export const EVENT_STATUS: Record<EventStatus, { label: string; tone: string }> = {
+  planned: { label: 'Terjadwal', tone: 'accent' },
+  active: { label: 'Berlangsung', tone: 'success' },
+  done: { label: 'Selesai', tone: 'sage' },
+  archived: { label: 'Diarsipkan', tone: 'sage' },
+};
+
+/** Status yang masih boleh menerima peserta baru. */
+export const bisaTerimaPeserta = (s: EventStatus) => s === 'active' || s === 'planned';
 
 export const rp = (n: number) => 'Rp ' + Math.round(n).toLocaleString('id-ID');
 export const pct = (n: number) => (Math.round(n * 1000) / 10).toLocaleString('id-ID') + '%';

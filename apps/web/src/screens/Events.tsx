@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Badge, Button, Field, Icon, ICONS, InputRupiah, PageHead } from '../components/ui';
 import { api, type Recap as RecapData } from '../lib/api';
-import { PARAM_LABEL, ROLE_LABEL, fmtTanggal, pct, rp } from '../lib/domain';
+import { EVENT_STATUS, PARAM_LABEL, ROLE_LABEL, bisaTerimaPeserta, fmtTanggal, pct, rp } from '../lib/domain';
 import { localEvents, muatRekan, pullEvents, rekanTersimpan, saveLocalEvent, type Rekan } from '../lib/events';
 import { useApp } from '../lib/store';
 import { isOnline, refreshPending, syncNow } from '../lib/sync';
@@ -43,14 +43,11 @@ export function Events({ go, onOpenRecap, onOpenPeserta, reloadKey }: {
       )}
 
       {events.map((ev) => {
-        const badge = ev.status === 'active'
-          ? <Badge tone="success" dot>Berlangsung</Badge>
-          : ev.status === 'planned'
-            ? <Badge tone="brand">Terjadwal</Badge>
-            : <Badge tone="sage">Selesai</Badge>;
-        // Event berlangsung dibuka ke daftar pesertanya — itu tempat kerja
-        // petugas. Event selesai langsung ke rekapnya.
-        const berlangsung = ev.status === 'active';
+        const st = EVENT_STATUS[ev.status];
+        const badge = <Badge tone={st.tone} dot={ev.status === 'active'}>{st.label}</Badge>;
+        // Event yang masih menerima peserta dibuka ke daftar pesertanya — itu
+        // tempat kerja petugas. Event yang sudah berakhir langsung ke rekapnya.
+        const berlangsung = bisaTerimaPeserta(ev.status);
         return (
           <button key={ev.clientId} className="card event-card"
             onClick={() => (berlangsung ? onOpenPeserta(ev) : ev.serverId ? onOpenRecap(ev) : onOpenPeserta(ev))}>
