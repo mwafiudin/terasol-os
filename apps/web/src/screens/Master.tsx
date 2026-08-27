@@ -1,5 +1,8 @@
 import { Fragment, useCallback, useEffect, useState } from 'react';
-import { Badge, Button, Field, Icon, ICONS, InputRupiah, PageHead, SegTabs, Sheet } from '../components/ui';
+import {
+  Badge, Button, Field, Icon, ICONS, InputRupiah, PageHead, Paginasi, SegTabs, Sheet,
+  usePaginasi,
+} from '../components/ui';
 import { api, ApiError, type CabangRow, type JenisTransaksi, type KatalogRow, type PenggunaRow } from '../lib/api';
 import { ROLE_LABEL, fmtTanggal, rp } from '../lib/domain';
 import { useApp } from '../lib/store';
@@ -390,6 +393,11 @@ function TabTim({ pusat }: { pusat: boolean }) {
     if (pusat) void api.cabang().then((r) => setCabang(r.cabang)).catch(() => setCabang([]));
   }, [pusat]);
 
+  // Dipanggil sebelum early-return di bawah: hook tidak boleh dilewati pada
+  // sebagian render. Daftar akun tumbuh terus, dan bagi Admin Pusat ia memuat
+  // seluruh cabang sekaligus.
+  const halaman = usePaginasi(rows ?? [], 15);
+
   if (rows === null) return <span className="hint">Memuat tim…</span>;
 
   const aktif = rows.filter((u) => u.active).length;
@@ -448,7 +456,7 @@ function TabTim({ pusat }: { pusat: boolean }) {
               </tr>
             </thead>
             <tbody>
-              {rows.map((u) => (
+              {halaman.potong.map((u) => (
                 <tr className={u.active ? '' : 'nonaktif'} key={u.id}>
                   <td data-label="Nama" className="kol-nama">
                     <b>{u.nama}</b>
@@ -470,6 +478,7 @@ function TabTim({ pusat }: { pusat: boolean }) {
             </tbody>
           </table>
         )}
+        <Paginasi {...halaman} satuan="akun" onPindah={halaman.setHal} />
       </div>
 
       {kelola && (

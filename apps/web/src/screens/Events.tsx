@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Badge, Button, Field, Icon, ICONS, InputRupiah, PageHead } from '../components/ui';
+import {
+  Badge, Button, Field, Icon, ICONS, InputRupiah, PageHead, Paginasi, usePaginasi,
+} from '../components/ui';
 import { api, type Recap as RecapData } from '../lib/api';
 import { EVENT_STATUS, PARAM_LABEL, ROLE_LABEL, bisaTerimaPeserta, fmtTanggal, pct, rp } from '../lib/domain';
 import { localEvents, muatRekan, pullEvents, rekanTersimpan, saveLocalEvent, type Rekan } from '../lib/events';
@@ -25,6 +27,10 @@ export function Events({ go, onOpenRecap, onOpenPeserta, reloadKey }: {
   }, []);
   useEffect(() => { void load(); }, [load, reloadKey]);
 
+  // Daftar event menumpuk seiring waktu dan tidak pernah menyusut sendiri —
+  // event lama diarsipkan, bukan dihapus.
+  const halaman = usePaginasi(events, 10);
+
   return (
     <div className="page page-home">
       <div className="events-head">
@@ -42,7 +48,7 @@ export function Events({ go, onOpenRecap, onOpenPeserta, reloadKey }: {
         </div>
       )}
 
-      {events.map((ev) => {
+      {halaman.potong.map((ev) => {
         const st = EVENT_STATUS[ev.status];
         const badge = <Badge tone={st.tone} dot={ev.status === 'active'}>{st.label}</Badge>;
         // Event yang masih menerima peserta dibuka ke daftar pesertanya — itu
@@ -64,6 +70,8 @@ export function Events({ go, onOpenRecap, onOpenPeserta, reloadKey }: {
           </button>
         );
       })}
+
+      <Paginasi {...halaman} satuan="event" onPindah={halaman.setHal} />
     </div>
   );
 }

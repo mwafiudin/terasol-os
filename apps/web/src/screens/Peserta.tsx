@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Badge, Button, Field, Icon, ICONS, InputRupiah, PageHead, SegTabs, Sheet } from '../components/ui';
+import {
+  Badge, Button, Field, Icon, ICONS, InputRupiah, PageHead, Paginasi, SegTabs, Sheet,
+  usePaginasi,
+} from '../components/ui';
 import { api, type ParticipantDetail } from '../lib/api';
 import { readParticipant } from '../lib/db';
 import {
@@ -85,6 +88,10 @@ export function EventPeserta({ go, event, onBuka, onTambah, reloadKey }: {
   );
   const aktif = FILTER.find((f) => f.k === filter) ?? FILTER[0]!;
   const tampil = terjaring.filter(aktif.cocok);
+  // Sepuluh kartu, bukan dua puluh: di ponsel dua puluh kartu adalah empat
+  // layar gulir, dan itu persis keluhan yang membuat paginasi ini ada.
+  // Pencarian di atas tetap jalan tercepat menuju satu orang tertentu.
+  const halaman = usePaginasi(tampil, 10);
   const adaPenyaring = cari.trim() !== '' || filter !== 'semua';
 
   return (
@@ -212,7 +219,9 @@ export function EventPeserta({ go, event, onBuka, onTambah, reloadKey }: {
         </div>
       )}
 
-      {adaPenyaring && tampil.length > 0 && (
+      {/* Hitungan hasil penyaringan tidak lagi diulang di sini: baris paginasi
+          di bawah daftar sudah menyebut "n–m dari N peserta". */}
+      {adaPenyaring && tampil.length > 0 && halaman.totalHal <= 1 && (
         <span className="hint" style={{ textAlign: 'left' }}>
           Menampilkan {tampil.length} dari {daftar!.length} peserta.
         </span>
@@ -233,7 +242,7 @@ export function EventPeserta({ go, event, onBuka, onTambah, reloadKey }: {
         ) : null;
       })()}
 
-      {tampil.map((p) => {
+      {halaman.potong.map((p) => {
         const conv = CONV_LABEL[p.convStatus ?? 'baru']!;
         return (
           <button key={p.clientId} className="card peserta-card" onClick={() => onBuka(p)}>
@@ -252,6 +261,8 @@ export function EventPeserta({ go, event, onBuka, onTambah, reloadKey }: {
           </button>
         );
       })}
+
+      <Paginasi {...halaman} satuan="peserta" onPindah={halaman.setHal} />
     </div>
   );
 }
