@@ -2323,24 +2323,38 @@ button { cursor: pointer; font-family: inherit; }
   margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-hairline);
 }
 
+/* Pembungkus kolom kanan. Di ponsel ia tidak melakukan apa-apa: blok di
+   dalamnya menumpuk seperti blok mana pun, dipisah garis mendatar. */
+.kondisi-sisi { display: flex; flex-direction: column; }
+.kondisi-sisi > .kondisi-blok + .kondisi-blok {
+  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-hairline);
+}
+.kondisi-kolom > .kondisi-sisi {
+  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-hairline);
+}
+
 @media (min-width: 1100px) {
   /* Isinya kembali dua kolom penuh di sini, jadi pitanya ikut melebar lagi —
      pita 520px di atas badan 908px justru yang terlihat timpang. */
   .kondisi-pita { max-width: none; }
   .kondisi-kolom {
     display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    column-gap: 32px; align-content: start;
+    align-items: stretch;
   }
-  /* Blok parameter memanjang di kolom kiri; dua blok sisanya mengisi kanan. */
-  .kb-param { grid-row: 1 / span 2; }
-  /* Garis pemisahnya berpindah arah: yang membagi kini kiri-kanan, dan garis
-     mendatar di antara blok kanan tetap perlu. */
-  .kondisi-blok + .kondisi-blok { margin-top: 0; padding-top: 0; border-top: none; }
-  .kondisi-kolom > .kondisi-blok:not(.kb-param) { padding-left: 32px; border-left: 1px solid var(--border-hairline); }
-  .kondisi-kolom > .kondisi-blok:not(.kb-param) ~ .kondisi-blok:not(.kb-param) {
-    margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-hairline);
+  /* Ruang di kiri garis, bukan hanya di kanannya. Tanpa ini "49 diukur"
+     berhenti satu piksel dari garis pemisah sementara kolom seberangnya punya
+     32px — dan ketimpangan sekecil itu justru yang terbaca sebagai berantakan. */
+  .kb-param { padding-right: 32px; }
+  .kondisi-kolom > .kondisi-sisi {
+    margin-top: 0; padding-top: 0; border-top: none;
+    padding-left: 32px; border-left: 1px solid var(--border-hairline);
   }
-  .kondisi-kolom { column-gap: 0; }
+
+  /* Kendali dan baris yang BISA DIKETUK memakai lebar kartu penuh: batas 520px
+     ada demi panjang baris teks yang nyaman dibaca, dan sebuah tombol bukan
+     teks yang dibaca. Dibiarkan terpotong, chevron-nya mendarat di tengah
+     kartu sementara garis di atasnya membentang penuh. */
+  .kondisi-buka, .tindak-baris { max-width: none; }
 }
 
 /* ==================== Isian umur: tanggal lahir atau usia ==================== */

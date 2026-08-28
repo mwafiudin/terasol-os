@@ -51,10 +51,23 @@ export function pesanWa(o: {
   ].join('\n');
 }
 
-export function BagikanHasil({ pelangganId, nama, hp, onTutup }: {
+/**
+ * Versi teks persetujuan yang pertama kali menyebut tautan hasil.
+ *
+ * Orang yang menyetujui teks sebelum ini tidak pernah diberi tahu bahwa
+ * hasilnya bisa dikirimkan lewat tautan. Membagikannya tidak dilarang —
+ * mengirim seseorang hasilnya sendiri ke nomornya sendiri masih wajar — tapi
+ * petugas berhak tahu bahwa ia sedang melampaui apa yang tertulis, dan bisa
+ * menanyakannya langsung ke orangnya yang biasanya berdiri di depannya.
+ */
+const VERSI_TAUTAN = 'v3';
+
+export function BagikanHasil({ pelangganId, nama, hp, versiConsent, onTutup }: {
   pelangganId: string;
   nama: string;
   hp: string | null;
+  /** Versi teks yang disetujui peserta; null bila tidak diketahui. */
+  versiConsent: string | null;
   onTutup: () => void;
 }) {
   const { say, user } = useApp();
@@ -107,9 +120,22 @@ export function BagikanHasil({ pelangganId, nama, hp, onTutup }: {
     window.open(`${dasar}?text=${encodeURIComponent(teks)}`, '_blank', 'noopener');
   }
 
+  // Perbandingan teks apa adanya: versinya berupa "v1", "v2", "v3" dan
+  // urutannya sama dengan urutan abjadnya sampai v9. Kalau suatu saat ada
+  // v10, baris ini yang harus diubah — dan uji e2e yang membaca versi aktif
+  // akan menunjukkannya lebih dulu.
+  const consentLama = !!versiConsent && versiConsent < VERSI_TAUTAN;
+
   return (
     <Sheet title="Bagikan hasil" subtitle={nama} onClose={onTutup}>
       {tautan === undefined && <span className="hint">Memuat…</span>}
+
+      {consentLama && (
+        <div className="range-warn">
+          Peserta ini menyetujui teks {versiConsent}, yang belum menyebut
+          pengiriman hasil lewat tautan. Tanyakan dulu sebelum mengirim.
+        </div>
+      )}
 
       {tautan === null && (
         <>
