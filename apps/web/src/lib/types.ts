@@ -14,6 +14,14 @@ export type EventStatus = 'planned' | 'active' | 'done' | 'archived';
 export type User = {
   id: string; nama: string; email: string; role: Role;
   tenantId: string; tenantNama: string;
+  /**
+   * Mode sync cabang. 'online' menutup pintu masuk saat tidak ada sinyal;
+   * 'offline' membiarkan petugas mencatat dan mengantre. Lihat migrasi 017.
+   *
+   * Opsional: perangkat yang login sebelum kolom ini ada menyimpan profil
+   * tanpanya, dan sampai profilnya disegarkan ia harus tetap bisa bekerja.
+   */
+  modeSync?: 'online' | 'offline';
 };
 
 export type EventRow = {

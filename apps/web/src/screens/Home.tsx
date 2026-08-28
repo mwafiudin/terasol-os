@@ -3,6 +3,7 @@ import { Badge, Button, Icon, ICONS } from '../components/ui';
 import { api, type ServerParticipant } from '../lib/api';
 import { getMeta, setMeta } from '../lib/db';
 import { CONV_LABEL, fmtSejak, fmtTanggal, rp, statusTampil, usiaTampil } from '../lib/domain';
+import { ALASAN_TERTUTUP, modeSyncDari, pintuTertutup } from '../lib/modeSync';
 import { activeEvent, countsFor, eventHariIni, pullEvents, type EventCounts } from '../lib/events';
 import { useInstall } from '../lib/install';
 import { useApp } from '../lib/store';
@@ -163,6 +164,8 @@ export function Home({ go, onFollowUp, onDaftar, reloadKey }: Props) {
   useEffect(() => { void load(); }, [load, reloadKey]);
 
   const online = isOnline();
+  // Pintu masuk ditutup bila cabang disetel harus online dan sinyalnya hilang.
+  const tertutup = pintuTertutup(user) || (modeSyncDari(user) === 'online' && !online);
   const koordinator = user?.role === 'koordinator' || user?.role === 'admin_pusat';
   const pending = sync?.pending ?? 0;
 
@@ -190,7 +193,10 @@ export function Home({ go, onFollowUp, onDaftar, reloadKey }: Props) {
 
   const syncTitle = {
     jalan: 'Menyinkronkan…',
-    offline: 'Offline — input tetap berjalan',
+    // Kalimatnya harus sesuai modenya. "Input tetap berjalan" pada cabang yang
+    // disetel harus online adalah janji yang langsung dibantah oleh tombol
+    // registrasi yang mati tepat di bawahnya.
+    offline: tertutup ? 'Offline — pencatatan baru ditahan' : 'Offline — input tetap berjalan',
     gagal: 'Sync belum berhasil',
     aman: 'Semua data tersinkron',
     antre: `${pending} record menunggu terkirim`,
@@ -309,9 +315,10 @@ export function Home({ go, onFollowUp, onDaftar, reloadKey }: Props) {
                   <div className="hero-stat"><b>{c.tally}</b><span>Tally anonim</span></div>
                 </div>
                 <Button variant="onbrand" size="lg" full icon={ICONS.userPlus}
-                  onClick={() => onDaftar(e)}>
+                  disabled={tertutup} onClick={() => onDaftar(e)}>
                   Registrasi peserta baru
                 </Button>
+                {tertutup && <span className="hero-tertutup">{ALASAN_TERTUTUP}</span>}
               </div>
             );
           })}
