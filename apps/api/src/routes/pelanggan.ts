@@ -88,7 +88,8 @@ export default async function pelangganRoutes(app: FastifyInstance) {
     return withTenant(ctx, async (tx) => {
       const { rows } = await tx.query<{ tenantId: string }>(
         `select p.id, p.tenant_id as "tenantId", p.nama, p.gender, p.usia,
-                to_char(p.tanggal_lahir,'YYYY-MM-DD') as "tanggalLahir", p.hp, p.catatan,
+                to_char(p.tanggal_lahir,'YYYY-MM-DD') as "tanggalLahir",
+                p.tanggal_lahir_asumsi as "tanggalLahirAsumsi", p.hp, p.catatan,
                 p.created_at as "createdAt", p.erased_at as "erasedAt"
            from pelanggan p where p.id = $1`,
         [id],
@@ -128,6 +129,7 @@ export default async function pelangganRoutes(app: FastifyInstance) {
       tanggalLahir: z.string().date()
         .refine((s) => s <= new Date().toISOString().slice(0, 10), 'Tanggal lahir di masa depan')
         .nullish(),
+      tanggalLahirAsumsi: z.boolean().optional(),
       hp: z.string().min(3).max(32).optional(),
       catatan: z.string().max(1000).nullish(),
     }).safeParse(req.body);
@@ -141,12 +143,21 @@ export default async function pelangganRoutes(app: FastifyInstance) {
             set nama = coalesce($2::text, nama), gender = coalesce($3::gender, gender),
                 usia = coalesce($4::smallint, usia), hp = coalesce($5::text, hp),
                 catatan = coalesce($6::text, catatan),
-                tanggal_lahir = coalesce($7::date, tanggal_lahir)
+                -- Koordinator MENYUNTING dengan sengaja, jadi di sini yang
+                -- dikirim selalu menang — termasuk taksiran yang menggantikan
+                -- taksiran lama. Aturan ketelitian di jalur sinkronisasi ada
+                -- untuk melindungi dari perangkat yang tidak tahu apa-apa;
+                -- orang yang membuka form ini tahu persis apa yang ia ubah.
+                tanggal_lahir = coalesce($7::date, tanggal_lahir),
+                tanggal_lahir_asumsi = case
+                  when $7::date is not null then coalesce($8::boolean, false)
+                  else tanggal_lahir_asumsi end
           where id = $1 and erased_at is null
           returning id, nama, gender, usia,
-                    to_char(tanggal_lahir,'YYYY-MM-DD') as "tanggalLahir", hp, catatan`,
+                    to_char(tanggal_lahir,'YYYY-MM-DD') as "tanggalLahir",
+                    tanggal_lahir_asumsi as "tanggalLahirAsumsi", hp, catatan`,
         [id, d.nama ?? null, d.gender ?? null, d.usia ?? null, d.hp ?? null, d.catatan ?? null,
-         d.tanggalLahir ?? null],
+         d.tanggalLahir ?? null, d.tanggalLahirAsumsi ?? null],
       );
       if (!rows[0]) return reply.code(404).send({ error: 'not_found' });
       await audit(tx, ctx, 'pelanggan.update', 'pelanggan', id, d);

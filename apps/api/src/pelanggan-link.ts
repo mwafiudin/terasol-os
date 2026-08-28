@@ -21,7 +21,8 @@ export function idTurunan(...bagian: string[]): string {
 
 type Orang = {
   nama: string; gender: 'P' | 'L';
-  usia?: number | null; tanggalLahir?: string | null; hp: string;
+  usia?: number | null; tanggalLahir?: string | null;
+  tanggalLahirAsumsi?: boolean; hp: string;
 };
 
 /**
@@ -45,25 +46,31 @@ export async function pelangganUntuk(
   if (found.rows[0]) {
     // Usia berubah tiap tahun; ambil yang terbaru supaya profil tidak basi.
     //
-    // Tanggal lahir sebaliknya: sekali diketahui, ia tidak berubah. `coalesce`
-    // menjaganya dari kunjungan berikutnya yang datang tanpa tanggal lahir —
-    // perangkat dengan bundel lama, atau peserta yang dicatat cepat tanpa
-    // mengisinya. Yang belum diisi bukan berarti dibatalkan.
+    // Tanggal lahir sebaliknya: sekali diketahui, ia tidak berubah. Yang
+    // menang ditentukan KETELITIANNYA — tanggal sungguhan mengalahkan taksiran,
+    // taksiran hanya mengisi yang kosong, dan null tidak pernah menimpa apa pun.
+    // Tanpa itu, satu kunjungan yang dicatat cepat lewat usia akan menghapus
+    // tanggal lahir yang susah payah ditanyakan pada kunjungan sebelumnya.
     if (o.usia != null || o.tanggalLahir != null) {
+      const pakai = `$3::date is not null
+        and (tanggal_lahir is null or tanggal_lahir_asumsi or not $4::boolean)`;
       await tx.query(
         `update pelanggan
             set usia = coalesce($2::smallint, usia),
-                tanggal_lahir = coalesce($3::date, tanggal_lahir)
+                tanggal_lahir = case when ${pakai} then $3::date else tanggal_lahir end,
+                tanggal_lahir_asumsi = case when ${pakai} then $4::boolean else tanggal_lahir_asumsi end
           where id = $1`,
-        [found.rows[0].id, o.usia ?? null, o.tanggalLahir ?? null],
+        [found.rows[0].id, o.usia ?? null, o.tanggalLahir ?? null, o.tanggalLahirAsumsi ?? false],
       );
     }
     return found.rows[0].id;
   }
   const ins = await tx.query<{ id: string }>(
-    `insert into pelanggan (tenant_id, nama, gender, usia, tanggal_lahir, hp)
-     values ($1,$2,$3::gender,$4,$5,$6) returning id`,
-    [tenantId, o.nama, o.gender, o.usia ?? null, o.tanggalLahir ?? null, o.hp],
+    `insert into pelanggan
+       (tenant_id, nama, gender, usia, tanggal_lahir, tanggal_lahir_asumsi, hp)
+     values ($1,$2,$3::gender,$4,$5,$6,$7) returning id`,
+    [tenantId, o.nama, o.gender, o.usia ?? null, o.tanggalLahir ?? null,
+     o.tanggalLahir ? (o.tanggalLahirAsumsi ?? false) : false, o.hp],
   );
   return ins.rows[0]!.id;
 }

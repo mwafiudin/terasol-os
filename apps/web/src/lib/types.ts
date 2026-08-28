@@ -50,6 +50,8 @@ export type ParticipantSecret = {
   gender: 'P' | 'L';
   /** "YYYY-MM-DD", atau null untuk peserta yang didaftarkan sebelum ditanyakan. */
   tanggalLahir?: string | null;
+  /** Tanggalnya ditaksir dari usia; jangan pernah ditampilkan sebagai fakta. */
+  tanggalLahirAsumsi?: boolean;
   usia: string;
   hp: string;
   consent: { granted: boolean; versiTeks: string; ts: string };
@@ -117,6 +119,7 @@ export type CerminSecret = {
   nama: string;
   gender: 'P' | 'L';
   tanggalLahir?: string | null;
+  tanggalLahirAsumsi?: boolean;
   usia: string;
   hp: string;
   imt: number | null;

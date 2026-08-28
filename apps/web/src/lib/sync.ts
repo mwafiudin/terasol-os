@@ -98,6 +98,7 @@ async function buildParticipantPayload(
     gender: s.gender,
     usia: Number(s.usia) || 0,
     tanggalLahir: s.tanggalLahir ?? null,
+    tanggalLahirAsumsi: s.tanggalLahirAsumsi ?? false,
     hp: s.hp,
     updatedAt: row.updatedAt,
     consent: s.consent,

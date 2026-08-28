@@ -299,9 +299,9 @@ describe('Alur API end-to-end', () => {
     assert.match(res.headers.get('content-type') ?? '', /text\/csv/);
     const csv = await res.text();
     const lines = csv.trim().split('\r\n');
-    assert.match(lines[0], /nama;jenis_kelamin;tanggal_lahir;usia;no_hp/);
+    assert.match(lines[0], /nama;jenis_kelamin;tanggal_lahir;tanggal_lahir_taksiran;usia;no_hp/);
     // Kolom date dibaca lewat to_char; tanpa itu ia bergeser sehari di WIB.
-    assert.match(lines[1], /;1963-08-17;/, 'tanggal lahir tercetak apa adanya');
+    assert.match(lines[1], /;1963-08-17;tidak;/, 'tanggal lahir tercetak apa adanya, bukan taksiran');
     assert.equal(lines.length, 2, 'header + 1 peserta aktif');
     assert.match(lines[1], /Paket herbal sendi/);
   });

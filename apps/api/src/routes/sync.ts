@@ -60,6 +60,8 @@ const participantIn = z.object({
   tanggalLahir: z.string().date()
     .refine((s) => s <= new Date().toISOString().slice(0, 10), 'Tanggal lahir di masa depan')
     .nullish(),
+  /** Tanggalnya ditaksir dari usia, bukan ditanyakan. Lihat migrasi 012. */
+  tanggalLahirAsumsi: z.boolean().default(false),
   hp: z.string().min(3).max(32),
   updatedAt: z.string().datetime(),
   consent: z.object({
@@ -160,16 +162,29 @@ export default async function syncRoutes(app: FastifyInstance) {
         let participantId: string;
         if (existing.rowCount) {
           participantId = existing.rows[0]!.id;
-          // `coalesce` pada tanggal lahir: perangkat yang belum diperbarui
-          // mengirim null untuk peserta yang tanggal lahirnya sudah dicatat
-          // perangkat lain. Menulis null apa adanya membuat sinkronisasi biasa
-          // menghapus fakta yang sudah diketahui.
+          // Tanggal lahir menang menurut KETELITIANNYA, bukan menurut siapa
+          // yang datang terakhir:
+          //
+          //   * null tidak pernah menimpa apa pun — perangkat berbundel lama
+          //     mengirim null untuk orang yang tanggal lahirnya sudah dicatat
+          //     perangkat lain, dan menulisnya apa adanya menghapus fakta.
+          //   * tanggal sungguhan selalu menang, termasuk atas taksiran.
+          //   * taksiran hanya mengisi yang kosong atau menyegarkan taksiran
+          //     lain; ia tidak boleh menimpa tanggal yang pernah ditanyakan.
+          //
+          // Syaratnya sama persis untuk kedua kolom, jadi keduanya harus
+          // berubah bersama — kolom yang bergeser sendiri menghasilkan baris
+          // yang mengaku taksiran atas tanggal sungguhan, atau sebaliknya.
+          const pakaiLahir = `$6::date is not null
+            and (tanggal_lahir is null or tanggal_lahir_asumsi or not $7::boolean)`;
           await tx.query(
             `update participants
                 set nama = $1, gender = $2, usia = $3, hp = $4,
-                    tanggal_lahir = coalesce($6::date, tanggal_lahir)
+                    tanggal_lahir = case when ${pakaiLahir} then $6::date else tanggal_lahir end,
+                    tanggal_lahir_asumsi = case when ${pakaiLahir} then $7::boolean else tanggal_lahir_asumsi end
               where id = $5`,
-            [p.nama, p.gender, p.usia, p.hp, participantId, p.tanggalLahir ?? null],
+            [p.nama, p.gender, p.usia, p.hp, participantId,
+             p.tanggalLahir ?? null, p.tanggalLahirAsumsi],
           );
         } else {
           // §4.3 — kunci dedup event_id + nomor HP. Bentrok TIDAK ditimpa:
@@ -184,12 +199,14 @@ export default async function syncRoutes(app: FastifyInstance) {
           const needsReview = (dup.rowCount ?? 0) > 0;
           const ins = await tx.query<{ id: string }>(
             `insert into participants
-               (tenant_id, event_id, client_id, nama, gender, usia, tanggal_lahir, hp,
+               (tenant_id, event_id, client_id, nama, gender, usia,
+                tanggal_lahir, tanggal_lahir_asumsi, hp,
                 needs_review, created_by, device_id)
-             values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+             values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
              returning id`,
             [ctx.tenantId, eventId, p.clientId, p.nama, p.gender, p.usia,
-             p.tanggalLahir ?? null, p.hp, needsReview, ctx.userId, claims.did],
+             p.tanggalLahir ?? null, p.tanggalLahir ? p.tanggalLahirAsumsi : false,
+             p.hp, needsReview, ctx.userId, claims.did],
           );
           participantId = ins.rows[0]!.id;
           if (needsReview) {
@@ -205,7 +222,8 @@ export default async function syncRoutes(app: FastifyInstance) {
         // sendiri, tanpa perangkat lapangan perlu tahu soal entitas pelanggan.
         const pelangganId = await pelangganUntuk(tx, ctx.tenantId, {
           nama: p.nama, gender: p.gender, usia: p.usia,
-          tanggalLahir: p.tanggalLahir ?? null, hp: p.hp,
+          tanggalLahir: p.tanggalLahir ?? null,
+          tanggalLahirAsumsi: p.tanggalLahirAsumsi, hp: p.hp,
         });
         await tx.query(
           'update participants set pelanggan_id = $2 where id = $1 and pelanggan_id is distinct from $2',

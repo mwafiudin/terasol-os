@@ -121,7 +121,7 @@ export type PelangganRingkas = {
 
 export type PelangganDetail = {
   id: string; tenantId: string; nama: string; gender: 'P' | 'L'; usia: number | null;
-  tanggalLahir: string | null;
+  tanggalLahir: string | null; tanggalLahirAsumsi: boolean;
   hp: string; catatan: string | null; createdAt: string; erasedAt: string | null;
   kunjungan: {
     id: string; needsReview: boolean; createdAt: string;
@@ -203,7 +203,8 @@ export type LoginResult = { accessToken: string; refreshToken: string; user: Use
 
 export type SyncParticipant = {
   clientId: string; eventClientId: string; nama: string; gender: 'P' | 'L';
-  usia: number; tanggalLahir: string | null; hp: string; updatedAt: string;
+  usia: number; tanggalLahir: string | null; tanggalLahirAsumsi: boolean;
+  hp: string; updatedAt: string;
   consent: { granted: boolean; versiTeks: string; ts: string };
   screening: {
     clientId: string; tinggi: number | null; berat: number | null;
@@ -262,7 +263,7 @@ export type ConflictGroup = {
 
 export type ServerParticipant = {
   id: string; clientId: string; nama: string; gender: 'P' | 'L'; usia: number;
-  tanggalLahir: string | null; hp: string;
+  tanggalLahir: string | null; tanggalLahirAsumsi: boolean; hp: string;
   needsReview: boolean; eventId: string; eventNama: string; eventTanggal: string;
   eventStatus: string; imt: number | null; berminat: boolean; convStatus: ConvStatus;
   nilaiTransaksi: number; produk: string | null; createdAt: string;
@@ -371,7 +372,7 @@ export const api = {
   pelanggan: (cari?: string) =>
     request<{ pelanggan: PelangganRingkas[] }>(`/pelanggan?${new URLSearchParams(cari ? { cari } : {})}`),
   pelangganDetail: (id: string) => request<PelangganDetail>(`/pelanggan/${id}`),
-  updatePelanggan: (id: string, body: Partial<{ nama: string; gender: 'P' | 'L'; usia: number | null; tanggalLahir: string | null; hp: string; catatan: string | null }>) =>
+  updatePelanggan: (id: string, body: Partial<{ nama: string; gender: 'P' | 'L'; usia: number | null; tanggalLahir: string | null; tanggalLahirAsumsi: boolean; hp: string; catatan: string | null }>) =>
     patch<unknown>(`/pelanggan/${id}`, body),
 
   pengukuran: (pelangganId: string) =>

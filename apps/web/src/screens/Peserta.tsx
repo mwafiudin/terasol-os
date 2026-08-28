@@ -9,10 +9,11 @@ import {
 import { api, type ParticipantDetail } from '../lib/api';
 import { readParticipant } from '../lib/db';
 import {
-  CONV_LABEL, PARAM_LABEL, PARAMS, batasTanggalLahir, bisaTerimaPeserta,
+  CONV_LABEL, PARAM_LABEL, PARAMS, bisaTerimaPeserta,
   dec, fmtTanggal, fmtWaktu, imtOf, normalisasiHp, num, periksaHp,
-  periksaTanggalLahir, rp, statusTampil, usiaDari, usiaTampil,
+  rp, statusTampil, usiaDari, usiaTampil,
 } from '../lib/domain';
+import { IsianLahir, periksaLahir, type NilaiLahir } from '../components/IsianLahir';
 import { db } from '../lib/db';
 import { pesertaEvent, rekapSementara, type PesertaRingkas, type RekapSementara } from '../lib/pesertaEvent';
 import { RekapKondisiEvent } from './RekapKondisi';
@@ -694,15 +695,18 @@ function FormDataDiri({ pelangganId, nama, gender, tanggalLahir, usia, hp, onTut
   onTersimpan: () => void;
 }) {
   const { say } = useApp();
-  const [f, setF] = useState({ nama, gender, tanggalLahir: tanggalLahir ?? '', hp, catatan: '' });
+  const [f, setF] = useState({ nama, gender, hp, catatan: '' });
+  const [lahir, setLahir] = useState<NilaiLahir>({
+    tanggalLahir: tanggalLahir ?? '', usia: tanggalLahir ? '' : usia, asumsi: false,
+  });
   const [busy, setBusy] = useState(false);
 
   // Pemeriksaan yang sama dengan form registrasi. Kalau hanya dipasang di
   // sana, layar ini menjadi pintu belakang yang menerima nomor tak berbentuk.
   const salahHp = f.hp ? periksaHp(f.hp) : null;
-  const salahLahir = f.tanggalLahir ? periksaTanggalLahir(f.tanggalLahir) : null;
-  const usiaBaru = usiaDari(f.tanggalLahir);
-  const batas = batasTanggalLahir();
+  const adaIsiLahir = lahir.asumsi ? !!lahir.usia : !!lahir.tanggalLahir;
+  const salahLahir = adaIsiLahir ? periksaLahir(lahir) : null;
+  const usiaBaru = lahir.asumsi ? Number(lahir.usia) || null : usiaDari(lahir.tanggalLahir);
 
   async function simpan() {
     if (!f.nama.trim() || !f.hp.trim()) { say('Nama dan nomor HP tidak boleh kosong.'); return; }
@@ -713,7 +717,8 @@ function FormDataDiri({ pelangganId, nama, gender, tanggalLahir, usia, hp, onTut
       await api.updatePelanggan(pelangganId, {
         nama: f.nama.trim(),
         gender: f.gender,
-        tanggalLahir: f.tanggalLahir || null,
+        tanggalLahir: lahir.tanggalLahir || null,
+        tanggalLahirAsumsi: lahir.asumsi,
         // Usia ikut disegarkan supaya baris lama tetap masuk akal bagi ekspor
         // CSV dan laporan yang membacanya langsung, bukan lewat tanggal lahir.
         usia: usiaBaru,
@@ -742,19 +747,9 @@ function FormDataDiri({ pelangganId, nama, gender, tanggalLahir, usia, hp, onTut
         </div>
       </div>
       <div className="dua-kolom">
-        <Field label={`Tanggal lahir${usiaBaru == null ? '' : ` · ${usiaBaru} th`}`} htmlFor="i-lahir">
-          <input id="i-lahir" className={`input${salahLahir ? ' salah' : ''}`}
-            type="date" value={f.tanggalLahir} aria-invalid={!!salahLahir}
-            min={batas.min} max={batas.maks}
-            onChange={(e) => setF({ ...f, tanggalLahir: e.target.value })} />
-          {salahLahir && <small className="field-salah">{salahLahir}</small>}
-          {/* Orang yang terdaftar sebelum tanggal lahir ditanyakan hanya punya
-              angka usia. Ditampilkan apa adanya; mengisi tanggal lahir
-              menggantikannya dengan angka yang tidak akan basi. */}
-          {!f.tanggalLahir && usia && (
-            <small className="field-bantu">Tercatat {usia} th; isi tanggal lahir agar tidak basi.</small>
-          )}
-        </Field>
+        <IsianLahir id="i-lahir" nilai={lahir} salah={salahLahir}
+          usiaTercatat={tanggalLahir ? undefined : usia}
+          onUbah={setLahir} />
         <Field label="Nomor HP" htmlFor="i-hp">
           <input id="i-hp" className={`input${salahHp ? ' salah' : ''}`}
             inputMode="tel" value={f.hp} maxLength={16} aria-invalid={!!salahHp}
