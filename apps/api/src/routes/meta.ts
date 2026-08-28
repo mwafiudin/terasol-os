@@ -86,6 +86,35 @@ export default async function metaRoutes(app: FastifyInstance) {
       });
     });
 
+  /**
+   * Mode sync cabang. Lihat migrasi 017 untuk pertimbangannya.
+   *
+   * Koordinator boleh mengubahnya, bukan hanya Admin Pusat: yang tahu apakah
+   * balai desa tempat mereka bekerja punya sinyal adalah orang yang berdiri di
+   * sana, bukan kantor pusat.
+   */
+  app.patch('/tenant/mode-sync',
+    { preHandler: requireRole('koordinator', 'admin_pusat') },
+    async (req, reply) => {
+      const parsed = z.object({ modeSync: z.enum(['online', 'offline']) }).safeParse(req.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: 'bad_request', detail: parsed.error.flatten() });
+      }
+      const ctx = ctxOf(req);
+      return withTenant(ctx, async (tx) => {
+        const { rows } = await tx.query<{ mode_sync: string }>(
+          `update tenants set mode_sync = $2, updated_at = now()
+            where id = $1 returning mode_sync`,
+          [ctx.tenantId, parsed.data.modeSync],
+        );
+        if (!rows[0]) return reply.code(404).send({ error: 'not_found' });
+        // Mengubah ini mengubah apa yang bisa dikerjakan petugas di lapangan
+        // saat sinyal hilang; siapa yang mengubahnya dan kapan harus terlacak.
+        await audit(tx, ctx, 'tenant.mode_sync', 'tenant', ctx.tenantId, parsed.data);
+        return { modeSync: rows[0].mode_sync };
+      });
+    });
+
   app.get('/audit', { preHandler: requireRole('koordinator', 'admin_pusat') }, async (req) => {
     const limit = Math.min(Number((req.query as { limit?: string }).limit ?? 100), 500);
     const ctx = ctxOf(req);

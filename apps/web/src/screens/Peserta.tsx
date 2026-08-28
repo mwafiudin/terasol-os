@@ -15,6 +15,7 @@ import {
 } from '../lib/domain';
 import { IsianLahir, periksaLahir, type NilaiLahir } from '../components/IsianLahir';
 import { BagikanHasil } from './BagikanHasil';
+import { ALASAN_TERTUTUP, modeSyncDari, pintuTertutup } from '../lib/modeSync';
 import { db } from '../lib/db';
 import { pesertaEvent, rekapSementara, type PesertaRingkas, type RekapSementara } from '../lib/pesertaEvent';
 import { RekapKondisiEvent } from './RekapKondisi';
@@ -90,7 +91,8 @@ export function EventPeserta({ go, event, onBuka, onTambah, onUbahEvent, onHapus
   onHapusEvent?: (ev: EventRow) => void;
   reloadKey: number;
 }) {
-  const { key } = useApp();
+  const { key, user, online } = useApp();
+  const tertutup = pintuTertutup(user) || (modeSyncDari(user) === 'online' && !online);
   const [kelola, setKelola] = useState(false);
   const [daftar, setDaftar] = useState<PesertaRingkas[] | null>(null);
   const [rekap, setRekap] = useState<RekapSementara | null>(null);
@@ -235,9 +237,13 @@ export function EventPeserta({ go, event, onBuka, onTambah, onUbahEvent, onHapus
       )}
 
       {bisaTambah && (
-        <Button size="lg" full icon={ICONS.userPlus} onClick={onTambah}>
-          Tambah peserta baru
-        </Button>
+        <>
+          <Button size="lg" full icon={ICONS.userPlus}
+            disabled={tertutup} onClick={onTambah}>
+            Tambah peserta baru
+          </Button>
+          {tertutup && <div className="range-warn">{ALASAN_TERTUTUP}</div>}
+        </>
       )}
 
       <span className="section-title">

@@ -713,6 +713,33 @@ describe('Alur API end-to-end', () => {
    * bukan empat"). Menyisipkannya di tengah membuat uji yang tidak ada
    * hubungannya ikut gagal — dan yang gagal bukan yang rusak.
    */
+  it('mode sync cabang bisa diubah dan ikut di profil', async () => {
+    // Bawaannya 'online', termasuk untuk cabang yang dibuat sebelum kolomnya
+    // ada — migrasi 017 memberi DEFAULT, bukan NULL.
+    const awal = await call('/auth/me');
+    assert.equal(awal.body.user.modeSync, 'online', 'bawaan harus online');
+
+    const ubah = await call('/tenant/mode-sync', {
+      method: 'PATCH', body: JSON.stringify({ modeSync: 'offline' }),
+    });
+    assert.equal(ubah.status, 200, JSON.stringify(ubah.body));
+    assert.equal(ubah.body.modeSync, 'offline');
+
+    const sesudah = await call('/auth/me');
+    assert.equal(sesudah.body.user.modeSync, 'offline', 'profil ikut berubah');
+
+    const salah = await call('/tenant/mode-sync', {
+      method: 'PATCH', body: JSON.stringify({ modeSync: 'kadang-kadang' }),
+    });
+    assert.equal(salah.status, 400, 'mode di luar dua pilihan ditolak');
+
+    // Dikembalikan agar uji ini tidak mengubah cabang sungguhan.
+    const balik = await call('/tenant/mode-sync', {
+      method: 'PATCH', body: JSON.stringify({ modeSync: 'online' }),
+    });
+    assert.equal(balik.body.modeSync, 'online');
+  });
+
   it('peserta tanpa nomor HP diterima dan tidak pernah ditandai kembar', async () => {
     const now = new Date().toISOString();
     // DUA peserta tanpa nomor di event yang sama. Sebelum migrasi 016 keduanya

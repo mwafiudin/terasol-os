@@ -91,9 +91,85 @@ export function Conflicts({ go }: { go: Nav }) {
 
 /* ============================== Pengaturan ============================== */
 
+/**
+ * Mode sync cabang.
+ *
+ * Pertimbangannya ditulis apa adanya di layar, bukan disembunyikan di balik
+ * ikon tanya: yang memilih adalah Koordinator yang tahu apakah balai desa
+ * tempat timnya bekerja punya sinyal, dan ia berhak tahu apa yang ia
+ * pertaruhkan sebelum memilih — bukan sesudahnya.
+ */
+function ModeSyncTab() {
+  const { user, say } = useApp();
+  const [mode, setMode] = useState<'online' | 'offline'>(user?.modeSync ?? 'online');
+  const [busy, setBusy] = useState(false);
+
+  async function pilih(m: 'online' | 'offline') {
+    if (m === mode || busy) return;
+    setBusy(true);
+    const sebelum = mode;
+    setMode(m);
+    try {
+      await api.setModeSync(m);
+      say(m === 'online'
+        ? 'Cabang ini kini harus online untuk mencatat peserta baru.'
+        : 'Cabang ini kini boleh mencatat tanpa sinyal.');
+    } catch {
+      setMode(sebelum);
+      say('Gagal menyimpan. Periksa koneksi.');
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="card consumable-card">
+      <b>Mode pencatatan</b>
+
+      <button className={`mode-pilihan ${mode === 'online' ? 'on' : ''}`}
+        disabled={busy} onClick={() => void pilih('online')}>
+        <span className="mode-kepala">
+          <b>Harus online</b>
+          {mode === 'online' && <Badge tone="success">Dipakai</Badge>}
+        </span>
+        <span className="mode-untung">
+          Kesalahan terlihat seketika, dan data selalu sudah ada di server
+          begitu tersimpan.
+        </span>
+        <span className="mode-rugi">
+          Harganya: pencatatan peserta baru berhenti total saat sinyal hilang.
+        </span>
+      </button>
+
+      <button className={`mode-pilihan ${mode === 'offline' ? 'on' : ''}`}
+        disabled={busy} onClick={() => void pilih('offline')}>
+        <span className="mode-kepala">
+          <b>Boleh offline</b>
+          {mode === 'offline' && <Badge tone="success">Dipakai</Badge>}
+        </span>
+        <span className="mode-untung">
+          Petugas tetap bisa mencatat tanpa sinyal; datanya mengantre
+          terenkripsi di perangkat dan terkirim sendiri saat sinyal kembali.
+        </span>
+        <span className="mode-rugi">
+          Harganya: sampai terkirim, data itu hanya ada di satu HP. Petugas lain
+          tidak melihatnya, dan HP yang hilang berarti data yang hilang.
+          Antrean juga bisa tertahan tanpa disadari bila ada satu angka yang
+          ditolak server.
+        </span>
+      </button>
+
+      <small>
+        Apa pun modenya, yang sedang dikerjakan selalu boleh diselesaikan —
+        pengukuran yang sudah diambil dari orang yang berdiri di depan petugas
+        tidak pernah dibuang karena sinyal putus.
+      </small>
+    </div>
+  );
+}
+
 export function Settings({ go }: { go: Nav }) {
   const { user, lock, logout, say } = useApp();
-  const [tab, setTab] = useState<'akun' | 'biaya' | 'perangkat'>('akun');
+  const [tab, setTab] = useState<'akun' | 'sync' | 'biaya' | 'perangkat'>('akun');
+  const koordinatorKeAtas = user?.role === 'koordinator' || user?.role === 'admin_pusat';
 
   return (
     <div className="page">
@@ -110,14 +186,15 @@ export function Settings({ go }: { go: Nav }) {
       </div>
 
       <div className="seg">
-        {(['akun', 'biaya', 'perangkat'] as const).map((t) => (
+        {(['akun', ...(koordinatorKeAtas ? ['sync' as const] : []), 'biaya', 'perangkat'] as const).map((t) => (
           <button key={t} className={`seg-btn ${tab === t ? 'on' : ''}`} onClick={() => setTab(t)}>
-            {t === 'akun' ? 'Akun' : t === 'biaya' ? 'Biaya' : 'Perangkat'}
+            {t === 'akun' ? 'Akun' : t === 'sync' ? 'Sync' : t === 'biaya' ? 'Biaya' : 'Perangkat'}
           </button>
         ))}
       </div>
 
       {tab === 'akun' && <AkunTab />}
+      {tab === 'sync' && koordinatorKeAtas && <ModeSyncTab />}
       {tab === 'biaya' && <BiayaTab />}
       {tab === 'perangkat' && <PerangkatTab />}
 

@@ -2449,3 +2449,32 @@ button { cursor: pointer; font-family: inherit; }
 .tanpa-hp input { width: 18px; height: 18px; flex: none; margin-top: 1px; accent-color: var(--teal-700); }
 .tanpa-hp > span { display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: var(--text-body); }
 .tanpa-hp em { font-style: normal; font-size: 11.5px; line-height: 1.5; color: var(--text-subtle); }
+
+/* ==================== Pilihan mode sync ==================== */
+
+/* Pertimbangannya tertulis di kartunya, bukan di balik ikon tanya. Yang
+   memilih menanggung akibatnya di lapangan, dan ia berhak membaca untung-
+   ruginya SEBELUM memilih — bukan menemukannya sesudah data hilang. */
+.mode-pilihan {
+  display: flex; flex-direction: column; gap: 6px; text-align: left;
+  padding: 12px 14px; border-radius: var(--radius-field); cursor: pointer;
+  background: var(--surface-card); border: 1px solid var(--border-default);
+}
+.mode-pilihan.on { border: 2px solid var(--teal-700); background: var(--brand-tint); }
+.mode-pilihan:disabled { opacity: .6; cursor: default; }
+.mode-kepala { display: flex; align-items: center; gap: 8px; }
+.mode-kepala b { font-size: 14px; font-weight: var(--fw-semibold); color: var(--text-body); }
+.mode-untung { font-size: 12.5px; line-height: 1.55; color: var(--text-body); }
+/* Kerugiannya tidak dikecilkan dan tidak disamarkan warnanya. Kalau ia
+   ditulis lebih pelan daripada keuntungannya, yang membaca akan melewatinya —
+   dan itu justru bagian yang menentukan pilihannya. */
+.mode-rugi {
+  font-size: 12.5px; line-height: 1.55; color: var(--danger-700);
+  padding-left: 10px; border-left: 2px solid var(--danger-500);
+}
+
+/* Keterangan pintu tertutup pada kartu event di Beranda. */
+.hero-tertutup {
+  display: block; margin-top: 8px; font-size: 12px; line-height: 1.55;
+  color: var(--ivory-200);
+}

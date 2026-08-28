@@ -171,7 +171,7 @@ export type DaftarTerhapus = {
 };
 
 export type KatalogRow = {
-  id: string; tenantId: string; tenantNama: string;
+  id: string; tenantId: string; tenantNama: string; modeSync?: 'online' | 'offline';
   jenis: JenisTransaksi; nama: string; harga: string;
   catatan: string | null; aktif: boolean; terpakai: number;
 };
@@ -341,6 +341,9 @@ export const api = {
   me: () => request<{ user: User }>('/auth/me'),
   changePassword: (currentPassword: string, newPassword: string) =>
     post<{ ok: true; sesiLainDicabut: number }>('/auth/change-password', { currentPassword, newPassword }),
+
+  setModeSync: (modeSync: 'online' | 'offline') =>
+    patch<{ modeSync: 'online' | 'offline' }>('/tenant/mode-sync', { modeSync }),
 
   consentText: () => request<{ versi: string; isi: string } | null>('/consent-text'),
 

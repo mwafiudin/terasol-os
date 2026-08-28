@@ -18,6 +18,7 @@ const refreshBody = z.object({
 type UserRow = {
   id: string; tenant_id: string; email: string; password_hash: string;
   nama: string; role: Role; active: boolean; tenant_nama: string;
+  mode_sync: 'online' | 'offline';
 };
 
 export default async function authRoutes(app: FastifyInstance) {
@@ -30,7 +31,7 @@ export default async function authRoutes(app: FastifyInstance) {
 
     return withoutTenant(async (tx) => {
       const { rows } = await tx.query<UserRow>(
-        `select u.*, t.nama as tenant_nama
+        `select u.*, t.nama as tenant_nama, t.mode_sync
            from users u join tenants t on t.id = u.tenant_id
           where lower(u.email) = lower($1)`,
         [email],
@@ -77,6 +78,7 @@ export default async function authRoutes(app: FastifyInstance) {
         user: {
           id: user.id, nama: user.nama, email: user.email, role: user.role,
           tenantId: user.tenant_id, tenantNama: user.tenant_nama,
+          modeSync: user.mode_sync,
         },
       };
     });
@@ -91,9 +93,10 @@ export default async function authRoutes(app: FastifyInstance) {
         id: string; user_id: string; tenant_id: string; device_id: string;
         revoked_at: Date | null; wipe_requested: boolean; role: Role; active: boolean;
         nama: string; email: string; tenant_nama: string;
+        mode_sync: 'online' | 'offline';
       }>(
         `select s.id, s.user_id, s.tenant_id, s.device_id, s.revoked_at, s.wipe_requested,
-                u.role, u.active, u.nama, u.email, t.nama as tenant_nama
+                u.role, u.active, u.nama, u.email, t.nama as tenant_nama, t.mode_sync
            from device_sessions s
            join users u on u.id = s.user_id
            join tenants t on t.id = s.tenant_id
@@ -129,6 +132,7 @@ export default async function authRoutes(app: FastifyInstance) {
         user: {
           id: s.user_id, nama: s.nama, email: s.email, role: s.role,
           tenantId: s.tenant_id, tenantNama: s.tenant_nama,
+          modeSync: s.mode_sync,
         },
       };
     });
@@ -146,7 +150,8 @@ export default async function authRoutes(app: FastifyInstance) {
     const c = claimsOf(req);
     return withoutTenant(async (tx) => {
       const { rows } = await tx.query(
-        `select u.id, u.nama, u.email, u.role, u.tenant_id as "tenantId", t.nama as "tenantNama"
+        `select u.id, u.nama, u.email, u.role, u.tenant_id as "tenantId",
+                t.nama as "tenantNama", t.mode_sync as "modeSync"
            from users u join tenants t on t.id = u.tenant_id where u.id = $1`,
         [c.sub],
       );

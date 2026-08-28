@@ -1,0 +1,38 @@
+-- ============================================================================
+-- 017 — mode sync per cabang
+-- ============================================================================
+--
+-- Aplikasi ini local-first: setiap tulisan masuk ke IndexedDB terenkripsi
+-- dulu, lalu diantre untuk dikirim. Itu yang membuat pemeriksaan tetap
+-- berjalan di balai desa tanpa sinyal, dan yang menyelamatkan data saat
+-- aplikasi mati mendadak di tengah pengukuran (US-03).
+--
+-- Harganya baru terlihat hari ini: satu angka yang ditolak basis data menahan
+-- tujuh belas record di sebuah perangkat selama dua jam, dan tidak ada yang
+-- tahu sampai petugas kedua membuka HP-nya dan tidak menemukan apa-apa. Data
+-- yang mengantre BELUM ADA di mana pun. HP hilang berarti data hilang.
+--
+-- Jadi cabang memilih sendiri, karena yang dipertaruhkan berbeda di tiap
+-- tempat:
+--
+--   'online'  — pintu masuk ditutup saat tidak ada sinyal. Kesalahan terlihat
+--               seketika, dan tidak ada antrean yang bisa tersumbat diam-diam.
+--               Harganya: pemeriksaan berhenti total saat sinyal hilang.
+--   'offline' — petugas tetap bisa mencatat tanpa sinyal, data mengantre
+--               terenkripsi. Harganya: data belum ada di mana pun sampai
+--               tersinkron.
+--
+-- Bawaannya 'online', termasuk untuk cabang yang sudah ada. Sengaja: kegagalan
+-- yang terlihat seketika lebih murah daripada kegagalan yang diam selama dua
+-- jam, dan cabang yang benar-benar butuh offline akan tahu dirinya butuh —
+-- sedangkan cabang yang tidak tahu apa-apa lebih baik tidak menanggung
+-- risikonya tanpa memilihnya.
+--
+-- Yang TIDAK berubah: antrean lokal tetap menjadi pengangkutnya, apa pun
+-- modenya. Ia yang membuat sync idempoten (`on conflict (tenant_id,
+-- client_id)`) dan yang menahan data saat aplikasi tertutup di tengah
+-- pengukuran. Mode 'online' hanya menolak MEMULAI pencatatan baru tanpa
+-- sinyal; yang sudah dimulai tetap boleh diselesaikan.
+alter table tenants
+  add column if not exists mode_sync text not null default 'online'
+    check (mode_sync in ('online', 'offline'));
