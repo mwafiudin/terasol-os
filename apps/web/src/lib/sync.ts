@@ -1,6 +1,7 @@
 import { api, ApiError, WipeRequired, type SyncParticipant, type SyncPushResult } from './api';
 import { bacaAntreUkur, db, getMeta, purgeSynced, readParticipant, setMeta } from './db';
 import { num } from './domain';
+import { ditolakBasisData } from './rujukan';
 import type { JenisUkur, KonteksGula } from './rujukan';
 import type { ParamKey, ParticipantRow } from './types';
 
@@ -67,6 +68,37 @@ export function setSimulatedOffline(v: boolean) { simulatedOffline = v; }
 export function isSimulatedOffline() { return simulatedOffline; }
 export function isOnline() { return navigator.onLine && !simulatedOffline; }
 
+/**
+ * Angka yang MUSTAHIL dilepas menjadi null sebelum dikirim.
+ *
+ * Kolesterol 0 bukan pengukuran — ia tempat kosong yang diketik petugas saat
+ * alatnya tidak membaca. Basis data menolaknya, dan sebelum ada pelepasan ini
+ * penolakan itu menahan SELURUH record orang tersebut: nama, tensi, gula, dan
+ * semua yang benar-benar diukur ikut tersangkut di perangkat bersama satu
+ * angka yang tidak berarti apa-apa.
+ *
+ * Melepas yang mustahil demi menyelamatkan yang nyata jelas lebih baik daripada
+ * sebaliknya, dan tidak ada yang benar-benar hilang: yang dibuang adalah angka
+ * yang memang bukan hasil pengukuran. Parameternya lalu tampil "belum diukur"
+ * di layar, yang persis menggambarkan keadaannya.
+ *
+ * Ini JARING PENGAMAN, bukan izin. `ditolakBasisData` di papan ukur mencegah
+ * angka seperti ini masuk sejak awal; yang lewat sini hanya record yang sudah
+ * terlanjur tersimpan sebelum penjagaan itu ada.
+ */
+function lepasYangMustahil(values: Partial<Record<ParamKey, string>>): {
+  bersih: Partial<Record<ParamKey, string>>; dilepas: ParamKey[];
+} {
+  const bersih = { ...values };
+  const dilepas: ParamKey[] = [];
+  for (const k of Object.keys(bersih) as ParamKey[]) {
+    const n = num(bersih[k]);
+    if (n == null) continue;
+    if (ditolakBasisData(k as JenisUkur, n)) { delete bersih[k]; dilepas.push(k); }
+  }
+  return { bersih, dilepas };
+}
+
 function toNumberValues(values: Partial<Record<ParamKey, string>>) {
   return {
     tinggi: num(values.tinggi), berat: num(values.berat),
@@ -104,7 +136,7 @@ async function buildParticipantPayload(
     consent: s.consent,
     screening: sc
       ? {
-        clientId: sc.clientId, ...toNumberValues(sc.values),
+        clientId: sc.clientId, ...toNumberValues(lepasYangMustahil(sc.values).bersih),
         konteksGula: sc.konteksGula ?? null,
         paramsDiambil: taken, outOfRange: sc.outOfRange,
         diLuarWajar: sc.diLuarWajar ?? [],
