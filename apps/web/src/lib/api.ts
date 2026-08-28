@@ -314,7 +314,27 @@ export type ParticipantDetail = {
 
 /* ------------------------------ endpoint ------------------------------ */
 
+export type TautanHasil = {
+  id: string; token: string; kedaluwarsa: string;
+  dibukaKali: number; dibukaTerakhir: string | null; createdAt: string;
+};
+
 export const api = {
+  /* ---------------------------- tautan hasil ---------------------------- */
+  tautan: (pelangganId: string) =>
+    request<{ tautan: TautanHasil | null }>(`/pelanggan/${pelangganId}/tautan`),
+  buatTautan: (pelangganId: string, hari?: number) =>
+    post<{ tautan: TautanHasil }>(`/pelanggan/${pelangganId}/tautan`, hari ? { hari } : {}),
+  cabutTautan: (pelangganId: string) =>
+    request<{ ok: true }>(`/pelanggan/${pelangganId}/tautan`, { method: 'DELETE' }),
+  /**
+   * Dibuka tanpa login. `request` tetap dipakai supaya BASE, penanganan
+   * kesalahan, dan bentuk balasannya sama — header authorization memang tidak
+   * ikut terpasang karena tidak ada sesi.
+   */
+  hasilPublik: (token: string) =>
+    request<unknown>(`/publik/hasil/${encodeURIComponent(token)}`),
+
   login: (email: string, password: string, deviceId: string, deviceLabel: string) =>
     post<LoginResult>('/auth/login', { email, password, deviceId, deviceLabel }),
   logout: () => post<{ ok: true }>('/auth/logout'),

@@ -2372,3 +2372,52 @@ button { cursor: pointer; font-family: inherit; }
   border-color: var(--danger-500) !important;
   color: var(--danger-700) !important;
 }
+
+/* ==================== Halaman hasil publik & berbagi ==================== */
+
+/* Halaman yang dibuka peserta: tanpa navigasi, tanpa rel, tanpa apa pun yang
+   mengajaknya ke tempat lain — ia datang untuk satu hal saja. */
+.publik { min-height: 100dvh; background: var(--surface-page); }
+.publik-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 14px 16px; background: var(--surface-card);
+  border-bottom: 1px solid var(--border-hairline);
+  position: sticky; top: 0; z-index: 2;
+}
+.publik-bar > span { display: flex; flex-direction: column; min-width: 0; }
+.publik-bar b { font-size: 14px; font-weight: var(--fw-semibold); color: var(--text-body); }
+.publik-bar em {
+  font-style: normal; font-size: 12px; color: var(--text-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.publik .page-analisis { max-width: 720px; margin: 0 auto; padding: 16px; }
+.publik-kaki {
+  max-width: 720px; margin: 0 auto; padding: 0 16px 32px;
+  font-size: 12px; line-height: 1.6; color: var(--text-subtle);
+}
+.publik-kosong {
+  max-width: 420px; margin: 0 auto; padding: 64px 24px; text-align: center;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.publik-kosong b { font-size: 16px; color: var(--text-body); }
+.publik-kosong p { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--text-muted); }
+
+/* Yang dicetak peserta harus sama persis dengan yang dicetak petugas, jadi
+   bingkai halaman publiknya hilang seluruhnya di kertas. */
+@media print {
+  .publik-bar, .publik-kaki { display: none !important; }
+  .publik { background: #fff; }
+  .publik .page-analisis { max-width: none; margin: 0; padding: 0; }
+}
+
+.bagikan-jelas { margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-body); }
+.bagikan-jelas b { font-weight: var(--fw-semibold); }
+.bagikan-url {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px; border-radius: var(--radius-field);
+  background: var(--brand-tint); border: 1px solid var(--border-hairline);
+}
+.bagikan-url code {
+  flex: 1; min-width: 0; font-size: 11.5px; color: var(--teal-800);
+  overflow-wrap: anywhere; line-height: 1.5;
+}

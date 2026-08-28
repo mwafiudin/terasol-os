@@ -14,6 +14,7 @@ import {
   rp, statusTampil, usiaDari, usiaTampil,
 } from '../lib/domain';
 import { IsianLahir, periksaLahir, type NilaiLahir } from '../components/IsianLahir';
+import { BagikanHasil } from './BagikanHasil';
 import { db } from '../lib/db';
 import { pesertaEvent, rekapSementara, type PesertaRingkas, type RekapSementara } from '../lib/pesertaEvent';
 import { RekapKondisiEvent } from './RekapKondisi';
@@ -384,6 +385,7 @@ export function PesertaDetail({ go, peserta, onUbah, onAnalisis }: {
   const [produk, setProduk] = useState('');
   const [tab, setTab] = useState<'diri' | 'belanja' | 'lain'>('diri');
   const [ubahDiri, setUbahDiri] = useState(false);
+  const [bagikan, setBagikan] = useState(false);
   const koordinator = user?.role === 'koordinator' || user?.role === 'admin_pusat';
 
   const muat = useCallback(async () => {
@@ -506,6 +508,15 @@ export function PesertaDetail({ go, peserta, onUbah, onAnalisis }: {
                 Analisis
               </Button>
             )}
+            {/* Berbagi butuh pelangganId dengan alasan yang sama seperti
+                analisis: halaman yang diterima peserta adalah lembar analisis
+                itu juga, dan tanpa pelanggan tidak ada riwayat untuk dibagi. */}
+            {pelangganId && (
+              <button className="ikon-btn" aria-label="Bagikan hasil"
+                onClick={() => setBagikan(true)}>
+                <Icon d={ICONS.bagikan} size={18} />
+              </button>
+            )}
             {peserta.belumSync && <Badge tone="warning">Antre</Badge>}
           </>
         } />
@@ -525,6 +536,11 @@ export function PesertaDetail({ go, peserta, onUbah, onAnalisis }: {
           </button>
         )}
       </div>
+
+      {bagikan && pelangganId && (
+        <BagikanHasil pelangganId={pelangganId} nama={nama} hp={hp}
+          onTutup={() => setBagikan(false)} />
+      )}
 
       {ubahDiri && pelangganId && (
         <FormDataDiri pelangganId={pelangganId}
