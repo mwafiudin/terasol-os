@@ -165,13 +165,42 @@ export function Analisis({ go, pelangganId, nama, gender, usia, hp }: {
   }, [pelangganId]);
   useEffect(() => { void muat(); }, [muat]);
 
-  const hasil = useMemo<Analisis | null>(() => {
-    if (!rows) return null;
-    return analisa(bangunDeret(rows, gender, null), gender);
-  }, [rows, gender]);
-
   if (rows === null) return <span className="hint">Memuat analisis…</span>;
   if (gagal) return <span className="hint">{gagal}</span>;
+
+  return (
+    <div className="page page-analisis">
+      <PageHead title="Analisis" onBack={() => go('peserta')}
+        right={<Button size="sm" variant="secondary" icon={ICONS.tag}
+          onClick={() => window.print()}>Cetak</Button>} />
+      <LembarAnalisis rows={rows} nama={nama} gender={gender} usia={usia} hp={hp}
+        cabang={user?.tenantNama ?? null} olehNama={user?.nama ?? null} />
+    </div>
+  );
+}
+
+/**
+ * Lembar hasilnya sendiri, tanpa pengambilan data dan tanpa kepala halaman.
+ *
+ * Dipisah karena lembar yang sama dipakai dua tempat: layar petugas yang sudah
+ * login, dan halaman publik yang dibuka peserta dari tautan WhatsApp. Kalau
+ * keduanya disusun terpisah, cepat atau lambat yang dilihat peserta akan
+ * berbeda dari yang dilihat petugas sebelum membagikannya — dan yang dipegang
+ * peserta adalah yang dibagikan.
+ */
+export function LembarAnalisis({ rows, nama, gender, usia, hp, cabang, olehNama }: {
+  rows: PengukuranRow[];
+  nama: string;
+  gender: Gender;
+  usia: number | null;
+  hp: string | null;
+  cabang: string | null;
+  /** Nama petugas untuk jejak cetak; null pada halaman publik. */
+  olehNama: string | null;
+}) {
+  const hasil = useMemo<Analisis | null>(
+    () => analisa(bangunDeret(rows, gender, null), gender), [rows, gender],
+  );
 
   const kosong = !hasil || hasil.penanda.length === 0;
   // Tiap sumber sekali saja, dengan urutan kemunculannya di lembar.
@@ -197,12 +226,7 @@ export function Analisis({ go, pelangganId, nama, gender, usia, hp }: {
   });
 
   return (
-    <div className="page page-analisis">
-      <PageHead title="Analisis" onBack={() => go('peserta')}
-        right={<Button size="sm" variant="secondary" icon={ICONS.tag}
-          onClick={() => window.print()}>Cetak</Button>} />
-
-      <div className="lembar">
+    <div className="lembar">
         <header className="lembar-kop">
           <div>
             <h1>{nama}</h1>
@@ -212,7 +236,7 @@ export function Analisis({ go, pelangganId, nama, gender, usia, hp }: {
             </p>
           </div>
           <div className="lembar-kop-kanan">
-            <b>{user?.tenantNama ?? 'Rumah Sehat Terasol'}</b>
+            <b>{cabang ?? 'Rumah Sehat Terasol'}</b>
             {hasil?.terakhirDiukur && (
               <span>Pengukuran terakhir {fmtTanggal(hasil.terakhirDiukur)}</span>
             )}
@@ -287,13 +311,12 @@ export function Analisis({ go, pelangganId, nama, gender, usia, hp }: {
           <div className="hanya-cetak lembar-tanda">
             <span>
               Dicetak {fmtTanggal(new Date().toISOString())}
-              {user?.nama ? ` · ${user.nama}` : ''}
-              {user?.tenantNama ? ` · ${user.tenantNama}` : ''}
+              {olehNama ? ` · ${olehNama}` : ''}
+              {cabang ? ` · ${cabang}` : ''}
             </span>
             <span>Terasol OS</span>
           </div>
         </footer>
-      </div>
     </div>
   );
 }

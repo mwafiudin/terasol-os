@@ -15,6 +15,7 @@ import participantRoutes from './routes/participants.js';
 import pelangganRoutes from './routes/pelanggan.js';
 import syncRoutes from './routes/sync.js';
 import userRoutes from './routes/users.js';
+import tautanRoutes from './routes/tautan.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -103,6 +104,7 @@ export async function buildServer() {
   await app.register(syncRoutes);
   await app.register(deviceRoutes);
   await app.register(userRoutes);
+  await app.register(tautanRoutes);
 
   return app;
 }

@@ -17,6 +17,20 @@ import { Consent, Done, Register, Screening } from './screens/Participant';
 import { EventPeserta, PesertaDetail, type SasaranAnalisis } from './screens/Peserta';
 import { Analisis } from './screens/Analisis';
 import { ProdukKatalog } from './screens/Produk';
+import { HasilPublik } from './screens/HasilPublik';
+
+/**
+ * Tautan hasil yang dibagikan ke peserta: /h/<token>.
+ *
+ * Dibaca dari alamat SEBELUM apa pun yang lain — sebelum boot, sebelum
+ * gerbang login, sebelum kunci PIN. Peserta yang membukanya tidak punya akun
+ * dan tidak akan pernah punya; menyuruhnya login untuk membaca hasilnya
+ * sendiri adalah pintu yang tidak bisa ia lewati.
+ */
+function tokenPublik(): string | null {
+  const m = /^\/h\/([A-Za-z0-9_-]{32,128})\/?$/.exec(window.location.pathname);
+  return m ? m[1]! : null;
+}
 
 type Screen =
   | 'home' | 'events' | 'outlet' | 'hs'
@@ -27,6 +41,9 @@ type Screen =
 const TOP_SCREENS: Screen[] = ['home', 'events', 'outlet', 'hs'];
 
 export default function App() {
+  // Dibaca sekali saat modul dijalankan: halaman publik tidak punya navigasi,
+  // jadi alamatnya tidak akan berubah selama halaman terbuka.
+  const [publik] = useState(tokenPublik);
   const { phase, boot, key, toast, say, user } = useApp();
   const [screen, setScreen] = useState<Screen>('home');
   const [tab, setTab] = useState<TabId>('home');
@@ -126,6 +143,8 @@ export default function App() {
     }
     go(s);
   }, [asalPeserta, eventPeserta, go]);
+
+  if (publik) return <HasilPublik token={publik} />;
 
   if (phase === 'booting') {
     return <div className="app boot"><img src="/terasol-mark.svg" alt="" width={56} height={56} /></div>;
