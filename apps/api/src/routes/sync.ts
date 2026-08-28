@@ -35,6 +35,9 @@ const screeningIn = z.object({
   diukurOleh: z.string().uuid().nullish(),
   paramsDiambil: z.array(z.string()).default([]),
   outOfRange: z.boolean().default(false),
+  // Parameter MANA yang di luar rentang wajar. Opsional: perangkat versi lama
+  // hanya mengirim benderanya, dan itu tetap diterima.
+  diLuarWajar: z.array(z.string()).default([]),
   measuredAt: z.string().datetime(),
 });
 

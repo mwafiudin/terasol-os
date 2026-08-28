@@ -82,6 +82,46 @@ export default async function eventRoutes(app: FastifyInstance) {
     });
   });
 
+  /**
+   * Menghapus event yang BELUM punya jejak apa pun.
+   *
+   * US-01 menyatakan event yang sudah punya peserta tidak boleh dihapus, hanya
+   * diarsipkan — menghapusnya akan ikut menarik peserta, consent, dan hasil
+   * pengukuran mereka lewat cascade, dan itu menghapus catatan pelayanan orang
+   * sungguhan demi merapikan daftar.
+   *
+   * Yang tersisa adalah kasus yang justru paling sering: event salah ketik atau
+   * event percobaan yang belum pernah dipakai. Untuk itu mengarsipkan hanya
+   * memindahkan sampah, bukan membuangnya.
+   */
+  app.delete('/events/:id', { preHandler: requireRole('koordinator', 'admin_pusat') }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const ctx = ctxOf(req);
+    return withTenant(ctx, async (tx) => {
+      const { rows: jejak } = await tx.query<{ peserta: number; tally: number }>(
+        `select (select count(*) from participants where event_id = $1)::int as peserta,
+                (select count(*) from anon_tallies where event_id = $1)::int as tally`,
+        [id],
+      );
+      const j = jejak[0]!;
+      if (j.peserta > 0 || j.tally > 0) {
+        return reply.code(409).send({
+          error: 'ada_jejak',
+          message: j.peserta > 0
+            ? `Event ini sudah punya ${j.peserta} peserta. Arsipkan saja agar catatannya tetap utuh.`
+            : `Event ini sudah punya ${j.tally} tally anonim. Arsipkan saja agar hitungannya tetap utuh.`,
+        });
+      }
+
+      const { rows } = await tx.query<{ nama: string }>(
+        'delete from events where id = $1 returning nama', [id],
+      );
+      if (!rows[0]) return reply.code(404).send({ error: 'not_found' });
+      await audit(tx, ctx, 'event.delete', 'event', id, { nama: rows[0].nama });
+      return { ok: true };
+    });
+  });
+
   app.get('/events/:id/recap', { preHandler: requireAuth }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const ctx = ctxOf(req);

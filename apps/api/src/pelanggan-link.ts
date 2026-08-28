@@ -66,7 +66,14 @@ export type ScreeningMasuk = {
   konteksGula?: string | null;
   kolesterol?: number | null;
   asamUrat?: number | null;
+  /** Benar bila ADA satu saja parameter di luar rentang wajar. */
   outOfRange: boolean;
+  /**
+   * Parameter MANA yang di luar rentang wajar. Opsional: perangkat versi lama
+   * hanya mengirim benderanya, dan pada baris-baris itu penandanya menjadi
+   * false — lebih baik diam daripada menandai kesembilan angka sekaligus.
+   */
+  diLuarWajar?: string[];
   measuredAt: string;
   diukurOleh?: string | null;
 };
@@ -105,7 +112,11 @@ export async function cerminkanScreening(
               diukur_pada = excluded.diukur_pada, out_of_range = excluded.out_of_range,
               diukur_oleh = coalesce(excluded.diukur_oleh, pengukuran.diukur_oleh)`,
       [tenantId, pelangganId, participantId, idTurunan(s.clientId, jenis, konteks ?? ''),
-       jenis, konteks, nilai, s.measuredAt, s.diukurOleh ?? null, s.outOfRange],
+       jenis, konteks, nilai, s.measuredAt, s.diukurOleh ?? null,
+       // Per parameter, bukan bendera bersama. Menyalin satu bendera ke semua
+       // baris membuat satu angka mencurigakan menandai kesembilan angka
+       // lainnya "di luar rentang wajar" — termasuk tinggi badan 180 cm.
+       (s.diLuarWajar ?? []).includes(jenis)],
     );
     ditulis++;
   }

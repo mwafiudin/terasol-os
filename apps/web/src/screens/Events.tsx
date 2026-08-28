@@ -4,7 +4,10 @@ import {
 } from '../components/ui';
 import { api, type Recap as RecapData } from '../lib/api';
 import { PARAM_LABEL, ROLE_LABEL, bisaTerimaPeserta, fmtTanggal, pct, rp, statusTampil } from '../lib/domain';
-import { localEvents, muatRekan, pullEvents, rekanTersimpan, saveLocalEvent, type Rekan } from '../lib/events';
+import {
+  localEvents, muatRekan, pullEvents, rekanTersimpan, saveLocalEvent, ubahLocalEvent,
+  type Rekan,
+} from '../lib/events';
 import { useApp } from '../lib/store';
 import { isOnline, refreshPending, syncNow } from '../lib/sync';
 import type { EventRow } from '../lib/types';
@@ -78,14 +81,26 @@ export function Events({ go, onOpenRecap, onOpenPeserta, reloadKey }: {
 
 /* ============================ Buat event ============================ */
 
-export function EventForm({ go, onSaved }: { go: Nav; onSaved: () => void }) {
+/**
+ * Membuat ATAU menyunting event.
+ *
+ * Satu form untuk keduanya, bukan dua yang harus dijaga tetap serupa: isian,
+ * pemeriksaan, dan pemilih petugasnya persis sama, dan yang berbeda hanya ke
+ * mana hasilnya ditulis.
+ */
+export function EventForm({ go, onSaved, awal }: {
+  go: Nav; onSaved: () => void; awal?: EventRow | null;
+}) {
   const { key, say } = useApp();
   const [f, setF] = useState({
-    nama: '', lokasi: '', tanggal: new Date().toISOString().slice(0, 10),
-    tipe: 'gratis' as 'gratis' | 'berbayar', hargaPaket: '',
+    nama: awal?.nama ?? '',
+    lokasi: awal?.lokasi ?? '',
+    tanggal: awal?.tanggal ?? new Date().toISOString().slice(0, 10),
+    tipe: (awal?.tipe ?? 'gratis') as 'gratis' | 'berbayar',
+    hargaPaket: awal?.hargaPaket ? String(awal.hargaPaket) : '',
   });
   const [rekan, setRekan] = useState<Rekan[]>(rekanTersimpan);
-  const [terpilih, setTerpilih] = useState<Set<string>>(new Set());
+  const [terpilih, setTerpilih] = useState<Set<string>>(new Set(awal?.petugasIds ?? []));
   const [busy, setBusy] = useState(false);
 
   useEffect(() => { void muatRekan().then(setRekan); }, []);
@@ -102,15 +117,25 @@ export function EventForm({ go, onSaved }: { go: Nav; onSaved: () => void }) {
       // Nama ikut disimpan sebagai teks agar event tetap terbaca utuh saat
       // offline, sebelum penugasan sempat dikirim ke server.
       const namaPetugas = rekan.filter((r) => terpilih.has(r.id)).map((r) => r.nama).join(', ');
-      await saveLocalEvent({
-        clientId: crypto.randomUUID(),
-        nama: f.nama, lokasi: f.lokasi, tanggal: f.tanggal,
-        tipe: f.tipe, hargaPaket: harga,
-        petugas: namaPetugas || null, petugasIds: ids,
-        status: f.tanggal > today ? 'planned' : 'active',
-      });
+
+      if (awal) {
+        await ubahLocalEvent(awal.clientId, {
+          nama: f.nama, lokasi: f.lokasi, tanggal: f.tanggal,
+          tipe: f.tipe, hargaPaket: harga,
+          petugas: namaPetugas || null, petugasIds: ids,
+        });
+        say('Perubahan event tersimpan dan masuk antrean sync.');
+      } else {
+        await saveLocalEvent({
+          clientId: crypto.randomUUID(),
+          nama: f.nama, lokasi: f.lokasi, tanggal: f.tanggal,
+          tipe: f.tipe, hargaPaket: harga,
+          petugas: namaPetugas || null, petugasIds: ids,
+          status: f.tanggal > today ? 'planned' : 'active',
+        });
+        say('Event tersimpan dan masuk antrean sync.');
+      }
       await refreshPending();
-      say('Event tersimpan dan masuk antrean sync.');
       void syncNow(key, { silent: true }).catch(() => {});
       onSaved();
       go('events');
@@ -121,7 +146,8 @@ export function EventForm({ go, onSaved }: { go: Nav; onSaved: () => void }) {
 
   return (
     <div className="page">
-      <PageHead title="Buat event" onBack={() => go('home')} right={<Badge tone="accent">Koordinator</Badge>} />
+      <PageHead title={awal ? 'Ubah event' : 'Buat event'} onBack={() => go(awal ? 'events' : 'home')}
+        right={<Badge tone="accent">Koordinator</Badge>} />
 
       <Field label="Nama event" htmlFor="e-nama">
         <input id="e-nama" className="input" value={f.nama}

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Badge, Button, Field, ICONS, InputRupiah, Navigasi, Sheet, Toast, type TabId } from './components/ui';
-import { api, type ServerParticipant } from './lib/api';
+import { api, ApiError, type ServerParticipant } from './lib/api';
 import { CONV_LABEL, fmtTanggal, fmtWaktu } from './lib/domain';
 import { useDraft } from './lib/draft';
-import { activeEvent } from './lib/events';
+import { activeEvent, hapusEvent } from './lib/events';
 import type { PesertaRingkas } from './lib/pesertaEvent';
 import { installIdleLock, installNetworkWatch, useApp } from './lib/store';
 import { isOnline, startAutoSync } from './lib/sync';
@@ -32,6 +32,8 @@ export default function App() {
   const [tab, setTab] = useState<TabId>('home');
   const [recapEvent, setRecapEvent] = useState<EventRow | null>(null);
   const [eventPeserta, setEventPeserta] = useState<EventRow | null>(null);
+  /** Event yang sedang disunting; null berarti form dipakai untuk membuat baru. */
+  const [eventUbah, setEventUbah] = useState<EventRow | null>(null);
   const [pesertaTerpilih, setPesertaTerpilih] = useState<PesertaRingkas | null>(null);
   const [sasaranAnalisis, setSasaranAnalisis] = useState<SasaranAnalisis | null>(null);
   /** Alur peserta bisa dimulai dari Beranda atau dari daftar peserta event. */
@@ -65,6 +67,10 @@ export default function App() {
 
   const go = useCallback((next: string) => {
     const s = next as Screen;
+    // Mode sunting dilepas di sini, bukan di tiap pemanggil: 'eventForm'
+    // dicapai dari beberapa tempat, dan satu yang terlewat berarti "Buat
+    // event" membuka form berisi event lain.
+    if (s !== 'eventForm') setEventUbah(null);
     setScreen(s);
     if (TOP_SCREENS.includes(s)) setTab(s as TabId);
     window.scrollTo(0, 0);
@@ -78,6 +84,26 @@ export default function App() {
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, [screen, go]);
+
+  /**
+   * Menghapus event lalu kembali ke daftarnya.
+   *
+   * Server tetap memeriksa jejaknya sendiri meski tombolnya sudah disembunyikan
+   * di layar: peserta bisa saja dicatat petugas lain dari perangkat berbeda
+   * sesudah layar ini dimuat, dan hitungan yang dilihat di sini sudah basi.
+   */
+  async function hapusEventLalu(ev: EventRow) {
+    try {
+      await hapusEvent(ev);
+      say(`Event "${ev.nama}" dihapus.`);
+      setReloadKey((k) => k + 1);
+      go('events');
+    } catch (err) {
+      say(err instanceof ApiError && err.status === 409
+        ? err.message
+        : 'Gagal menghapus event. Periksa koneksi.');
+    }
+  }
 
   async function mulaiRegistrasi(dari: 'home' | 'eventPeserta' = 'home', ev?: EventRow) {
     const target = ev ?? await activeEvent();
@@ -156,7 +182,9 @@ export default function App() {
         {screen === 'eventPeserta' && eventPeserta && (
           <EventPeserta go={go} event={eventPeserta} reloadKey={reloadKey}
             onBuka={(p) => { setPesertaTerpilih(p); go('pesertaDetail'); }}
-            onTambah={() => void mulaiRegistrasi('eventPeserta', eventPeserta)} />
+            onTambah={() => void mulaiRegistrasi('eventPeserta', eventPeserta)}
+            onUbahEvent={koordinator ? (ev) => { setEventUbah(ev); go('eventForm'); } : undefined}
+            onHapusEvent={koordinator ? (ev) => void hapusEventLalu(ev) : undefined} />
         )}
         {screen === 'pesertaDetail' && pesertaTerpilih && (
           <PesertaDetail go={go} peserta={pesertaTerpilih}
@@ -166,7 +194,10 @@ export default function App() {
         {screen === 'analisis' && sasaranAnalisis && (
           <Analisis go={() => go('pesertaDetail')} {...sasaranAnalisis} />
         )}
-        {screen === 'eventForm' && <EventForm go={go} onSaved={() => setReloadKey((k) => k + 1)} />}
+        {screen === 'eventForm' && (
+          <EventForm go={go} awal={eventUbah}
+            onSaved={() => { setEventUbah(null); setReloadKey((k) => k + 1); }} />
+        )}
         {screen === 'register' && <Register go={goAlurPeserta} />}
         {screen === 'consent' && <Consent go={goAlurPeserta} consentText={consentText} />}
         {screen === 'screening' && <Screening go={goAlurPeserta} />}

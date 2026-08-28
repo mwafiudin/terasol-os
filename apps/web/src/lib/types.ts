@@ -57,7 +57,10 @@ export type ParticipantSecret = {
     values: Partial<Record<ParamKey, string>>;
     /** Tanpa ini, angka gula darah tidak punya rentang rujukan yang benar. */
     konteksGula?: KonteksGula | null;
+    /** Benar bila ADA satu saja parameter di luar rentang wajar. */
     outOfRange: boolean;
+    /** Parameter MANA yang di luar rentang wajar. */
+    diLuarWajar?: ParamKey[];
     measuredAt: string;
   } | null;
 };
