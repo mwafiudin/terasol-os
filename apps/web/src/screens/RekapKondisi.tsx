@@ -140,33 +140,42 @@ export function RekapKondisiEvent({ daftar, onBuka }: {
           </div>
         </div>
 
-        <div className="kondisi-blok">
-          <span className="kondisi-judul">Berapa temuan per orang</span>
-          <Sebaran r={r} />
-          <small className="kondisi-catatan">
-            Satu orang dengan tiga temuan bukan hal yang sama dengan tiga orang
-            yang masing-masing satu, dan batang di atas tidak bisa membedakannya.
-          </small>
-        </div>
+        {/* Dua blok kanan dibungkus jadi satu kolom.
 
-        {r.usia.length > 1 && (
+            Tanpa pembungkus, garis pemisah tegaknya adalah border-left pada
+            MASING-MASING blok — dan karena tinggi keduanya berbeda, garisnya
+            terputus di antaranya lalu berhenti sebelum dasar kartu. Dengan
+            satu pembungkus, garisnya setinggi barisnya, dan ruang sisa di
+            kolom yang lebih pendek terbaca sebagai ruang kolom, bukan sebagai
+            garis yang lupa diselesaikan. */}
+        <div className="kondisi-sisi">
           <div className="kondisi-blok">
-            <span className="kondisi-judul">Menurut kelompok usia</span>
-            {/* Dua hal sekaligus: PANJANG batang adalah besar kelompoknya, ISI
-                berwarna adalah yang punya temuan.
+            <span className="kondisi-judul">Berapa temuan per orang</span>
+            <Sebaran r={r} />
+            <small className="kondisi-catatan">
+              Satu orang dengan tiga temuan bukan hal yang sama dengan tiga orang
+              yang masing-masing satu, dan batang di atas tidak bisa membedakannya.
+            </small>
+          </div>
 
-                Kalau panjangnya selalu penuh dan hanya isinya yang berubah,
-                event yang semua pesertanya punya temuan menghasilkan tiga
-                batang penuh yang identik — tidak mengatakan apa pun, padahal
-                kelompok yang satu berisi sembilan orang dan yang lain dua
-                puluh. */}
-            {r.usia.map((k) => (
-              <div className="usia-baris" key={k.label}>
-                <span className="usia-label">{k.label}</span>
-                <div className="usia-jalur">
-                  <div className="usia-bar" style={{ width: `${(k.total / terbesar) * 100}%` }}>
-                    <i style={{ width: `${(k.denganTemuan / k.total) * 100}%` }} />
-                  </div>
+          {r.usia.length > 1 && (
+            <div className="kondisi-blok">
+              <span className="kondisi-judul">Menurut kelompok usia</span>
+              {/* Dua hal sekaligus: PANJANG batang adalah besar kelompoknya, ISI
+                  berwarna adalah yang punya temuan.
+
+                  Kalau panjangnya selalu penuh dan hanya isinya yang berubah,
+                  event yang semua pesertanya punya temuan menghasilkan tiga
+                  batang penuh yang identik — tidak mengatakan apa pun, padahal
+                  kelompok yang satu berisi sembilan orang dan yang lain dua
+                  puluh. */}
+              {r.usia.map((k) => (
+                <div className="usia-baris" key={k.label}>
+                  <span className="usia-label">{k.label}</span>
+                  <div className="usia-jalur">
+                    <div className="usia-bar" style={{ width: `${(k.total / terbesar) * 100}%` }}>
+                      <i style={{ width: `${(k.denganTemuan / k.total) * 100}%` }} />
+                    </div>
                 </div>
                 <span className="usia-n">{k.denganTemuan}/{k.total}</span>
               </div>
@@ -177,6 +186,7 @@ export function RekapKondisiEvent({ daftar, onBuka }: {
             </small>
           </div>
         )}
+        </div>
       </div>
 
       {r.perluTindak.length > 0 && (

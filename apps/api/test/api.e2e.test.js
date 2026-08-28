@@ -144,7 +144,7 @@ describe('Alur API end-to-end', () => {
     const mk = (clientId, nama) => ({
       clientId, eventClientId, nama, gender: 'P', usia: 62,
       tanggalLahir: '1963-08-17', hp: HP, updatedAt: now,
-      consent: { granted: true, versiTeks: 'v2', ts: now },
+      consent: { granted: true, versiTeks: 'v3', ts: now },
       screening: {
         clientId: randomUUID(), tinggi: 156, berat: 61, sistolik: 128, diastolik: 84,
         gula: 112, kolesterol: null, asamUrat: null,
@@ -309,8 +309,11 @@ describe('Alur API end-to-end', () => {
   it('teks consent aktif tersedia dengan versinya', async () => {
     const r = await call('/consent-text');
     assert.equal(r.status, 200);
-    assert.equal(r.body.versi, 'v2');
+    assert.equal(r.body.versi, 'v3');
     assert.match(r.body.isi, /nama, jenis kelamin, tanggal lahir/);
+    // Tautan hasil adalah perlakuan baru atas data peserta, dan teks yang
+    // aktif harus menyebutnya — termasuk masa berlakunya.
+    assert.match(r.body.isi, /tautan pribadi yang berlaku 30 hari/);
   });
 
   it('audit log mencatat tindakan koordinator', async () => {
@@ -334,7 +337,7 @@ describe('Alur API end-to-end', () => {
     assert.equal(d.event.id, eventId);
     assert.ok(d.consent, 'record persetujuan ikut');
     assert.equal(d.consent.granted, true);
-    assert.equal(d.consent.versiTeks, 'v2');
+    assert.equal(d.consent.versiTeks, 'v3');
 
     assert.ok(d.screening, 'hasil pengukuran ikut');
     assert.equal(Number(d.screening.tinggi), 156);

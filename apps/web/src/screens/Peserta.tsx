@@ -539,6 +539,7 @@ export function PesertaDetail({ go, peserta, onUbah, onAnalisis }: {
 
       {bagikan && pelangganId && (
         <BagikanHasil pelangganId={pelangganId} nama={nama} hp={hp}
+          versiConsent={consent?.versiTeks ?? null}
           onTutup={() => setBagikan(false)} />
       )}
 

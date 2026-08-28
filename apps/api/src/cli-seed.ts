@@ -147,7 +147,7 @@ async function seed(tx: Tx) {
     )).rows[0]!.id;
 
     await tx.query(
-      `insert into consents (tenant_id, participant_id, granted, versi_teks) values ($1,$2,true,'v2')`,
+      `insert into consents (tenant_id, participant_id, granted, versi_teks) values ($1,$2,true,'v3')`,
       [tenantId, pid],
     );
 
