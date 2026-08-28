@@ -5,7 +5,7 @@ import { audit, auditAdminRead, withTenant } from '../db.js';
 
 const JENIS = [
   'tinggi', 'berat', 'lingkar_perut', 'sistolik', 'diastolik', 'nadi',
-  'gula', 'kolesterol', 'asam_urat',
+  'gula', 'kolesterol', 'trigliserida', 'asam_urat',
 ] as const;
 const KONTEKS = ['puasa', 'sewaktu', '2jam_pp'] as const;
 

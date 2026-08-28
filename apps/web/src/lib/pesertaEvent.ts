@@ -69,7 +69,8 @@ function nilaiDariDraft(
   const a = (k: ParamKey) => num(v?.[k]);
   return {
     sistolik: a('sistolik'), diastolik: a('diastolik'),
-    gula: a('gula'), kolesterol: a('kolesterol'), asamUrat: a('asam_urat'),
+    gula: a('gula'), kolesterol: a('kolesterol'),
+    trigliserida: a('trigliserida'), asamUrat: a('asam_urat'),
     lingkarPerut: a('lingkar_perut'), imt, konteksGula,
   };
 }
@@ -159,7 +160,8 @@ export async function pesertaEvent(
           dariCermin: null,
           nilai: {
             sistolik: s.sistolik, diastolik: s.diastolik, gula: s.gula,
-            kolesterol: s.kolesterol, asamUrat: s.asamUrat,
+            kolesterol: s.kolesterol, trigliserida: s.trigliserida ?? null,
+            asamUrat: s.asamUrat,
             lingkarPerut: s.lingkarPerut, imt: s.imt, konteksGula: s.konteksGula,
           },
         });
@@ -189,7 +191,8 @@ export async function pesertaEvent(
               // Ikut disalin supaya penyaring temuan tetap bekerja offline.
               nilai: {
                 sistolik: s.sistolik, diastolik: s.diastolik, gula: s.gula,
-                kolesterol: s.kolesterol, asamUrat: s.asamUrat,
+                kolesterol: s.kolesterol, trigliserida: s.trigliserida ?? null,
+                asamUrat: s.asamUrat,
                 lingkarPerut: s.lingkarPerut, imt: s.imt, konteksGula: s.konteksGula,
               },
             },
@@ -227,7 +230,8 @@ export async function pesertaEvent(
         dariCermin: c.diambilPada,
         nilai: c.secret?.nilai ?? {
           sistolik: null, diastolik: null, gula: null, kolesterol: null,
-          asamUrat: null, lingkarPerut: null, imt: c.secret?.imt ?? null, konteksGula: null,
+          trigliserida: null, asamUrat: null,
+          lingkarPerut: null, imt: c.secret?.imt ?? null, konteksGula: null,
         },
       });
     }

@@ -26,6 +26,7 @@ const screeningIn = z.object({
   diastolik: z.number().int().nullish(),
   gula: z.number().int().nullish(),
   kolesterol: z.number().int().nullish(),
+  trigliserida: z.number().int().nullish(),
   asamUrat: z.number().nullish(),
   // Parameter baru dan konteks gula darah opsional: perangkat versi lama tetap
   // boleh mengirim payload tanpa field ini.
@@ -91,6 +92,31 @@ const pushBody = z.object({
   })).default([]),
 });
 
+/**
+ * Nama constraint diterjemahkan menjadi kalimat yang bisa ditindaklanjuti
+ * petugas di lapangan.
+ *
+ * "screenings_kolesterol_check" tidak memberi tahu siapa pun apa yang harus
+ * diperbaiki. Yang perlu diketahui petugas hanya dua hal: angka mana, dan
+ * bahwa mengosongkannya lebih baik daripada menuliskan nol.
+ */
+function alasanTolak(constraint: string | undefined): string {
+  const m = /^screenings_(.+)_check$/.exec(constraint ?? '');
+  if (m) {
+    const nama: Record<string, string> = {
+      tinggi: 'Tinggi badan', berat: 'Berat badan', lingkar_perut: 'Lingkar perut',
+      sistolik: 'Tensi sistolik', diastolik: 'Tensi diastolik', nadi: 'Nadi',
+      gula: 'Gula darah', kolesterol: 'Kolesterol', asam_urat: 'Asam urat',
+    };
+    const label = nama[m[1]!] ?? m[1]!;
+    return `${label} di luar batas yang bisa disimpan. Kosongkan bila tidak diperiksa, jangan diisi 0.`;
+  }
+  if (constraint === 'participants_usia_check') {
+    return 'Usia di luar batas yang bisa disimpan.';
+  }
+  return 'Ditolak aturan basis data. Periksa kembali angka pemeriksaannya.';
+}
+
 type Conflict = {
   kind: 'dedup' | 'unknown_event' | 'rejected';
   entity: 'participant' | 'event' | 'anonTally';
@@ -154,133 +180,169 @@ export default async function syncRoutes(app: FastifyInstance) {
           continue;
         }
 
-        const existing = await tx.query<{ id: string }>(
-          'select id from participants where tenant_id = $1 and client_id = $2',
-          [ctx.tenantId, p.clientId],
-        );
+        /**
+         * Tiap peserta ditulis di dalam SAVEPOINT-nya sendiri.
+         *
+         * Sebelum ini seluruh batch berada dalam satu transaksi tanpa sekat:
+         * satu angka yang ditolak CHECK — kolesterol 0 yang diketik saat
+         * alatnya tidak membaca, misalnya — menggagalkan SEMUANYA. Petugas
+         * melihat "Data ditolak aturan basis data", tujuh belas record tetap
+         * mengantre, dan setiap percobaan sync berikutnya gagal di record yang
+         * sama. Satu ketikan mengunci pekerjaan seharian, dan tidak ada di
+         * layar yang memberi tahu record mana penyebabnya.
+         *
+         * Dengan savepoint, yang ditolak hanya orang itu; sisanya masuk. Ia
+         * dilaporkan sebagai konflik `rejected` beserta alasannya, dan tetap
+         * mengantre di perangkat supaya bisa diperbaiki — bukan dibuang diam-
+         * diam, karena yang dibuang adalah pemeriksaan orang sungguhan.
+         */
+        await tx.query('savepoint peserta');
+        try {
 
-        let participantId: string;
-        if (existing.rowCount) {
-          participantId = existing.rows[0]!.id;
-          // Tanggal lahir menang menurut KETELITIANNYA, bukan menurut siapa
-          // yang datang terakhir:
-          //
-          //   * null tidak pernah menimpa apa pun — perangkat berbundel lama
-          //     mengirim null untuk orang yang tanggal lahirnya sudah dicatat
-          //     perangkat lain, dan menulisnya apa adanya menghapus fakta.
-          //   * tanggal sungguhan selalu menang, termasuk atas taksiran.
-          //   * taksiran hanya mengisi yang kosong atau menyegarkan taksiran
-          //     lain; ia tidak boleh menimpa tanggal yang pernah ditanyakan.
-          //
-          // Syaratnya sama persis untuk kedua kolom, jadi keduanya harus
-          // berubah bersama — kolom yang bergeser sendiri menghasilkan baris
-          // yang mengaku taksiran atas tanggal sungguhan, atau sebaliknya.
-          const pakaiLahir = `$6::date is not null
-            and (tanggal_lahir is null or tanggal_lahir_asumsi or not $7::boolean)`;
-          await tx.query(
-            `update participants
-                set nama = $1, gender = $2, usia = $3, hp = $4,
-                    tanggal_lahir = case when ${pakaiLahir} then $6::date else tanggal_lahir end,
-                    tanggal_lahir_asumsi = case when ${pakaiLahir} then $7::boolean else tanggal_lahir_asumsi end
-              where id = $5`,
-            [p.nama, p.gender, p.usia, p.hp, participantId,
-             p.tanggalLahir ?? null, p.tanggalLahirAsumsi],
+          const existing = await tx.query<{ id: string }>(
+            'select id from participants where tenant_id = $1 and client_id = $2',
+            [ctx.tenantId, p.clientId],
           );
-        } else {
-          // §4.3 — kunci dedup event_id + nomor HP. Bentrok TIDAK ditimpa:
-          // kedua record disimpan, yang baru ditandai needs_review agar
-          // Koordinator memilih secara sadar. Hasil pengukuran adalah fakta
-          // pada satu momen; menimpanya menghilangkan data yang tak bisa diulang.
-          const dup = await tx.query(
-            `select 1 from participants
-              where event_id = $1 and hp = $2 and deleted_at is null limit 1`,
-            [eventId, p.hp],
-          );
-          const needsReview = (dup.rowCount ?? 0) > 0;
-          const ins = await tx.query<{ id: string }>(
-            `insert into participants
-               (tenant_id, event_id, client_id, nama, gender, usia,
-                tanggal_lahir, tanggal_lahir_asumsi, hp,
-                needs_review, created_by, device_id)
-             values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-             returning id`,
-            [ctx.tenantId, eventId, p.clientId, p.nama, p.gender, p.usia,
-             p.tanggalLahir ?? null, p.tanggalLahir ? p.tanggalLahirAsumsi : false,
-             p.hp, needsReview, ctx.userId, claims.did],
-          );
-          participantId = ins.rows[0]!.id;
-          if (needsReview) {
-            conflicts.push({
-              kind: 'dedup', entity: 'participant', clientId: p.clientId,
-              message: `Nomor ${p.hp} sudah ada di event ini — ditandai perlu ditinjau.`,
-            });
+
+          let participantId: string;
+          if (existing.rowCount) {
+            participantId = existing.rows[0]!.id;
+            // Tanggal lahir menang menurut KETELITIANNYA, bukan menurut siapa
+            // yang datang terakhir:
+            //
+            //   * null tidak pernah menimpa apa pun — perangkat berbundel lama
+            //     mengirim null untuk orang yang tanggal lahirnya sudah dicatat
+            //     perangkat lain, dan menulisnya apa adanya menghapus fakta.
+            //   * tanggal sungguhan selalu menang, termasuk atas taksiran.
+            //   * taksiran hanya mengisi yang kosong atau menyegarkan taksiran
+            //     lain; ia tidak boleh menimpa tanggal yang pernah ditanyakan.
+            //
+            // Syaratnya sama persis untuk kedua kolom, jadi keduanya harus
+            // berubah bersama — kolom yang bergeser sendiri menghasilkan baris
+            // yang mengaku taksiran atas tanggal sungguhan, atau sebaliknya.
+            const pakaiLahir = `$6::date is not null
+              and (tanggal_lahir is null or tanggal_lahir_asumsi or not $7::boolean)`;
+            await tx.query(
+              `update participants
+                  set nama = $1, gender = $2, usia = $3, hp = $4,
+                      tanggal_lahir = case when ${pakaiLahir} then $6::date else tanggal_lahir end,
+                      tanggal_lahir_asumsi = case when ${pakaiLahir} then $7::boolean else tanggal_lahir_asumsi end
+                where id = $5`,
+              [p.nama, p.gender, p.usia, p.hp, participantId,
+               p.tanggalLahir ?? null, p.tanggalLahirAsumsi],
+            );
+          } else {
+            // §4.3 — kunci dedup event_id + nomor HP. Bentrok TIDAK ditimpa:
+            // kedua record disimpan, yang baru ditandai needs_review agar
+            // Koordinator memilih secara sadar. Hasil pengukuran adalah fakta
+            // pada satu momen; menimpanya menghilangkan data yang tak bisa diulang.
+            const dup = await tx.query(
+              `select 1 from participants
+                where event_id = $1 and hp = $2 and deleted_at is null limit 1`,
+              [eventId, p.hp],
+            );
+            const needsReview = (dup.rowCount ?? 0) > 0;
+            const ins = await tx.query<{ id: string }>(
+              `insert into participants
+                 (tenant_id, event_id, client_id, nama, gender, usia,
+                  tanggal_lahir, tanggal_lahir_asumsi, hp,
+                  needs_review, created_by, device_id)
+               values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+               returning id`,
+              [ctx.tenantId, eventId, p.clientId, p.nama, p.gender, p.usia,
+               p.tanggalLahir ?? null, p.tanggalLahir ? p.tanggalLahirAsumsi : false,
+               p.hp, needsReview, ctx.userId, claims.did],
+            );
+            participantId = ins.rows[0]!.id;
+            if (needsReview) {
+              conflicts.push({
+                kind: 'dedup', entity: 'participant', clientId: p.clientId,
+                message: `Nomor ${p.hp} sudah ada di event ini — ditandai perlu ditinjau.`,
+              });
+            }
           }
-        }
 
-        // Setiap peserta event adalah satu kunjungan milik seorang pelanggan
-        // cabang ini. Ditautkan di sini supaya riwayat lintas-event terbentuk
-        // sendiri, tanpa perangkat lapangan perlu tahu soal entitas pelanggan.
-        const pelangganId = await pelangganUntuk(tx, ctx.tenantId, {
-          nama: p.nama, gender: p.gender, usia: p.usia,
-          tanggalLahir: p.tanggalLahir ?? null,
-          tanggalLahirAsumsi: p.tanggalLahirAsumsi, hp: p.hp,
-        });
-        await tx.query(
-          'update participants set pelanggan_id = $2 where id = $1 and pelanggan_id is distinct from $2',
-          [participantId, pelangganId],
-        );
-
-        // consent immutable: hanya insert bila peserta ini belum punya.
-        const hasConsent = await tx.query(
-          'select 1 from consents where participant_id = $1 limit 1', [participantId],
-        );
-        if (!hasConsent.rowCount) {
+          // Setiap peserta event adalah satu kunjungan milik seorang pelanggan
+          // cabang ini. Ditautkan di sini supaya riwayat lintas-event terbentuk
+          // sendiri, tanpa perangkat lapangan perlu tahu soal entitas pelanggan.
+          const pelangganId = await pelangganUntuk(tx, ctx.tenantId, {
+            nama: p.nama, gender: p.gender, usia: p.usia,
+            tanggalLahir: p.tanggalLahir ?? null,
+            tanggalLahirAsumsi: p.tanggalLahirAsumsi, hp: p.hp,
+          });
           await tx.query(
-            `insert into consents (tenant_id, participant_id, granted, versi_teks, ts)
-             values ($1,$2,$3,$4,$5)`,
-            [ctx.tenantId, participantId, p.consent.granted, p.consent.versiTeks, p.consent.ts],
+            'update participants set pelanggan_id = $2 where id = $1 and pelanggan_id is distinct from $2',
+            [participantId, pelangganId],
           );
-        }
 
-        if (p.screening) {
-          const s = p.screening;
-          await tx.query(
-            `insert into screenings (tenant_id, participant_id, client_id, tinggi, berat, sistolik,
-                                     diastolik, gula, kolesterol, asam_urat, lingkar_perut, nadi,
-                                     konteks_gula, params_diambil, out_of_range, measured_at)
-             values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
-             on conflict (participant_id) do update
-                set tinggi = excluded.tinggi, berat = excluded.berat, sistolik = excluded.sistolik,
-                    diastolik = excluded.diastolik, gula = excluded.gula, kolesterol = excluded.kolesterol,
-                    asam_urat = excluded.asam_urat, lingkar_perut = excluded.lingkar_perut,
-                    nadi = excluded.nadi, konteks_gula = excluded.konteks_gula,
-                    params_diambil = excluded.params_diambil,
-                    out_of_range = excluded.out_of_range, measured_at = excluded.measured_at`,
-            [ctx.tenantId, participantId, s.clientId, s.tinggi ?? null, s.berat ?? null,
-             s.sistolik ?? null, s.diastolik ?? null, s.gula ?? null, s.kolesterol ?? null,
-             s.asamUrat ?? null, s.lingkarPerut ?? null, s.nadi ?? null,
-             s.konteksGula ?? null, s.paramsDiambil, s.outOfRange, s.measuredAt],
+          // consent immutable: hanya insert bila peserta ini belum punya.
+          const hasConsent = await tx.query(
+            'select 1 from consents where participant_id = $1 limit 1', [participantId],
           );
-          await cerminkanScreening(tx, ctx.tenantId, pelangganId, participantId, s);
-        }
+          if (!hasConsent.rowCount) {
+            await tx.query(
+              `insert into consents (tenant_id, participant_id, granted, versi_teks, ts)
+               values ($1,$2,$3,$4,$5)`,
+              [ctx.tenantId, participantId, p.consent.granted, p.consent.versiTeks, p.consent.ts],
+            );
+          }
 
-        if (p.conversion) {
-          const c = p.conversion;
-          // Field non-konflik: last-write-wins berdasarkan updated_at (§4.3.5).
-          await tx.query(
-            `insert into conversions (tenant_id, participant_id, berminat, status, nilai_transaksi, produk, updated_at)
-             values ($1,$2,$3,$4,$5,$6,$7)
-             on conflict (participant_id) do update
-                set berminat = excluded.berminat, status = excluded.status,
-                    nilai_transaksi = excluded.nilai_transaksi, produk = excluded.produk,
-                    updated_at = excluded.updated_at
-              where excluded.updated_at >= conversions.updated_at`,
-            [ctx.tenantId, participantId, c.berminat, c.status, c.nilaiTransaksi,
-             c.produk ?? null, c.updatedAt],
-          );
-        }
+          if (p.screening) {
+            const s = p.screening;
+            await tx.query(
+              `insert into screenings (tenant_id, participant_id, client_id, tinggi, berat, sistolik,
+                                       diastolik, gula, kolesterol, trigliserida, asam_urat,
+                                       lingkar_perut, nadi,
+                                       konteks_gula, params_diambil, out_of_range, measured_at)
+               values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+               on conflict (participant_id) do update
+                  set tinggi = excluded.tinggi, berat = excluded.berat, sistolik = excluded.sistolik,
+                      diastolik = excluded.diastolik, gula = excluded.gula, kolesterol = excluded.kolesterol,
+                      trigliserida = excluded.trigliserida,
+                      asam_urat = excluded.asam_urat, lingkar_perut = excluded.lingkar_perut,
+                      nadi = excluded.nadi, konteks_gula = excluded.konteks_gula,
+                      params_diambil = excluded.params_diambil,
+                      out_of_range = excluded.out_of_range, measured_at = excluded.measured_at`,
+              [ctx.tenantId, participantId, s.clientId, s.tinggi ?? null, s.berat ?? null,
+               s.sistolik ?? null, s.diastolik ?? null, s.gula ?? null, s.kolesterol ?? null,
+               s.trigliserida ?? null, s.asamUrat ?? null, s.lingkarPerut ?? null, s.nadi ?? null,
+               s.konteksGula ?? null, s.paramsDiambil, s.outOfRange, s.measuredAt],
+            );
+            await cerminkanScreening(tx, ctx.tenantId, pelangganId, participantId, s);
+          }
 
-        accepted.participants.push(p.clientId);
+          if (p.conversion) {
+            const c = p.conversion;
+            // Field non-konflik: last-write-wins berdasarkan updated_at (§4.3.5).
+            await tx.query(
+              `insert into conversions (tenant_id, participant_id, berminat, status, nilai_transaksi, produk, updated_at)
+               values ($1,$2,$3,$4,$5,$6,$7)
+               on conflict (participant_id) do update
+                  set berminat = excluded.berminat, status = excluded.status,
+                      nilai_transaksi = excluded.nilai_transaksi, produk = excluded.produk,
+                      updated_at = excluded.updated_at
+                where excluded.updated_at >= conversions.updated_at`,
+              [ctx.tenantId, participantId, c.berminat, c.status, c.nilaiTransaksi,
+               c.produk ?? null, c.updatedAt],
+            );
+          }
+
+          accepted.participants.push(p.clientId);
+          await tx.query('release savepoint peserta');
+        } catch (e) {
+          await tx.query('rollback to savepoint peserta');
+          const err = e as { code?: string; constraint?: string; message?: string };
+          // Hanya pelanggaran aturan DATA yang diperlakukan begini. Kegagalan
+          // lain — koneksi putus, kesalahan pemrograman — harus tetap
+          // menggagalkan batch, karena melanjutkannya berarti melaporkan
+          // "berhasil" atas sesuatu yang belum tentu tersimpan.
+          if (err.code !== '23514' && err.code !== '23503' && err.code !== '22003') throw e;
+          req.log.warn({ err, clientId: p.clientId }, 'peserta ditolak, batch dilanjutkan');
+          conflicts.push({
+            kind: 'rejected', entity: 'participant', clientId: p.clientId,
+            message: alasanTolak(err.constraint),
+          });
+        }
       }
 
       // ---------------- tally anonim ----------------

@@ -19,7 +19,7 @@
 export type JenisUkur =
   | 'tinggi' | 'berat' | 'lingkar_perut'
   | 'sistolik' | 'diastolik' | 'nadi'
-  | 'gula' | 'kolesterol' | 'asam_urat';
+  | 'gula' | 'kolesterol' | 'trigliserida' | 'asam_urat';
 
 export type KonteksGula = 'puasa' | 'sewaktu' | '2jam_pp';
 export type Gender = 'P' | 'L';
@@ -70,6 +70,7 @@ export const UKUR: Record<JenisUkur, {
   nadi:          { label: 'Nadi',              singkat: 'NADI', satuan: 'bpm',   kategori: 'tensi',        wajar: { min: 40,  max: 180 }, desimal: false, pakaiStrip: false },
   gula:          { label: 'Gula darah',        singkat: 'GD',   satuan: 'mg/dL', kategori: 'darah',        wajar: { min: 50,  max: 500 }, desimal: false, pakaiStrip: true },
   kolesterol:    { label: 'Kolesterol total',  singkat: 'KOL',  satuan: 'mg/dL', kategori: 'darah',        wajar: { min: 100, max: 400 }, desimal: false, pakaiStrip: true },
+  trigliserida:  { label: 'Trigliserida',       singkat: 'TG',   satuan: 'mg/dL', kategori: 'darah',        wajar: { min: 30,  max: 800 }, desimal: false, pakaiStrip: true },
   asam_urat:     { label: 'Asam urat',         singkat: 'AU',   satuan: 'mg/dL', kategori: 'darah',        wajar: { min: 2,   max: 15  }, desimal: true,  pakaiStrip: true },
 };
 
@@ -96,7 +97,11 @@ const SUMBER = {
   imt: 'Klasifikasi IMT WHO Asia-Pasifik (dipakai Kemenkes)',
   gula: 'Pedoman Pengelolaan dan Pencegahan Diabetes Melitus Tipe 2 di Indonesia (2024)',
   kolesterol: 'Nilai rujukan kolesterol total dewasa',
-  asamUrat: 'Nilai rujukan asam urat dewasa menurut jenis kelamin',
+  // Kartu "Acuan Hasil Pemeriksaan Kesehatan" yang dipegang peserta di event.
+  // Angkanya HARUS sama dengan yang tercetak di sana: peserta memegang kertas
+  // itu sambil membaca lembar dari aplikasi, dan dua ambang berbeda untuk
+  // pemeriksaan yang sama membuat keduanya kehilangan wibawa sekaligus.
+  kartu: 'Acuan Hasil Pemeriksaan Kesehatan (kartu event)',
   tensi: 'Klasifikasi tekanan darah JNC VII',
   lingkarPerut: 'Ambang obesitas sentral Asia-Pasifik',
 } as const;
@@ -133,20 +138,43 @@ const DALAM: Pick<Penilaian, 'singkat' | 'nada'> = { singkat: 'Dalam rujukan', n
 const DI_ATAS: Pick<Penilaian, 'singkat' | 'nada'> = { singkat: 'Di atas rujukan', nada: 'tinggi' };
 const PRA_DM: Pick<Penilaian, 'singkat' | 'nada'> = { singkat: 'Prediabetes', nada: 'perhatian' };
 
+/**
+ * Batas BAWAH gula darah, dari kartu acuan event (70 mg/dL).
+ *
+ * Sebelumnya aplikasi diam soal ini: berapa pun rendahnya sebuah angka, ia
+ * tetap "dalam rentang rujukan" selama di bawah ambang atas. Padahal gula
+ * terlalu rendah adalah temuan yang justru mendesak di tempat, bukan yang bisa
+ * ditunda sampai kunjungan berikutnya.
+ *
+ * Berlaku untuk semua konteks. Ambang ATAS-nya yang berbeda menurut konteks —
+ * 130 mg/dL sesudah makan siang wajar, 130 mg/dL puasa sudah prediabetes — dan
+ * itulah sebabnya konteksnya tetap ditanyakan meski kartu hanya memuat satu
+ * baris "70–99 mg/dL", yang sebenarnya rentang puasa.
+ */
+const GULA_MIN = 70;
+
+const RENDAH: Pick<Penilaian, 'singkat' | 'nada'> = { singkat: 'Di bawah rujukan', nada: 'rendah' };
+
 export function nilaiGula(mgdl: number, konteks: KonteksGula): Penilaian {
   const s = SUMBER.gula;
+  if (mgdl < GULA_MIN) {
+    return {
+      label: `Di bawah rentang rujukan (<${GULA_MIN})`, ...RENDAH,
+      sumber: `${SUMBER.kartu} — batas bawah ${GULA_MIN} mg/dL`,
+    };
+  }
   if (konteks === 'puasa') {
-    if (mgdl < 100) return { label: 'Dalam rentang rujukan (<100)', ...DALAM, sumber: s };
+    if (mgdl < 100) return { label: `Dalam rentang rujukan (${GULA_MIN}–99)`, ...DALAM, sumber: s };
     if (mgdl < 126) return { label: 'Rentang prediabetes (100–125)', ...PRA_DM, sumber: s };
     return { label: 'Di atas rentang rujukan (≥126)', ...DI_ATAS, sumber: s };
   }
   if (konteks === '2jam_pp') {
-    if (mgdl < 140) return { label: 'Dalam rentang rujukan (<140)', ...DALAM, sumber: s };
+    if (mgdl < 140) return { label: `Dalam rentang rujukan (${GULA_MIN}–139)`, ...DALAM, sumber: s };
     if (mgdl < 200) return { label: 'Rentang prediabetes (140–199)', ...PRA_DM, sumber: s };
     return { label: 'Di atas rentang rujukan (≥200)', ...DI_ATAS, sumber: s };
   }
-  // Sewaktu: hanya ada satu ambang yang lazim dipakai.
-  if (mgdl < 200) return { label: 'Dalam rentang rujukan (<200)', ...DALAM, sumber: s };
+  // Sewaktu: hanya ada satu ambang atas yang lazim dipakai.
+  if (mgdl < 200) return { label: `Dalam rentang rujukan (${GULA_MIN}–199)`, ...DALAM, sumber: s };
   return { label: 'Di atas rentang rujukan (≥200)', ...DI_ATAS, sumber: s };
 }
 
@@ -159,32 +187,43 @@ export function nilaiKolesterol(mgdl: number): Penilaian {
   return { label: 'Di atas rentang rujukan (≥240)', ...DI_ATAS, sumber: s };
 }
 
-/* ============================== asam urat ============================== */
-
-export const RENTANG_ASAM_URAT: Record<Gender, { min: number; max: number }> = {
-  L: { min: 3.4, max: 7.6 },
-  P: { min: 2.4, max: 6.0 },
-};
+/* ============================= trigliserida ============================= */
 
 /**
- * Batas asam urat ditulis dengan koma dan selalu satu desimal.
+ * Ambang tunggal <150 mg/dL, persis seperti di kartu acuan event.
  *
- * `${6.0}` menghasilkan "6", sehingga rentang wanita tercetak "2.4–6" — dua
- * sisi yang terbaca berbeda ketelitiannya, di lembar yang selebihnya memakai
- * koma. Ditulis di sini, bukan diambil dari `dec()` di domain.ts, karena
- * domain.ts sudah mengimpor berkas ini.
+ * Rentang perantara 150–199 ("batas tinggi") memang ada di pedoman lipid, dan
+ * ia sengaja TIDAK dipakai di sini: kartu yang dipegang peserta hanya menyebut
+ * satu angka, dan menambahkan tingkat yang tidak tercetak di sana membuat
+ * lembar aplikasi mengatakan sesuatu yang tidak bisa dicari peserta di
+ * kertasnya sendiri.
  */
-const batas = (n: number) =>
-  n.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+export function nilaiTrigliserida(mgdl: number): Penilaian {
+  const s = `${SUMBER.kartu} — trigliserida <150 mg/dL`;
+  return mgdl < 150
+    ? { label: 'Dalam rentang rujukan (<150)', ...DALAM, sumber: s }
+    : { label: 'Di atas rentang rujukan (≥150)', ...DI_ATAS, sumber: s };
+}
+
+/* ============================== asam urat ============================== */
+
+/**
+ * Ambang ATAS saja, mengikuti kartu acuan event: pria <7, wanita <6 mg/dL.
+ *
+ * Sebelumnya ada batas bawah (pria 3,4; wanita 2,4) dari nilai rujukan
+ * laboratorium umum. Batas itu dilepas bersama angka atasnya karena kartu tidak
+ * memuatnya — dan asam urat rendah nyaris tidak pernah menjadi tindakan di
+ * sebuah event skrining, sementara "di bawah rentang rujukan" yang muncul di
+ * lembar peserta pasti menimbulkan pertanyaan yang tidak bisa dijawab petugas.
+ */
+export const AMBANG_ASAM_URAT: Record<Gender, number> = { L: 7, P: 6 };
 
 export function nilaiAsamUrat(mgdl: number, gender: Gender): Penilaian {
-  const r = RENTANG_ASAM_URAT[gender];
-  const s = `${SUMBER.asamUrat} (${gender === 'L' ? 'pria' : 'wanita'} ${batas(r.min)}–${batas(r.max)})`;
-  if (mgdl < r.min) {
-    return { label: `Di bawah rentang rujukan (<${batas(r.min)})`, singkat: 'Di bawah rujukan', nada: 'rendah', sumber: s };
-  }
-  if (mgdl > r.max) return { label: `Di atas rentang rujukan (>${batas(r.max)})`, ...DI_ATAS, sumber: s };
-  return { label: `Dalam rentang rujukan (${batas(r.min)}–${batas(r.max)})`, ...DALAM, sumber: s };
+  const ambang = AMBANG_ASAM_URAT[gender];
+  const s = `${SUMBER.kartu} — asam urat ${gender === 'L' ? 'pria' : 'wanita'} <${ambang} mg/dL`;
+  return mgdl >= ambang
+    ? { label: `Di atas rentang rujukan (≥${ambang})`, ...DI_ATAS, sumber: s }
+    : { label: `Dalam rentang rujukan (<${ambang})`, ...DALAM, sumber: s };
 }
 
 /* ============================ tekanan darah ============================ */
@@ -229,6 +268,8 @@ export function nilaiUkur(
       return nilaiGula(nilai, opsi.konteks ?? 'sewaktu');
     case 'kolesterol':
       return nilaiKolesterol(nilai);
+    case 'trigliserida':
+      return nilaiTrigliserida(nilai);
     case 'asam_urat':
       return opsi.gender ? nilaiAsamUrat(nilai, opsi.gender) : null;
     case 'lingkar_perut':
@@ -240,6 +281,45 @@ export function nilaiUkur(
     default:
       return null;
   }
+}
+
+/**
+ * Batas KERAS, disalin dari CHECK constraint `screenings_*_check`.
+ *
+ * Ini bukan "rentang wajar" (US-03) yang boleh dilewati dengan konfirmasi —
+ * ini batas yang MENOLAK baris di basis data. Perbedaannya pernah menjatuhkan
+ * satu event: petugas mengetik kolesterol 0 saat alatnya tidak membaca, layar
+ * hanya meminta konfirmasi "di luar rentang wajar", dan angka itu tersimpan di
+ * perangkat lalu ditolak server selamanya. Tujuh belas record mengantre di
+ * belakangnya tanpa ada yang tahu record mana penyebabnya.
+ *
+ * Disalin, bukan ditarik dari server: perangkat harus bisa menegakkannya saat
+ * offline, justru ketika kesalahan ini paling mungkin terjadi. Kalau CHECK di
+ * basis data berubah, angka di sini ikut diubah — dan uji e2e yang mengirim
+ * nilai di luar batas inilah yang akan menangkap kalau lupa.
+ */
+export const BATAS_KERAS: Record<JenisUkur, { min: number; max: number }> = {
+  tinggi:        { min: 50, max: 250 },
+  berat:         { min: 1,  max: 400 },
+  lingkar_perut: { min: 20, max: 300 },
+  sistolik:      { min: 30, max: 350 },
+  diastolik:     { min: 20, max: 250 },
+  nadi:          { min: 20, max: 300 },
+  gula:          { min: 10, max: 1000 },
+  kolesterol:    { min: 20, max: 800 },
+  trigliserida:  { min: 20, max: 2000 },
+  asam_urat:     { min: 0,  max: 50 },
+};
+
+/**
+ * Nilai yang TIDAK BISA disimpan sama sekali. Mengembalikan alasannya, atau
+ * null bila angkanya masih bisa diterima.
+ */
+export function ditolakBasisData(jenis: JenisUkur, nilai: number): string | null {
+  const b = BATAS_KERAS[jenis];
+  if (nilai >= b.min && nilai <= b.max) return null;
+  return `${UKUR[jenis].label} ${nilai} tidak bisa disimpan (batas ${b.min}–${b.max} ${UKUR[jenis].satuan}). `
+    + 'Kosongkan bila tidak diperiksa.';
 }
 
 export function diLuarWajar(jenis: JenisUkur, nilai: number): boolean {
@@ -273,12 +353,14 @@ export function rentangSasaran(
     case 'gula': {
       const k = opsi.konteks ?? 'sewaktu';
       const max = k === 'puasa' ? 100 : k === '2jam_pp' ? 140 : 200;
-      return { min: null, max };
+      return { min: GULA_MIN, max };
     }
     case 'kolesterol':
       return { min: null, max: 200 };
+    case 'trigliserida':
+      return { min: null, max: 150 };
     case 'asam_urat':
-      return opsi.gender ? RENTANG_ASAM_URAT[opsi.gender] : null;
+      return opsi.gender ? { min: null, max: AMBANG_ASAM_URAT[opsi.gender] } : null;
     case 'lingkar_perut':
       return opsi.gender ? { min: null, max: AMBANG_LINGKAR_PERUT[opsi.gender] } : null;
     // Tensi dinilai dari sepasang angka, jadi jaraknya dihitung pemanggil dari

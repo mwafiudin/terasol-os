@@ -4,7 +4,7 @@ import type { KonteksGula } from './rujukan';
 export type ParamKey =
   | 'tinggi' | 'berat' | 'lingkar_perut'
   | 'sistolik' | 'diastolik' | 'nadi'
-  | 'gula' | 'kolesterol' | 'asam_urat';
+  | 'gula' | 'kolesterol' | 'trigliserida' | 'asam_urat';
 
 export type Role = 'petugas' | 'koordinator' | 'admin_pusat';
 export type ConvStatus = 'baru' | 'dihubungi' | 'membeli' | 'batal';

@@ -15,7 +15,7 @@ import type { Deret, Titik } from './deret';
 import { angka } from './deret';
 import {
   SASARAN_IMT, UKUR, hitungImt, jarakKeSasaran, nilaiAsamUrat, nilaiGula, nilaiImt,
-  nilaiKolesterol, nilaiLingkarPerut, nilaiTensi, rentangSasaran,
+  nilaiKolesterol, nilaiLingkarPerut, nilaiTensi, nilaiTrigliserida, rentangSasaran,
   type Gender, type JenisUkur, type KonteksGula, type Nada, type Penilaian,
 } from './rujukan';
 
@@ -58,6 +58,7 @@ function jarakTitik(deret: Deret, t: Titik, gender: Gender): number | null {
 const AMBANG_BERUBAH: Partial<Record<JenisUkur, number>> = {
   gula: 10,
   kolesterol: 10,
+  trigliserida: 15,
   asam_urat: 0.5,
   sistolik: 5,
   diastolik: 5,
@@ -110,7 +111,7 @@ const URUT_NADA: Record<Nada, number> = {
  */
 const DIHARAPKAN: JenisUkur[] = [
   'tinggi', 'berat', 'lingkar_perut', 'sistolik', 'diastolik',
-  'gula', 'kolesterol', 'asam_urat',
+  'gula', 'kolesterol', 'trigliserida', 'asam_urat',
 ];
 
 export function analisa(deret: Deret[], gender: Gender): Analisis {
@@ -187,19 +188,21 @@ function hitungImtDari(deret: Deret[]): Analisis['imt'] {
 /** Nilai pemeriksaan seorang peserta, apa adanya. Null berarti belum diukur. */
 export type NilaiRingkas = {
   sistolik: number | null; diastolik: number | null;
-  gula: number | null; kolesterol: number | null; asamUrat: number | null;
+  gula: number | null; kolesterol: number | null;
+  trigliserida: number | null; asamUrat: number | null;
   lingkarPerut: number | null; imt: number | null;
   /** Null berarti tidak diketahui — lihat catatan di `temuanPeserta`. */
   konteksGula: KonteksGula | null;
 };
 
 export type KodeTemuan =
-  | 'gula' | 'tensi' | 'kolesterol' | 'asam_urat' | 'imt' | 'lingkar_perut';
+  | 'gula' | 'tensi' | 'kolesterol' | 'trigliserida' | 'asam_urat' | 'imt' | 'lingkar_perut';
 
 export const TEMUAN_LABEL: Record<KodeTemuan, string> = {
   gula: 'Gula darah',
   tensi: 'Tekanan darah',
   kolesterol: 'Kolesterol',
+  trigliserida: 'Trigliserida',
   asam_urat: 'Asam urat',
   imt: 'IMT',
   lingkar_perut: 'Lingkar perut',
@@ -227,6 +230,7 @@ export function penilaianPeserta(
   const p: Partial<Record<KodeTemuan, Penilaian>> = {};
   if (n.gula != null) p.gula = nilaiGula(n.gula, n.konteksGula ?? 'sewaktu');
   if (n.kolesterol != null) p.kolesterol = nilaiKolesterol(n.kolesterol);
+  if (n.trigliserida != null) p.trigliserida = nilaiTrigliserida(n.trigliserida);
   if (n.asamUrat != null) p.asam_urat = nilaiAsamUrat(n.asamUrat, gender);
   if (n.lingkarPerut != null) p.lingkar_perut = nilaiLingkarPerut(n.lingkarPerut, gender);
   if (n.sistolik != null && n.diastolik != null) p.tensi = nilaiTensi(n.sistolik, n.diastolik);
@@ -255,7 +259,8 @@ export function temuanPeserta(n: NilaiRingkas, gender: Gender): Set<KodeTemuan> 
 
 /** Ada angka yang bisa dinilai sama sekali. */
 export function adaYangDinilai(n: NilaiRingkas): boolean {
-  return n.gula != null || n.kolesterol != null || n.asamUrat != null
+  return n.gula != null || n.kolesterol != null || n.trigliserida != null
+    || n.asamUrat != null
     || n.lingkarPerut != null || n.imt != null
     || (n.sistolik != null && n.diastolik != null);
 }

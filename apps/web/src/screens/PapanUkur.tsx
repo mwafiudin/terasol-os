@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Button, Icon, ICONS } from '../components/ui';
 import { PARAMS, dec, num } from '../lib/domain';
 import {
-  KONTEKS_GULA, UKUR, diLuarWajar, hitungImt, nilaiImt,
+  KONTEKS_GULA, UKUR, diLuarWajar, ditolakBasisData, hitungImt, nilaiImt,
   type JenisUkur, type KonteksGula,
 } from '../lib/rujukan';
 
@@ -71,7 +71,7 @@ export function grupUntuk(konteksGula: KonteksGula): Grup[] {
     },
     {
       id: 'darah', label: 'Pemeriksaan darah', ikon: ICONS.tag,
-      slot: [slot('gula', konteksGula), slot('kolesterol'), slot('asam_urat')],
+      slot: [slot('gula', konteksGula), slot('kolesterol'), slot('trigliserida'), slot('asam_urat')],
     },
   ];
 }
@@ -285,8 +285,18 @@ export function PapanUkur({
     setAktif(slot[idx + 1]!.kunci);
   }
 
+  const tolak = (() => {
+    const n = num(nilai[aktif] ?? '');
+    return n == null ? null : ditolakBasisData(kini.jenis, n);
+  })();
+
   function lanjut() {
     const n = num(nilai[aktif] ?? '');
+    // Angka yang PASTI ditolak basis data tidak boleh lolos konfirmasi:
+    // konfirmasi hanya berlaku untuk yang di luar rentang wajar tapi masih
+    // bisa disimpan. Kalau tidak, angkanya tersimpan di perangkat lalu
+    // menyumbat antrean sync selamanya.
+    if (tolak) return;
     // US-03: nilai di luar rentang wajar minta konfirmasi, bukan ditolak.
     if (n != null && diLuarWajar(kini.jenis, n) && warn !== aktif) {
       setWarn(aktif);
@@ -392,7 +402,9 @@ export function PapanUkur({
               begitu ubinnya bertambah, petunjuk yang ikut menggulung akan
               hilang persis ketika paling dibutuhkan. Peringatannya pun kini
               bersebelahan dengan tombol yang diminta diketuk ulang. */}
-          {warn === aktif ? (
+          {tolak ? (
+            <div className="range-warn range-tolak">{tolak}</div>
+          ) : warn === aktif ? (
             <div className="range-warn">
               Nilai di luar rentang wajar. Ketuk Lanjut sekali lagi untuk konfirmasi.
             </div>

@@ -41,7 +41,7 @@ export default async function participantRoutes(app: FastifyInstance) {
                 -- Nilai pemeriksaan ikut dikirim supaya penyaring temuan pada
                 -- daftar peserta bisa dihitung di perangkat, termasuk saat
                 -- offline dari salinan lokal.
-                s.sistolik, s.diastolik, s.gula, s.kolesterol,
+                s.sistolik, s.diastolik, s.gula, s.kolesterol, s.trigliserida,
                 s.asam_urat as "asamUrat", s.lingkar_perut as "lingkarPerut",
                 s.konteks_gula as "konteksGula",
                 -- US-04: jejak peserta — tanggal screening sesungguhnya, bukan
