@@ -344,11 +344,12 @@ export function EventPeserta({ go, event, onBuka, onTambah, onUbahEvent, onHapus
                 {p.nama}{usia == null ? '' : `, ${usia} th`}
               </span>
               {p.belumSync && <Badge tone="warning">Antre</Badge>}
-              {/* Nada peringatan, bukan bahaya. Merah di sebelah chip temuan
-                  yang juga merah adalah persis yang membuatnya terbaca sebagai
-                  vonis kesehatan; ini keraguan atas pencatatan, bukan atas
-                  orangnya. */}
-              {p.needsReview && <Badge tone="warning">Nomor kembar</Badge>}
+              {/* Nomor kembar TIDAK ditandai di kartu ini.
+                  Penyelesaiannya sudah punya tempatnya sendiri — Beranda →
+                  "record perlu ditinjau" — dan penanda di sini hanya menambah
+                  satu chip lagi di baris yang sudah penuh chip temuan, tanpa
+                  ada yang bisa dikerjakan dari sini. Yang mencarinya di dalam
+                  event punya penyaring "Nomor kembar" di baris chip. */}
             </div>
             <span className="peserta-meta">
               {p.imt != null ? `IMT ${dec(p.imt)}` : 'IMT belum ada'}
