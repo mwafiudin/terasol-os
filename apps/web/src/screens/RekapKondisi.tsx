@@ -42,27 +42,37 @@ function Batang({ b, total }: { b: BarisParam; total: number }) {
   );
 }
 
+/**
+ * Batang mendatar, bukan kolom tegak.
+ *
+ * Kolom tegak menaruh angkanya di atas batang, jadi pada event yang timpang —
+ * 0, 0, 1, 4 — keempat angkanya melayang di empat ketinggian berbeda di atas
+ * ruang kosong. Mendatar, ia memakai kisi yang sama dengan dua bagian lain di
+ * kartu ini, dan seluruh kartu jadi punya satu bahasa: label, batang, angka.
+ */
 function Sebaran({ r }: { r: RekapKondisi }) {
   const puncak = Math.max(...r.sebaran, 1);
-  const kolom: { n: number; label: string; kelas: string }[] = [
+  const baris: { n: number; label: string; kelas: string }[] = [
     { n: r.sebaran[0], label: '0 temuan', kelas: 't-aman' },
     { n: r.sebaran[1], label: '1 temuan', kelas: 't-perhatian' },
     { n: r.sebaran[2], label: '2 temuan', kelas: 't-perhatian' },
     { n: r.sebaran[3], label: '3+ temuan', kelas: 't-luar' },
   ];
   return (
-    <div className="sebar-grid">
-      {kolom.map((k) => (
-        <div key={k.label}>
-          <b>{k.n}</b>
-          {/* Tinggi minimum 3px: kolom bernilai nol yang hilang sama sekali
-              membuat empat kolom menjadi tiga, dan sumbunya ikut hilang. */}
-          <div className={`sebar-kol ${k.kelas}`}
-            style={{ height: `${Math.max(3, (k.n / puncak) * 56)}px` }} />
-          <span>{k.label}</span>
+    <>
+      {baris.map((k) => (
+        <div className="sebar-baris" key={k.label}>
+          <span className="sebar-label">{k.label}</span>
+          <div className="sebar-jalur">
+            {/* Lebar minimum 3px lewat CSS: baris bernilai nol yang lenyap
+                sama sekali membuat empat baris terbaca sebagai tiga. */}
+            <div className={`sebar-bar ${k.kelas}`}
+              style={{ width: `${(k.n / puncak) * 100}%` }} />
+          </div>
+          <span className="sebar-n">{k.n}</span>
         </div>
       ))}
-    </div>
+    </>
   );
 }
 
