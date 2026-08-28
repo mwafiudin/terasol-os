@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Button, Field, Icon, ICONS, PageHead } from '../components/ui';
 import { db, putParticipant } from '../lib/db';
-import { imtOf, normalisasiHp, num, PARAMS, periksaHp, periksaUsia } from '../lib/domain';
+import {
+  batasTanggalLahir, imtOf, normalisasiHp, num, PARAMS, periksaHp,
+  periksaTanggalLahir, usiaDari,
+} from '../lib/domain';
 import { draftToRecord, hpSudahAda, useDraft } from '../lib/draft';
 import { useApp } from '../lib/store';
 import { refreshPending, syncNow } from '../lib/sync';
@@ -25,24 +28,39 @@ export function Register({ go }: { go: Nav }) {
    * "08" yang baru diketik separuh adalah menegur orang yang belum selesai
    * bicara. Sesudah menekan Lanjut, keduanya dianggap tersentuh.
    */
-  const [sentuh, setSentuh] = useState<{ usia?: boolean; hp?: boolean }>({});
+  const [sentuh, setSentuh] = useState<{ lahir?: boolean; hp?: boolean }>({});
 
   if (!draft || !key) return null;
   const set = (p: Parameters<typeof patch>[1]) => void patch(key, p);
 
-  const salahUsia = draft.usia ? periksaUsia(draft.usia) : null;
+  const salahLahir = draft.tanggalLahir ? periksaTanggalLahir(draft.tanggalLahir) : null;
   const salahHp = draft.hp ? periksaHp(draft.hp) : null;
+  const usia = usiaDari(draft.tanggalLahir);
+  const batas = batasTanggalLahir();
+
+  /**
+   * Usia disimpan sebagai turunan, bukan dihitung ulang saat dikirim.
+   *
+   * Yang dikirim adalah usia PADA SAAT PENDAFTARAN, dan pendaftaran ini terjadi
+   * sekarang. Menghitungnya lagi saat sinkronisasi — yang bisa terjadi berhari
+   * -hari kemudian di lapangan tanpa sinyal — akan mencatat usia pada hari
+   * paketnya terkirim, bukan pada hari orangnya diperiksa.
+   */
+  const isiLahir = (v: string) => {
+    const u = usiaDari(v);
+    set({ tanggalLahir: v, usia: u == null ? '' : String(u) });
+  };
 
   async function lanjut() {
     if (!draft || !key) return;
-    setSentuh({ usia: true, hp: true });
-    if (!draft.nama || !draft.gender || !draft.usia || !draft.hp) {
-      say('Lengkapi nama, jenis kelamin, usia, dan nomor HP.');
+    setSentuh({ lahir: true, hp: true });
+    if (!draft.nama || !draft.gender || !draft.tanggalLahir || !draft.hp) {
+      say('Lengkapi nama, jenis kelamin, tanggal lahir, dan nomor HP.');
       return;
     }
     // Nomor yang salah bentuk tidak bisa dihubungi saat tindak lanjut, dan
     // memecah orang yang sama menjadi dua record karena dedup HP tidak cocok.
-    if (periksaUsia(draft.usia) || periksaHp(draft.hp)) return;
+    if (periksaTanggalLahir(draft.tanggalLahir) || periksaHp(draft.hp)) return;
 
     // Disimpan dalam bentuk baku supaya "0812…", "+62812…", dan "62812…"
     // menjadi satu nomor yang sama bagi pencarian maupun dedup.
@@ -76,15 +94,18 @@ export function Register({ go }: { go: Nav }) {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: 12 }}>
-        <Field label="Usia" htmlFor="p-usia">
-          <input id="p-usia" className={`input${sentuh.usia && salahUsia ? ' salah' : ''}`}
-            inputMode="numeric" value={draft.usia}
-            aria-invalid={!!(sentuh.usia && salahUsia)}
-            onChange={(e) => set({ usia: e.target.value.replace(/\D/g, '').slice(0, 3) })}
-            onBlur={() => setSentuh((s) => ({ ...s, usia: true }))}
-            placeholder="62" />
-          {sentuh.usia && salahUsia && <small className="field-salah">{salahUsia}</small>}
+      <div className="dua-kolom">
+        {/* Usianya muncul di sebelah label begitu tanggalnya lengkap — petugas
+            menyebut usia, bukan tanggal lahir, saat memastikan ke pesertanya.
+            Tanpa itu kolom ini menuntut kepercayaan bahwa yang dihitung benar. */}
+        <Field label={`Tanggal lahir${usia == null ? '' : ` · ${usia} th`}`} htmlFor="p-lahir">
+          <input id="p-lahir" className={`input${sentuh.lahir && salahLahir ? ' salah' : ''}`}
+            type="date" value={draft.tanggalLahir}
+            min={batas.min} max={batas.maks}
+            aria-invalid={!!(sentuh.lahir && salahLahir)}
+            onChange={(e) => isiLahir(e.target.value)}
+            onBlur={() => setSentuh((s) => ({ ...s, lahir: true }))} />
+          {sentuh.lahir && salahLahir && <small className="field-salah">{salahLahir}</small>}
         </Field>
         <Field label="Nomor HP" htmlFor="p-hp">
           <input id="p-hp" className={`input${sentuh.hp && salahHp ? ' salah' : ''}`}

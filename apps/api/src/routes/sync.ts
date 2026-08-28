@@ -47,6 +47,19 @@ const participantIn = z.object({
   nama: z.string().min(1).max(160),
   gender: z.enum(['P', 'L']),
   usia: z.number().int().min(0).max(130),
+  /**
+   * Nullish, dan bukan sekadar demi bundel lama.
+   *
+   * Peserta yang terdaftar sebelum kolom ini ada memang tidak punya tanggal
+   * lahir, dan tidak akan pernah punya — usia tidak bisa dibalik. Menuntutnya
+   * berarti menolak sinkronisasi record yang sudah sah tersimpan di perangkat.
+   *
+   * Batas atasnya dijaga di sini karena CHECK di basis data tidak bisa
+   * memakai `current_date`.
+   */
+  tanggalLahir: z.string().date()
+    .refine((s) => s <= new Date().toISOString().slice(0, 10), 'Tanggal lahir di masa depan')
+    .nullish(),
   hp: z.string().min(3).max(32),
   updatedAt: z.string().datetime(),
   consent: z.object({
@@ -147,9 +160,16 @@ export default async function syncRoutes(app: FastifyInstance) {
         let participantId: string;
         if (existing.rowCount) {
           participantId = existing.rows[0]!.id;
+          // `coalesce` pada tanggal lahir: perangkat yang belum diperbarui
+          // mengirim null untuk peserta yang tanggal lahirnya sudah dicatat
+          // perangkat lain. Menulis null apa adanya membuat sinkronisasi biasa
+          // menghapus fakta yang sudah diketahui.
           await tx.query(
-            `update participants set nama = $1, gender = $2, usia = $3, hp = $4 where id = $5`,
-            [p.nama, p.gender, p.usia, p.hp, participantId],
+            `update participants
+                set nama = $1, gender = $2, usia = $3, hp = $4,
+                    tanggal_lahir = coalesce($6::date, tanggal_lahir)
+              where id = $5`,
+            [p.nama, p.gender, p.usia, p.hp, participantId, p.tanggalLahir ?? null],
           );
         } else {
           // §4.3 — kunci dedup event_id + nomor HP. Bentrok TIDAK ditimpa:
@@ -164,11 +184,12 @@ export default async function syncRoutes(app: FastifyInstance) {
           const needsReview = (dup.rowCount ?? 0) > 0;
           const ins = await tx.query<{ id: string }>(
             `insert into participants
-               (tenant_id, event_id, client_id, nama, gender, usia, hp, needs_review, created_by, device_id)
-             values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+               (tenant_id, event_id, client_id, nama, gender, usia, tanggal_lahir, hp,
+                needs_review, created_by, device_id)
+             values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
              returning id`,
-            [ctx.tenantId, eventId, p.clientId, p.nama, p.gender, p.usia, p.hp,
-             needsReview, ctx.userId, claims.did],
+            [ctx.tenantId, eventId, p.clientId, p.nama, p.gender, p.usia,
+             p.tanggalLahir ?? null, p.hp, needsReview, ctx.userId, claims.did],
           );
           participantId = ins.rows[0]!.id;
           if (needsReview) {
@@ -183,7 +204,8 @@ export default async function syncRoutes(app: FastifyInstance) {
         // cabang ini. Ditautkan di sini supaya riwayat lintas-event terbentuk
         // sendiri, tanpa perangkat lapangan perlu tahu soal entitas pelanggan.
         const pelangganId = await pelangganUntuk(tx, ctx.tenantId, {
-          nama: p.nama, gender: p.gender, usia: p.usia, hp: p.hp,
+          nama: p.nama, gender: p.gender, usia: p.usia,
+          tanggalLahir: p.tanggalLahir ?? null, hp: p.hp,
         });
         await tx.query(
           'update participants set pelanggan_id = $2 where id = $1 and pelanggan_id is distinct from $2',

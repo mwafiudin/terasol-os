@@ -19,7 +19,10 @@ export function idTurunan(...bagian: string[]): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-type Orang = { nama: string; gender: 'P' | 'L'; usia?: number | null; hp: string };
+type Orang = {
+  nama: string; gender: 'P' | 'L';
+  usia?: number | null; tanggalLahir?: string | null; hp: string;
+};
 
 /**
  * Cari pelanggan yang cocok di cabang ini, atau buat baru.
@@ -41,15 +44,26 @@ export async function pelangganUntuk(
   );
   if (found.rows[0]) {
     // Usia berubah tiap tahun; ambil yang terbaru supaya profil tidak basi.
-    if (o.usia != null) {
-      await tx.query('update pelanggan set usia = $2 where id = $1', [found.rows[0].id, o.usia]);
+    //
+    // Tanggal lahir sebaliknya: sekali diketahui, ia tidak berubah. `coalesce`
+    // menjaganya dari kunjungan berikutnya yang datang tanpa tanggal lahir —
+    // perangkat dengan bundel lama, atau peserta yang dicatat cepat tanpa
+    // mengisinya. Yang belum diisi bukan berarti dibatalkan.
+    if (o.usia != null || o.tanggalLahir != null) {
+      await tx.query(
+        `update pelanggan
+            set usia = coalesce($2::smallint, usia),
+                tanggal_lahir = coalesce($3::date, tanggal_lahir)
+          where id = $1`,
+        [found.rows[0].id, o.usia ?? null, o.tanggalLahir ?? null],
+      );
     }
     return found.rows[0].id;
   }
   const ins = await tx.query<{ id: string }>(
-    `insert into pelanggan (tenant_id, nama, gender, usia, hp)
-     values ($1,$2,$3::gender,$4,$5) returning id`,
-    [tenantId, o.nama, o.gender, o.usia ?? null, o.hp],
+    `insert into pelanggan (tenant_id, nama, gender, usia, tanggal_lahir, hp)
+     values ($1,$2,$3::gender,$4,$5,$6) returning id`,
+    [tenantId, o.nama, o.gender, o.usia ?? null, o.tanggalLahir ?? null, o.hp],
   );
   return ins.rows[0]!.id;
 }

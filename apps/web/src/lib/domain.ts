@@ -201,20 +201,76 @@ export function periksaHp(raw: string): string | null {
   return null;
 }
 
+/* ============================== tanggal lahir ============================== */
+
 /**
- * Batas usia. Bukan batas medis, melainkan batas kewajaran pengetikan: 123
- * hampir pasti salah ketik dari 12 atau 23, dan menyimpannya membuat rerata
- * usia peserta event itu tidak berarti apa-apa.
+ * Batas usia. Bukan batas medis, melainkan batas kewajaran pengisian: tahun
+ * lahir 1902 hampir pasti salah ketik, dan menyimpannya membuat rerata usia
+ * peserta event itu tidak berarti apa-apa.
  */
 export const USIA_MIN = 1;
 export const USIA_MAKS = 120;
 
-export function periksaUsia(raw: string): string | null {
-  if (!raw.trim()) return 'Usia belum diisi.';
-  const n = Number(raw);
-  if (!Number.isFinite(n) || !Number.isInteger(n)) return 'Usia diisi angka tahun.';
-  if (n < USIA_MIN || n > USIA_MAKS) {
-    return `Usia di luar rentang wajar (${USIA_MIN}–${USIA_MAKS} tahun).`;
-  }
+/**
+ * Batas kolom tanggal lahir, dinyatakan sebagai tanggal supaya pemilih tanggal
+ * bawaan peramban ikut menegakkannya sebelum petugas sempat salah.
+ *
+ * Dihitung dari `USIA_MAKS`, bukan dari tahun tetap: keduanya menyatakan hal
+ * yang sama, dan dua angka yang harus dijaga tetap sama pada akhirnya berbeda.
+ */
+export function batasTanggalLahir(): { min: string; maks: string } {
+  const kini = new Date();
+  const min = new Date(kini.getFullYear() - USIA_MAKS, kini.getMonth(), kini.getDate());
+  return { min: lokalIso(min), maks: hariIni() };
+}
+
+/** `toISOString()` memakai UTC dan menggeser tanggal sehari di zona WIB. */
+function lokalIso(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+/**
+ * Usia penuh pada hari ini, dari tanggal lahir "YYYY-MM-DD".
+ *
+ * Menghitungnya sebagai selisih tahun saja membuat orang bertambah tua pada 1
+ * Januari, bukan pada hari ulang tahunnya — meleset sampai sebelas bulan, dan
+ * di ambang seperti 45 tahun itu cukup untuk memindahkan seseorang ke sisi
+ * yang salah. Karena itu bulan dan tanggalnya ikut diperiksa.
+ */
+export function usiaDari(tglLahir: string | null | undefined, pada = hariIni()): number | null {
+  if (!tglLahir || !/^\d{4}-\d{2}-\d{2}$/.test(tglLahir)) return null;
+  const [tl, bl, hl] = tglLahir.split('-').map(Number) as [number, number, number];
+  const [tk, bk, hk] = pada.split('-').map(Number) as [number, number, number];
+  let usia = tk - tl;
+  if (bk < bl || (bk === bl && hk < hl)) usia -= 1;
+  return usia < 0 ? null : usia;
+}
+
+/**
+ * Usia yang ditampilkan, dengan tanggal lahir sebagai sumber utama.
+ *
+ * Usia tersimpan adalah angka yang benar pada hari pendaftaran dan makin salah
+ * setiap tahun sesudahnya; ia hanya dipakai untuk orang yang terdaftar sebelum
+ * tanggal lahir ditanyakan, dan bagi mereka memang tidak ada yang lebih baik.
+ */
+export function usiaTampil(
+  tglLahir: string | null | undefined, usiaTersimpan: number | null | undefined,
+): number | null {
+  return usiaDari(tglLahir) ?? usiaTersimpan ?? null;
+}
+
+/** Mengembalikan pesan kesalahan, atau null bila tanggalnya masuk akal. */
+export function periksaTanggalLahir(raw: string): string | null {
+  if (!raw.trim()) return 'Tanggal lahir belum diisi.';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return 'Tanggal lahir belum lengkap.';
+  const { min, maks } = batasTanggalLahir();
+  if (raw > maks) return 'Tanggal lahir tidak bisa di masa depan.';
+  if (raw < min) return `Usia di luar rentang wajar (maksimal ${USIA_MAKS} tahun).`;
+  // Tanggal yang tidak ada — 31 Februari — lolos pemeriksaan pola di atas.
+  const d = new Date(`${raw}T00:00:00`);
+  if (Number.isNaN(d.getTime()) || lokalIso(d) !== raw) return 'Tanggal itu tidak ada.';
+  const u = usiaDari(raw);
+  if (u != null && u < USIA_MIN) return `Peserta termuda yang dicatat berusia ${USIA_MIN} tahun.`;
   return null;
 }

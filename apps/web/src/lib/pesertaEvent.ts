@@ -17,6 +17,8 @@ export type PesertaRingkas = {
   clientId: string;
   nama: string;
   gender: 'P' | 'L';
+  /** "YYYY-MM-DD" bila diketahui; usianya dihitung darinya saat ditampilkan. */
+  tanggalLahir: string | null;
   usia: string;
   hp: string;
   imt: number | null;
@@ -106,6 +108,7 @@ export async function pesertaEvent(
     clientId: p.clientId,
     nama: p.secret?.nama ?? 'Identitas sudah dibersihkan',
     gender: p.secret?.gender ?? 'P',
+    tanggalLahir: p.secret?.tanggalLahir ?? null,
     usia: p.secret?.usia ?? '',
     hp: p.secret?.hp ?? '',
     imt: p.secret?.screening ? imtLokal(p.secret.screening.values) : null,
@@ -141,6 +144,7 @@ export async function pesertaEvent(
           // di-purge tidak lagi punya namanya.
           nama: s.nama,
           gender: s.gender,
+          tanggalLahir: s.tanggalLahir ?? null,
           usia: String(s.usia),
           hp: s.hp,
           imt: s.imt,
@@ -179,7 +183,8 @@ export async function pesertaEvent(
               diambilPada: new Date().toISOString(),
             },
             secret: {
-              nama: s.nama, gender: s.gender, usia: String(s.usia), hp: s.hp,
+              nama: s.nama, gender: s.gender, tanggalLahir: s.tanggalLahir ?? null,
+              usia: String(s.usia), hp: s.hp,
               imt: s.imt, paramsDiambil: (s.paramsDiambil ?? []) as ParamKey[],
               // Ikut disalin supaya penyaring temuan tetap bekerja offline.
               nilai: {
@@ -207,6 +212,7 @@ export async function pesertaEvent(
         clientId: c.clientId,
         nama: c.secret?.nama ?? 'Identitas terkunci',
         gender: c.secret?.gender ?? 'P',
+        tanggalLahir: c.secret?.tanggalLahir ?? null,
         usia: c.secret?.usia ?? '',
         hp: c.secret?.hp ?? '',
         imt: c.secret?.imt ?? null,

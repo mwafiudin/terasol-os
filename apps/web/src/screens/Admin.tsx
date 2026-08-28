@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Badge, Button, Field, Icon, ICONS, InputRupiah, PageHead } from '../components/ui';
 import { api, type ConflictGroup, type PusatRingkasan } from '../lib/api';
 import { LOCAL_RETENTION_HOURS } from '../lib/db';
-import { PARAM_LABEL, ROLE_LABEL, fmtTanggal, rp } from '../lib/domain';
+import { PARAM_LABEL, ROLE_LABEL, fmtTanggal, rp, usiaTampil } from '../lib/domain';
 import { IDLE_LOCK_MS, REQUIRE_PIN, useApp } from '../lib/store';
 import { isOnline, MAX_UNSYNCED } from '../lib/sync';
 import type { ParamKey } from '../lib/types';
@@ -72,7 +72,7 @@ export function Conflicts({ go }: { go: Nav }) {
             return (
               <div className="card conflict-card" key={r.id}>
                 <div className="who">
-                  <b>Record {i + 1} — {r.nama}, {r.usia} th</b>
+                  <b>Record {i + 1} — {r.nama}, {usiaTampil(r.tanggalLahir, r.usia)} th</b>
                   <span>{new Date(r.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
                 <div className="conflict-vals">{nilai || 'Belum ada hasil pengukuran'}</div>

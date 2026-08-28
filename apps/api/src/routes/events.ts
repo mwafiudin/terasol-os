@@ -141,7 +141,8 @@ export default async function eventRoutes(app: FastifyInstance) {
       if (!ev.rowCount) return reply.code(404).send({ error: 'not_found' });
 
       const { rows } = await tx.query(
-        `select p.nama, p.gender, p.usia, p.hp, p.needs_review,
+        `select p.nama, p.gender, p.usia,
+                to_char(p.tanggal_lahir,'YYYY-MM-DD') as tanggal_lahir, p.hp, p.needs_review,
                 c.granted as consent_granted, c.versi_teks, c.ts as consent_ts,
                 s.tinggi, s.berat, s.imt, s.sistolik, s.diastolik, s.gula, s.kolesterol, s.asam_urat,
                 cv.berminat, cv.status as conv_status, cv.nilai_transaksi, cv.produk
@@ -159,7 +160,7 @@ export default async function eventRoutes(app: FastifyInstance) {
       // Setiap ekspor data peserta dicatat (§4.5.8).
       await audit(tx, ctx, 'event.export_csv', 'event', id, { baris: rows.length });
 
-      const head = ['nama', 'jenis_kelamin', 'usia', 'no_hp', 'perlu_ditinjau', 'consent', 'consent_versi',
+      const head = ['nama', 'jenis_kelamin', 'tanggal_lahir', 'usia', 'no_hp', 'perlu_ditinjau', 'consent', 'consent_versi',
         'consent_waktu', 'tinggi_cm', 'berat_kg', 'imt', 'sistolik', 'diastolik', 'gula_mgdl',
         'kolesterol_mgdl', 'asam_urat_mgdl', 'berminat', 'status_konversi', 'nilai_transaksi', 'produk'];
       const cell = (v: unknown) => {
@@ -167,7 +168,8 @@ export default async function eventRoutes(app: FastifyInstance) {
         return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
       };
       const lines = rows.map((r) => [
-        r.nama, r.gender, r.usia, r.hp, r.needs_review ? 'ya' : 'tidak',
+        r.nama, r.gender, r.tanggal_lahir ?? '', r.usia, r.hp,
+        r.needs_review ? 'ya' : 'tidak',
         r.consent_granted ? 'setuju' : 'tolak', r.versi_teks,
         r.consent_ts ? new Date(r.consent_ts).toISOString() : '',
         r.tinggi, r.berat, r.imt, r.sistolik, r.diastolik, r.gula, r.kolesterol, r.asam_urat,

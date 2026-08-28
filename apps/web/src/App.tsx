@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Badge, Button, Field, ICONS, InputRupiah, Navigasi, Sheet, Toast, type TabId } from './components/ui';
 import { api, ApiError, type ServerParticipant } from './lib/api';
-import { CONV_LABEL, fmtTanggal, fmtWaktu } from './lib/domain';
+import { CONV_LABEL, fmtTanggal, fmtWaktu, usiaTampil } from './lib/domain';
 import { useDraft } from './lib/draft';
 import { activeEvent, hapusEvent } from './lib/events';
 import type { PesertaRingkas } from './lib/pesertaEvent';
@@ -267,7 +267,7 @@ function FollowUpSheet({ participant, onClose, onDone }: {
   }
 
   return (
-    <Sheet title={`${participant.nama}, ${participant.usia} th`}
+    <Sheet title={`${participant.nama}, ${usiaTampil(participant.tanggalLahir, participant.usia)} th`}
       subtitle={participant.hp} onClose={onClose}>
 
       {/* US-04 — jejak peserta: event asal → tanggal screening → status terkini. */}

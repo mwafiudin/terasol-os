@@ -48,6 +48,8 @@ export type EventRow = {
 export type ParticipantSecret = {
   nama: string;
   gender: 'P' | 'L';
+  /** "YYYY-MM-DD", atau null untuk peserta yang didaftarkan sebelum ditanyakan. */
+  tanggalLahir?: string | null;
   usia: string;
   hp: string;
   consent: { granted: boolean; versiTeks: string; ts: string };
@@ -114,6 +116,7 @@ export type AnonTallyRow = {
 export type CerminSecret = {
   nama: string;
   gender: 'P' | 'L';
+  tanggalLahir?: string | null;
   usia: string;
   hp: string;
   imt: number | null;

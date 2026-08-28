@@ -131,16 +131,23 @@ async function seed(tx: Tx) {
     const usia = opts.usia ?? int(50, 74);
     const hp = opts.hp ?? '08' + String(int(1_200_000_000, 1_999_999_999));
     const createdAt = opts.createdAt ?? minus(int(0, 3));
+    // Sebagian peserta demo sengaja TANPA tanggal lahir: itulah keadaan setiap
+    // orang yang terdaftar sebelum kolomnya ada, dan tampilan yang jatuh ke
+    // usia tersimpan harus ikut terlihat saat demo, bukan hanya di produksi.
+    const tglLahir = rand() < 0.75
+      ? `${new Date().getFullYear() - usia}-${String(int(1, 12)).padStart(2, '0')}-${String(int(1, 28)).padStart(2, '0')}`
+      : null;
 
     const pid = (await tx.query<{ id: string }>(
-      `insert into participants (tenant_id, event_id, client_id, nama, gender, usia, hp, needs_review, created_by, created_at)
-       values ($1,$2,$3,$4,$5::gender,$6,$7,$8,$9,$10) returning id`,
-      [tenantId, opts.eventId, randomUUID(), nama, gender, usia, hp,
+      `insert into participants (tenant_id, event_id, client_id, nama, gender, usia, tanggal_lahir,
+                                 hp, needs_review, created_by, created_at)
+       values ($1,$2,$3,$4,$5::gender,$6,$7,$8,$9,$10,$11) returning id`,
+      [tenantId, opts.eventId, randomUUID(), nama, gender, usia, tglLahir, hp,
        opts.needsReview ?? false, userIds.petugas, createdAt],
     )).rows[0]!.id;
 
     await tx.query(
-      `insert into consents (tenant_id, participant_id, granted, versi_teks) values ($1,$2,true,'v1')`,
+      `insert into consents (tenant_id, participant_id, granted, versi_teks) values ($1,$2,true,'v2')`,
       [tenantId, pid],
     );
 

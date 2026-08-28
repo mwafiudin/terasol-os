@@ -61,8 +61,9 @@ export default async function pelangganRoutes(app: FastifyInstance) {
       args.push(limit);
 
       const { rows } = await tx.query<{ tenantId: string }>(
-        `select p.id, p.tenant_id as "tenantId", p.nama, p.gender, p.usia, p.hp,
-                p.created_at as "createdAt",
+        `select p.id, p.tenant_id as "tenantId", p.nama, p.gender, p.usia,
+                to_char(p.tanggal_lahir,'YYYY-MM-DD') as "tanggalLahir",
+                p.hp, p.created_at as "createdAt",
                 (select count(*) from participants k where k.pelanggan_id = p.id
                    and k.deleted_at is null)::int as kunjungan,
                 (select coalesce(sum(t.total),0) from transaksi t where t.pelanggan_id = p.id and t.deleted_at is null)::bigint as "totalBelanja",
@@ -86,7 +87,8 @@ export default async function pelangganRoutes(app: FastifyInstance) {
 
     return withTenant(ctx, async (tx) => {
       const { rows } = await tx.query<{ tenantId: string }>(
-        `select p.id, p.tenant_id as "tenantId", p.nama, p.gender, p.usia, p.hp, p.catatan,
+        `select p.id, p.tenant_id as "tenantId", p.nama, p.gender, p.usia,
+                to_char(p.tanggal_lahir,'YYYY-MM-DD') as "tanggalLahir", p.hp, p.catatan,
                 p.created_at as "createdAt", p.erased_at as "erasedAt"
            from pelanggan p where p.id = $1`,
         [id],
@@ -123,6 +125,9 @@ export default async function pelangganRoutes(app: FastifyInstance) {
       nama: z.string().min(1).max(160).optional(),
       gender: z.enum(['P', 'L']).optional(),
       usia: z.number().int().min(0).max(130).nullish(),
+      tanggalLahir: z.string().date()
+        .refine((s) => s <= new Date().toISOString().slice(0, 10), 'Tanggal lahir di masa depan')
+        .nullish(),
       hp: z.string().min(3).max(32).optional(),
       catatan: z.string().max(1000).nullish(),
     }).safeParse(req.body);
@@ -135,10 +140,13 @@ export default async function pelangganRoutes(app: FastifyInstance) {
         `update pelanggan
             set nama = coalesce($2::text, nama), gender = coalesce($3::gender, gender),
                 usia = coalesce($4::smallint, usia), hp = coalesce($5::text, hp),
-                catatan = coalesce($6::text, catatan)
+                catatan = coalesce($6::text, catatan),
+                tanggal_lahir = coalesce($7::date, tanggal_lahir)
           where id = $1 and erased_at is null
-          returning id, nama, gender, usia, hp, catatan`,
-        [id, d.nama ?? null, d.gender ?? null, d.usia ?? null, d.hp ?? null, d.catatan ?? null],
+          returning id, nama, gender, usia,
+                    to_char(tanggal_lahir,'YYYY-MM-DD') as "tanggalLahir", hp, catatan`,
+        [id, d.nama ?? null, d.gender ?? null, d.usia ?? null, d.hp ?? null, d.catatan ?? null,
+         d.tanggalLahir ?? null],
       );
       if (!rows[0]) return reply.code(404).send({ error: 'not_found' });
       await audit(tx, ctx, 'pelanggan.update', 'pelanggan', id, d);
