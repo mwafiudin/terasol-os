@@ -63,6 +63,28 @@ type AppState = {
 
 let toastTimer: number | undefined;
 
+/**
+ * Menyegarkan profil dari server setelah aplikasi siap.
+ *
+ * `boot` memulihkan pengguna dari penyimpanan lokal, dan sampai sekarang itu
+ * satu-satunya sumbernya — artinya nama cabang, nama pengguna, dan perannya
+ * BEKU sejak login terakhir. Admin Pusat mengganti nama cabang, dan setiap
+ * perangkat tetap menampilkan nama lama sampai seseorang keluar lalu masuk
+ * lagi. Bukan cuma di kepala layar: nama itu ikut tercetak di lembar hasil
+ * yang dibawa pulang peserta, dan ikut terkirim dalam pesan WhatsApp.
+ *
+ * Tidak menghalangi boot dan tidak pernah menggagalkannya. Perangkat di
+ * lapangan sering dibuka tanpa sinyal; gagal menyegarkan berarti tetap memakai
+ * yang tersimpan, bukan menolak masuk.
+ */
+async function segarkanProfil(set: (p: { user: User }) => void) {
+  try {
+    const { user } = await api.me();
+    await setMeta('user', user);
+    set({ user });
+  } catch { /* biarkan yang tersimpan */ }
+}
+
 export const useApp = create<AppState>((set, get) => ({
   phase: 'booting',
   user: null,
@@ -122,6 +144,7 @@ export const useApp = create<AppState>((set, get) => ({
       setSession(null, await loadRefreshToken(key));
       set({ user, key, phase: 'ready' });
       await refreshPending();
+      void segarkanProfil(set);
       return;
     }
 
@@ -177,6 +200,7 @@ export const useApp = create<AppState>((set, get) => ({
     setSession(null, refreshToken);
     set({ key, phase: 'ready' });
     await refreshPending();
+    void segarkanProfil(set);
     // Token akses diambil ulang lewat refresh saat request pertama.
     void syncNow(key, { silent: true }).catch(() => {});
     return true;

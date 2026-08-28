@@ -1575,9 +1575,15 @@ button { cursor: pointer; font-family: inherit; }
     position: static; padding-top: 8px;
   }
   .tabel .kol-aksi:has(.hapus-konfirm) .hapus-konfirm { justify-content: flex-start; }
-  /* Tombol teks (Nonaktifkan/Aktifkan) tidak muat di sudut bersama nama. */
-  .tabel .kol-aksi:has(> .btn) { position: static; padding-top: 8px; text-align: right; }
-  .tabel .kol-aksi:has(> .btn) ~ .kol-nama, .tabel tr:has(.kol-aksi > .btn) .kol-nama { padding-right: 0; }
+  /* Tombol teks (Simpan, Nonaktifkan, Aktifkan) tidak muat di sudut bersama
+     nama, jadi selnya turun ke barisnya sendiri.
+
+     Keturunan, BUKAN anak langsung: saat baris disunting, tombol Simpan
+     dibungkus `.riwayat-aksi` bersama tautan Batal. Dengan `> .btn` selnya
+     tetap absolut dan tombolnya menimpa kolom nama — persis di atas input yang
+     sedang diketik. */
+  .tabel .kol-aksi:has(.btn) { position: static; padding-top: 8px; text-align: right; }
+  .tabel .kol-aksi:has(.btn) ~ .kol-nama, .tabel tr:has(.kol-aksi .btn) .kol-nama { padding-right: 0; }
 
   .tabel .baris-grup td {
     padding: 4px 0 2px; font-size: 11px; font-weight: var(--fw-semibold);
