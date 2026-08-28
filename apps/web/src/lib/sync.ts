@@ -104,7 +104,9 @@ async function buildParticipantPayload(
       ? {
         clientId: sc.clientId, ...toNumberValues(sc.values),
         konteksGula: sc.konteksGula ?? null,
-        paramsDiambil: taken, outOfRange: sc.outOfRange, measuredAt: sc.measuredAt,
+        paramsDiambil: taken, outOfRange: sc.outOfRange,
+        diLuarWajar: sc.diLuarWajar ?? [],
+        measuredAt: sc.measuredAt,
       }
       : null,
     conversion: row.convStatus

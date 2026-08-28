@@ -67,14 +67,18 @@ function cocokPencarian(p: PesertaRingkas, kata: string): boolean {
   return digit.length > 0 && angkaSaja(p.hp).includes(digit);
 }
 
-export function EventPeserta({ go, event, onBuka, onTambah, reloadKey }: {
+export function EventPeserta({ go, event, onBuka, onTambah, onUbahEvent, onHapusEvent, reloadKey }: {
   go: Nav;
   event: EventRow;
   onBuka: (p: PesertaRingkas) => void;
   onTambah: () => void;
+  /** Hanya untuk Koordinator ke atas; App yang menegakkan perannya. */
+  onUbahEvent?: (ev: EventRow) => void;
+  onHapusEvent?: (ev: EventRow) => void;
   reloadKey: number;
 }) {
   const { key } = useApp();
+  const [kelola, setKelola] = useState(false);
   const [daftar, setDaftar] = useState<PesertaRingkas[] | null>(null);
   const [rekap, setRekap] = useState<RekapSementara | null>(null);
   const [cari, setCari] = useState('');
@@ -118,7 +122,45 @@ export function EventPeserta({ go, event, onBuka, onTambah, reloadKey }: {
   return (
     <div className="page">
       <PageHead title={event.nama} onBack={() => go('events')}
-        right={<Badge tone={status.tone} dot={status.hariIni}>{status.label}</Badge>} />
+        right={
+          <>
+            <Badge tone={status.tone} dot={status.hariIni}>{status.label}</Badge>
+            {(onUbahEvent || onHapusEvent) && (
+              <button className="ikon-btn" aria-label="Kelola event"
+                onClick={() => setKelola(true)}>
+                <Icon d={ICONS.gear} size={18} />
+              </button>
+            )}
+          </>
+        } />
+
+      {kelola && (
+        <Sheet title="Kelola event" subtitle={event.nama} onClose={() => setKelola(false)}>
+          {onUbahEvent && (
+            <Button full variant="secondary" icon={ICONS.pencil}
+              onClick={() => { setKelola(false); onUbahEvent(event); }}>
+              Ubah data event
+            </Button>
+          )}
+          {/* Menghapus hanya ditawarkan selagi event belum punya jejak. Setelah
+              ada peserta, menghapusnya berarti ikut menarik consent dan hasil
+              pengukuran orang sungguhan — server menolaknya, dan menawarkan
+              tombol yang pasti ditolak hanya memancing kekecewaan. */}
+          {onHapusEvent && event.peserta === 0 && event.tally === 0 ? (
+            <Button full variant="ghost" icon={ICONS.trash}
+              onClick={() => { setKelola(false); onHapusEvent(event); }}>
+              Hapus event
+            </Button>
+          ) : onHapusEvent && (
+            <small className="field-bantu">
+              Event ini sudah punya {event.peserta} peserta dan {event.tally} tally,
+              jadi tidak bisa dihapus. Arsipkan saja dari layar rekap agar
+              catatannya tetap utuh.
+            </small>
+          )}
+          <button className="link-btn" onClick={() => setKelola(false)}>Tutup</button>
+        </Sheet>
+      )}
 
       <span className="recap-sub">
         <span>

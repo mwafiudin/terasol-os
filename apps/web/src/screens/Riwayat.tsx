@@ -340,7 +340,14 @@ function BarisUkur({
             {kini.penilaian && (
               <span className={`vonis vonis-${kini.penilaian.nada}`}>{kini.penilaian.singkat}</span>
             )}
-            {kini.outOfRange && <span className="vonis vonis-tinggi">Di luar rentang wajar</span>}
+            {/* Penanda kewajaran pengetikan TIDAK ditampilkan berdampingan
+                dengan penilaian rujukan.
+                Keduanya menjawab pertanyaan yang berbeda — yang satu "apakah
+                angkanya masuk akal untuk diketik", yang lain "apa artinya
+                dibanding rentang rujukan" — dan menaruhnya sebagai dua chip
+                sederajat membuat satu angka seolah punya dua vonis yang
+                bertentangan: "Dalam rujukan" tepat di sebelah "Di luar rentang
+                wajar". Keterangannya pindah ke dalam baris yang dibuka. */}
             {/* Waktu hanya ditulis kalau ia membedakan sesuatu. Bila seluruh
                 angka berasal dari kunjungan yang sedang dibuka, baik tanggal
                 maupun tanda "Kunjungan ini" mengatakan hal yang sudah jelas
@@ -390,6 +397,11 @@ function BarisUkur({
                     {t.event ? ` · ${t.event}` : ''}
                   </span>
                   {antre && <em className="riwayat-antre">Menunggu terkirim</em>}
+                  {/* Provenans, bukan penilaian: petugas sempat diminta
+                      mengonfirmasi angka ini saat mengetiknya. */}
+                  {t.outOfRange && (
+                    <em className="riwayat-wajar">Dikonfirmasi petugas saat dicatat</em>
+                  )}
                   {t.catatan && <em>{t.catatan}</em>}
                 </div>
                 <div className="riwayat-aksi">

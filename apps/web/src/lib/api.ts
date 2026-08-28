@@ -210,7 +210,10 @@ export type SyncParticipant = {
     gula: number | null; kolesterol: number | null; asamUrat: number | null;
     /** Jenis gula darah yang dipilih petugas; menentukan rentang rujukannya. */
     konteksGula: KonteksGula | null;
-    paramsDiambil: string[]; outOfRange: boolean; measuredAt: string;
+    paramsDiambil: string[]; outOfRange: boolean;
+    /** Parameter yang petugas konfirmasi karena di luar rentang wajar. */
+    diLuarWajar: string[];
+    measuredAt: string;
   } | null;
   conversion: {
     berminat: boolean; status: ConvStatus; nilaiTransaksi: number;
@@ -343,6 +346,9 @@ export const api = {
   setConversion: (id: string, body: { status: ConvStatus; nilaiTransaksi: number; produk?: string | null; berminat?: boolean }) =>
     patch<unknown>(`/participants/${id}/conversion`, body),
   eraseParticipant: (id: string, alasan: string) => post<{ ok: true }>(`/participants/${id}/erase`, { alasan }),
+
+  /** Hanya untuk event tanpa peserta dan tanpa tally; server menolak sisanya. */
+  deleteEvent: (id: string) => del<{ ok: true }>(`/events/${id}`),
 
   conflicts: () => request<{ conflicts: ConflictGroup[] }>('/conflicts'),
   resolveConflict: (keepId: string, dropIds: string[]) =>

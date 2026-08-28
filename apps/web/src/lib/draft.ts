@@ -115,8 +115,12 @@ export function draftToRecord(draft: Draft): {
   secret: ParticipantSecret;
   anyOutOfRange: boolean;
 } {
-  const anyOutOfRange = (Object.keys(draft.values) as ParamKey[])
-    .some((k) => outOfRange(k, draft.values[k]));
+  // Daftar parameter yang di luar rentang wajar, BUKAN satu bendera untuk
+  // seluruh screening. Satu bendera bersama membuat satu angka mencurigakan
+  // menandai kesembilan angka lainnya sebagai mencurigakan juga.
+  const diLuarWajar = (Object.keys(draft.values) as ParamKey[])
+    .filter((k) => outOfRange(k, draft.values[k]));
+  const anyOutOfRange = diLuarWajar.length > 0;
 
   return {
     anyOutOfRange,
@@ -134,6 +138,7 @@ export function draftToRecord(draft: Draft): {
         clientId: crypto.randomUUID(),
         values: draft.values,
         outOfRange: anyOutOfRange,
+        diLuarWajar,
         measuredAt: new Date().toISOString(),
       },
     },

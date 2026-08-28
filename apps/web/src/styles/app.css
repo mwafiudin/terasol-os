@@ -1876,7 +1876,10 @@ button { cursor: pointer; font-family: inherit; }
    dan siapa yang membuka aplikasi sudah jelas. */
 .hanya-cetak { display: none; }
 
-@page { size: A4; margin: 16mm 14mm; }
+/* Kanvas halaman putih. Latar krem aplikasi ada untuk layar; di kertas ia
+   menjadi tinta yang terpakai tanpa alasan, dan hasil cetaknya terlihat kusam
+   dibanding dokumen lain di meja yang sama. */
+@page { size: A4; margin: 16mm 14mm; background: #fff; }
 
 @media print {
   .hanya-cetak { display: block; }
@@ -1902,6 +1905,12 @@ button { cursor: pointer; font-family: inherit; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 
   body { font-size: 9.5pt; color: #111; }
+  /* Ditegaskan terpisah dari daftar selektor di atas: peramban memakai latar
+     elemen html sebagai kanvas halaman, dan bila ia tembus pandang, latar body
+     yang dipakai. Keduanya harus putih agar tepi kertas tidak ikut berwarna —
+     latar krem aplikasi ada untuk layar, di kertas ia hanya menghabiskan tinta
+     dan membuat hasilnya terlihat kusam di antara dokumen lain. */
+  html, body { background-color: #fff !important; background-image: none !important; }
 
   /* ---- kop ---- */
   .lembar { display: flex !important; flex-direction: column; gap: 9pt; }

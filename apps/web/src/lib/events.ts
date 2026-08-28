@@ -159,6 +159,43 @@ export async function kirimPenugasan(): Promise<void> {
   }
 }
 
+/**
+ * Menyunting event yang sudah ada.
+ *
+ * TIDAK memakai rute khusus: `/sync/push` sudah memperbarui seluruh kolom event
+ * saat client_id-nya bentrok, jadi cukup menulis perubahannya ke perangkat dan
+ * menandainya belum tersync. Mesin yang sama yang membawa event baru ke server
+ * membawa suntingan ini juga — termasuk saat perubahannya dibuat tanpa sinyal.
+ */
+export async function ubahLocalEvent(
+  clientId: string,
+  ubah: Partial<Pick<EventRow, 'nama' | 'lokasi' | 'tanggal' | 'tipe' | 'hargaPaket' | 'petugas' | 'petugasIds'>>,
+): Promise<void> {
+  await db.events.update(clientId, { ...ubah, synced: 0, updatedAt: new Date().toISOString() });
+}
+
+/** Apa saja yang menempel pada event ini di perangkat ini. */
+export async function jejakLokal(clientId: string): Promise<{ peserta: number; tally: number }> {
+  const [peserta, tally] = await Promise.all([
+    db.participants.where('eventClientId').equals(clientId).count(),
+    db.anonTallies.where('eventClientId').equals(clientId).count(),
+  ]);
+  return { peserta, tally };
+}
+
+/**
+ * Menghapus event beserta salinan lokalnya.
+ *
+ * Event yang belum pernah tersinkron tidak ada di server, jadi cukup dihapus di
+ * perangkat. Yang sudah ada di server harus lewat rute yang memeriksa jejaknya
+ * — pemeriksaan lokal di sini tidak cukup, karena peserta bisa saja dicatat
+ * petugas lain dari perangkat yang berbeda.
+ */
+export async function hapusEvent(ev: EventRow): Promise<void> {
+  if (ev.serverId) await api.deleteEvent(ev.serverId);
+  await db.events.delete(ev.clientId);
+}
+
 export async function saveLocalEvent(
   e: Omit<EventRow, 'synced' | 'updatedAt' | 'serverId' | 'peserta' | 'berminat' | 'tally'>,
 ) {
