@@ -9,7 +9,7 @@
  * Seluruh isinya dihitung `analisis.ts` dari data yang sudah tersimpan. Tidak
  * ada panggilan model bahasa di sini.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge, Button, ICONS, PageHead, Rujukan } from '../components/ui';
 import { api, type PengukuranRow } from '../lib/api';
 import { analisa, labelArah, type Analisis, type Penanda } from '../lib/analisis';
@@ -180,6 +180,22 @@ export function Analisis({ go, pelangganId, nama, gender, usia, hp }: {
     ...(hasil?.penanda ?? []).map((p) => p.terbaru.penilaian?.sumber).filter((s): s is string => !!s),
   ])];
 
+  /**
+   * Arti tiap penanda yang benar-benar muncul di lembar ini.
+   *
+   * Didaftar PER PARAMETER, bukan per bentuk pendek. "Di atas rujukan" berarti
+   * ≥140/90 pada tensi dan ≥200 pada gula darah sewaktu, jadi mengumpulkannya
+   * sebagai daftar bentuk pendek menghasilkan dua baris berjudul sama dengan
+   * isi berbeda — pembacanya tidak punya cara tahu baris mana miliknya.
+   * Nama parameterlah yang menghubungkan chip di kartu dengan artinya di sini.
+   *
+   * IMT tidak ikut: kartunya sudah mencetak label utuhnya sendiri.
+   */
+  const arti = (hasil?.penanda ?? []).flatMap((p) => {
+    const v = p.terbaru.penilaian;
+    return v ? [{ nama: p.deret.nama, singkat: v.singkat, label: v.label }] : [];
+  });
+
   return (
     <div className="page page-analisis">
       <PageHead title="Analisis" onBack={() => go('peserta')}
@@ -233,6 +249,24 @@ export function Analisis({ go, pelangganId, nama, gender, usia, hp }: {
               di tiap baris. Di layar pengulangan itu berguna sebagai konteks;
               di kertas ia menjadi tujuh baris kecil yang mengatakan hal yang
               sama dan mendorong isi sesungguhnya turun satu halaman. */}
+          {/* Arti tiap penanda, dikumpulkan di kaki halaman.
+              Di layar penjelasannya bisa dibuka dengan mengetuk chip-nya;
+              kertas tidak bisa diketuk, jadi keterangannya harus ikut tercetak
+              atau pembacanya tinggal menebak apa arti "Di atas rujukan". */}
+          {arti.length > 0 && (
+            <div className="hanya-cetak lembar-sumber">
+              <h2>Arti penanda</h2>
+              <dl className="lembar-arti">
+                {arti.map((a) => (
+                  <Fragment key={a.nama}>
+                    <dt>{a.nama}</dt>
+                    <dd><i>{a.singkat}</i> — {a.label}</dd>
+                  </Fragment>
+                ))}
+              </dl>
+            </div>
+          )}
+
           {sumber.length > 0 && (
             <div className="hanya-cetak lembar-sumber">
               <h2>Sumber rujukan</h2>
@@ -464,6 +498,7 @@ function KartuPenanda({ p, gender }: { p: Penanda; gender: Gender }) {
   const { seri, band } = seriDari(p.deret, gender);
   const arah = labelArah(p);
   const nada = p.terbaru.penilaian?.nada ?? 'netral';
+  const [jelas, setJelas] = useState(false);
 
   return (
     <article className={`penanda nada-${nada}`}>
@@ -476,7 +511,24 @@ function KartuPenanda({ p, gender }: { p: Penanda; gender: Gender }) {
         <span>{p.deret.satuan}</span>
       </div>
       {p.terbaru.penilaian && (
-        <span className={`vonis vonis-${nada}`}>{p.terbaru.penilaian.singkat}</span>
+        <>
+          {/* Diketuk untuk membuka, bukan disorot: ini aplikasi sentuh, dan
+              tooltip yang hanya muncul saat hover tidak pernah bisa dibaca di
+              ponsel. `title` tetap dipasang agar tetikus di desktop juga
+              mendapatkannya tanpa mengetuk. */}
+          <button className={`vonis vonis-${nada} vonis-tanya`}
+            aria-expanded={jelas} title={p.terbaru.penilaian.label}
+            onClick={() => setJelas((v) => !v)}>
+            {p.terbaru.penilaian.singkat}
+            <span aria-hidden="true">?</span>
+          </button>
+          {jelas && (
+            <p className="vonis-jelas">
+              {p.terbaru.penilaian.label}
+              <span>{p.terbaru.penilaian.sumber}</span>
+            </p>
+          )}
+        </>
       )}
 
       {p.deret.titik.length > 1 && (

@@ -2140,3 +2140,41 @@ button { cursor: pointer; font-family: inherit; }
   .saran-kandungan > span { font-size: 6.5pt; }
   .saran-catatan { font-size: 7.5pt; }
 }
+
+/* Chip penilaian yang bisa dibuka. Tanda tanya kecil, bukan ikon terpisah:
+   ia harus terbaca sebagai bagian dari chip, bukan tombol kedua di sebelahnya. */
+.vonis-tanya {
+  display: inline-flex; align-items: center; gap: 5px;
+  border: none; cursor: pointer; font: inherit;
+}
+.vonis-tanya > span {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 13px; height: 13px; border-radius: 50%;
+  background: currentColor; color: var(--surface-card);
+  font-size: 9px; font-weight: var(--fw-semibold); line-height: 1;
+}
+.vonis-jelas {
+  margin: -2px 0 0; font-size: 12px; color: var(--text-body);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.vonis-jelas > span { font-size: 10.5px; color: var(--text-subtle); }
+
+@media print {
+  /* Di kertas chipnya tidak bisa diketuk, jadi tanda tanyanya menyesatkan dan
+     penjelasan yang kebetulan terbuka tidak boleh ikut tercetak sebagian —
+     artinya dikumpulkan utuh di kaki halaman. */
+  .vonis-tanya > span { display: none !important; }
+  .vonis-jelas { display: none !important; }
+
+  .lembar-arti {
+    display: grid; grid-template-columns: max-content 1fr;
+    gap: 1pt 8pt; margin: 0;
+  }
+  .lembar-arti dt { font-size: 7.5pt; font-weight: var(--fw-semibold); color: #333; }
+  .lembar-arti dd { margin: 0; font-size: 7.5pt; color: #444; }
+}
+@media print {
+  /* Bentuk pendeknya dimiringkan supaya terbaca sebagai KUTIPAN dari chip di
+     kartu, bukan sebagai kalimat baru yang berdiri sendiri. */
+  .lembar-arti dd i { font-style: italic; color: #222; }
+}
