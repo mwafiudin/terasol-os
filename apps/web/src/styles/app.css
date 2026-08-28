@@ -1357,6 +1357,7 @@ button { cursor: pointer; font-family: inherit; }
   .screen > .page > .chip-baris,
   .screen > .page > .warn-card,
   .screen > .page > .sync-row,
+  .screen > .page > .kondisi-kartu,
   .screen > .page > .rekap-lebar,
   .screen > .page > .belum-note,
   .screen > .page > .empty-card,
@@ -2295,3 +2296,49 @@ button { cursor: pointer; font-family: inherit; }
 /* Jalur usia: lebar batang di dalamnya menyatakan besar kelompok, jadi jalurnya
    yang menjadi acuan 100% — bukan batangnya sendiri. */
 .usia-jalur { display: flex; }
+
+/* Di layar lebar isi kartu kondisi TIDAK ikut melebar tanpa batas.
+   Melewati ~520px, dua hal rusak sekaligus: segmen batang tidak lagi bisa
+   dibandingkan sekali pandang, dan angka di ujung kanan terlepas jauh dari
+   batang pendek di sebelah kirinya — "0" berdiri 400px dari batangnya sendiri.
+   Paragrafnya pun menjadi 95 karakter per baris, dua kali panjang yang nyaman
+   dibaca. Garis pemisah sengaja dibiarkan penuh: ia menandai lebar KARTU, dan
+   memendekkannya membuat kartunya terlihat separuh terisi. */
+@media (min-width: 768px) {
+  .kondisi-pita, .kondisi-kalimat,
+  .kondisi-baris, .sebar-baris, .usia-baris,
+  .kondisi-legenda, .kondisi-catatan, .kondisi-kaki,
+  .tindak-baris, .kondisi-buka { max-width: 520px; }
+  .kondisi-baris, .sebar-baris, .usia-baris { grid-template-columns: 110px 1fr 54px; }
+}
+
+/* Blok grafik: satu kolom yang dipisah garis, sampai lebarnya cukup untuk dua.
+   Pada 1100px ke atas kartunya melintang penuh (lihat daftar grid-column di
+   tata letak desktop), jadi batang parameter menempati kolom kiri dan dua blok
+   yang lebih pendek menumpuk di kanan — bukan satu kolom panjang dengan
+   separuh kartu menganggur. */
+.kondisi-kolom { display: flex; flex-direction: column; }
+.kondisi-blok { display: flex; flex-direction: column; gap: 10px; }
+.kondisi-blok + .kondisi-blok {
+  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-hairline);
+}
+
+@media (min-width: 1100px) {
+  /* Isinya kembali dua kolom penuh di sini, jadi pitanya ikut melebar lagi —
+     pita 520px di atas badan 908px justru yang terlihat timpang. */
+  .kondisi-pita { max-width: none; }
+  .kondisi-kolom {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 32px; align-content: start;
+  }
+  /* Blok parameter memanjang di kolom kiri; dua blok sisanya mengisi kanan. */
+  .kb-param { grid-row: 1 / span 2; }
+  /* Garis pemisahnya berpindah arah: yang membagi kini kiri-kanan, dan garis
+     mendatar di antara blok kanan tetap perlu. */
+  .kondisi-blok + .kondisi-blok { margin-top: 0; padding-top: 0; border-top: none; }
+  .kondisi-kolom > .kondisi-blok:not(.kb-param) { padding-left: 32px; border-left: 1px solid var(--border-hairline); }
+  .kondisi-kolom > .kondisi-blok:not(.kb-param) ~ .kondisi-blok:not(.kb-param) {
+    margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-hairline);
+  }
+  .kondisi-kolom { column-gap: 0; }
+}
