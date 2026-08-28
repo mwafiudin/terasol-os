@@ -226,7 +226,6 @@ export function Analisis({ go, pelangganId, nama, gender, usia, hp }: {
         ) : (
           <>
             <Sorotan hasil={hasil!} />
-            <SaranProduk sorotan={hasil!.sorotan} />
             {hasil!.imt && <KartuImt imt={hasil!.imt} />}
 
             <section className="lembar-bagian">
@@ -241,6 +240,13 @@ export function Analisis({ go, pelangganId, nama, gender, usia, hp }: {
                 Belum pernah diukur: {hasil!.belumDiukur.map((j) => UKUR[j].label).join(', ')}.
               </p>
             )}
+
+            {/* Sesudah angkanya, bukan sebelum.
+                Lembar ini adalah hasil pemeriksaan; saran produk adalah apa
+                yang bisa dibicarakan SETELAH hasilnya dibaca. Menaruhnya di
+                atas membuat halaman terbuka dengan tawaran, dan angka-angkanya
+                terbaca seperti alasan yang disusun untuk mendukungnya. */}
+            <SaranProduk sorotan={hasil!.sorotan} />
           </>
         )}
 
@@ -372,7 +378,7 @@ function SaranProduk({ sorotan }: { sorotan: Penanda[] }) {
 
   return (
     <section className="lembar-bagian">
-      <h2>Produk yang bisa dibicarakan</h2>
+      <h2>Saran produk</h2>
 
       {saran.map((s) => (
         <div className="saran-grup" key={s.temuan}>
