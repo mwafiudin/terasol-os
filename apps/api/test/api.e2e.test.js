@@ -704,4 +704,43 @@ describe('Alur API end-to-end', () => {
     assert.equal(typeof entri.meta.jumlah, 'number', 'jumlah record yang diakses ikut dicatat');
     assert.equal(typeof entri.meta.lintasCabang, 'boolean', 'penanda lintas cabang ikut dicatat');
   });
+
+  /**
+   * Sengaja diletakkan paling akhir.
+   *
+   * Uji ini menambah dua peserta ke event yang sama, dan beberapa uji di
+   * atasnya menghitung jumlah peserta event itu secara persis ("tetap dua,
+   * bukan empat"). Menyisipkannya di tengah membuat uji yang tidak ada
+   * hubungannya ikut gagal — dan yang gagal bukan yang rusak.
+   */
+  it('peserta tanpa nomor HP diterima dan tidak pernah ditandai kembar', async () => {
+    const now = new Date().toISOString();
+    // DUA peserta tanpa nomor di event yang sama. Sebelum migrasi 016 keduanya
+    // akan saling menandai "nomor kembar" lewat string kosong yang sama —
+    // persis kesalahan yang membuat tujuh orang di lapangan mengaku duplikat.
+    const mk = (nama) => ({
+      clientId: randomUUID(), eventClientId, nama, gender: 'L', usia: 40,
+      hp: null, updatedAt: now,
+      consent: { granted: true, versiTeks: 'v3', ts: now },
+    });
+    const r = await call('/sync/push', {
+      method: 'POST',
+      body: JSON.stringify({
+        batchId: randomUUID(), events: [],
+        participants: [mk('__e2e Tanpa HP A'), mk('__e2e Tanpa HP B')],
+        anonTallies: [],
+      }),
+    });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(r.body.accepted.participants.length, 2, 'keduanya tersimpan');
+    assert.equal(r.body.conflicts.length, 0, 'tanpa nomor tidak pernah bentrok dedup');
+
+    const list = await call(`/participants?eventId=${eventId}`);
+    const tanpa = list.body.participants.filter((p) => p.nama.startsWith('__e2e Tanpa HP'));
+    assert.equal(tanpa.length, 2);
+    for (const p of tanpa) {
+      assert.equal(p.hp, null, 'nomornya null, bukan string kosong');
+      assert.equal(p.needsReview, false);
+    }
+  });
 });

@@ -63,7 +63,12 @@ const participantIn = z.object({
     .nullish(),
   /** Tanggalnya ditaksir dari usia, bukan ditanyakan. Lihat migrasi 012. */
   tanggalLahirAsumsi: z.boolean().default(false),
-  hp: z.string().min(3).max(32),
+  /**
+   * Nullish: peserta boleh tidak punya nomor. Lihat migrasi 016 — memaksa
+   * kolom ini terisi tidak menghasilkan data yang lebih lengkap, melainkan
+   * nomor karangan yang menyatukan orang-orang yang tak saling kenal.
+   */
+  hp: z.string().min(3).max(32).nullish(),
   updatedAt: z.string().datetime(),
   consent: z.object({
     granted: z.boolean(),
@@ -228,7 +233,7 @@ export default async function syncRoutes(app: FastifyInstance) {
                       tanggal_lahir = case when ${pakaiLahir} then $6::date else tanggal_lahir end,
                       tanggal_lahir_asumsi = case when ${pakaiLahir} then $7::boolean else tanggal_lahir_asumsi end
                 where id = $5`,
-              [p.nama, p.gender, p.usia, p.hp, participantId,
+              [p.nama, p.gender, p.usia, p.hp ?? null, participantId,
                p.tanggalLahir ?? null, p.tanggalLahirAsumsi],
             );
           } else {
@@ -236,12 +241,17 @@ export default async function syncRoutes(app: FastifyInstance) {
             // kedua record disimpan, yang baru ditandai needs_review agar
             // Koordinator memilih secara sadar. Hasil pengukuran adalah fakta
             // pada satu momen; menimpanya menghilangkan data yang tak bisa diulang.
-            const dup = await tx.query(
-              `select 1 from participants
-                where event_id = $1 and hp = $2 and deleted_at is null limit 1`,
-              [eventId, p.hp],
-            );
-            const needsReview = (dup.rowCount ?? 0) > 0;
+            // Tanpa nomor tidak ada yang bisa dibandingkan, jadi dedup
+             // dilewati seluruhnya — bukan dijalankan dengan NULL, yang tidak
+             // pernah cocok dan hanya menyamarkan pertanyaannya.
+             const dup = p.hp
+               ? await tx.query(
+                 `select 1 from participants
+                   where event_id = $1 and hp = $2 and deleted_at is null limit 1`,
+                 [eventId, p.hp],
+               )
+               : null;
+            const needsReview = (dup?.rowCount ?? 0) > 0;
             const ins = await tx.query<{ id: string }>(
               `insert into participants
                  (tenant_id, event_id, client_id, nama, gender, usia,
@@ -251,7 +261,7 @@ export default async function syncRoutes(app: FastifyInstance) {
                returning id`,
               [ctx.tenantId, eventId, p.clientId, p.nama, p.gender, p.usia,
                p.tanggalLahir ?? null, p.tanggalLahir ? p.tanggalLahirAsumsi : false,
-               p.hp, needsReview, ctx.userId, claims.did],
+               p.hp ?? null, needsReview, ctx.userId, claims.did],
             );
             participantId = ins.rows[0]!.id;
             if (needsReview) {
@@ -268,7 +278,7 @@ export default async function syncRoutes(app: FastifyInstance) {
           const pelangganId = await pelangganUntuk(tx, ctx.tenantId, {
             nama: p.nama, gender: p.gender, usia: p.usia,
             tanggalLahir: p.tanggalLahir ?? null,
-            tanggalLahirAsumsi: p.tanggalLahirAsumsi, hp: p.hp,
+            tanggalLahirAsumsi: p.tanggalLahirAsumsi, hp: p.hp ?? null,
           });
           await tx.query(
             'update participants set pelanggan_id = $2 where id = $1 and pelanggan_id is distinct from $2',

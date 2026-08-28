@@ -115,14 +115,14 @@ const del = <T>(p: string) => request<T>(p, { method: 'DELETE' });
 export type PelangganRingkas = {
   id: string; tenantId: string; nama: string; gender: 'P' | 'L'; usia: number | null;
   tanggalLahir: string | null;
-  hp: string; createdAt: string; kunjungan: number; totalBelanja: string;
+  hp: string | null; createdAt: string; kunjungan: number; totalBelanja: string;
   terakhirDiukur: string | null;
 };
 
 export type PelangganDetail = {
   id: string; tenantId: string; nama: string; gender: 'P' | 'L'; usia: number | null;
   tanggalLahir: string | null; tanggalLahirAsumsi: boolean;
-  hp: string; catatan: string | null; createdAt: string; erasedAt: string | null;
+  hp: string | null; catatan: string | null; createdAt: string; erasedAt: string | null;
   kunjungan: {
     id: string; needsReview: boolean; createdAt: string;
     eventId: string; eventNama: string; eventTanggal: string; eventStatus: EventStatus;
@@ -204,7 +204,7 @@ export type LoginResult = { accessToken: string; refreshToken: string; user: Use
 export type SyncParticipant = {
   clientId: string; eventClientId: string; nama: string; gender: 'P' | 'L';
   usia: number; tanggalLahir: string | null; tanggalLahirAsumsi: boolean;
-  hp: string; updatedAt: string;
+  hp: string | null; updatedAt: string;
   consent: { granted: boolean; versiTeks: string; ts: string };
   screening: {
     clientId: string; tinggi: number | null; berat: number | null;
@@ -253,7 +253,7 @@ export type Recap = {
 };
 
 export type ConflictGroup = {
-  eventId: string; hp: string; eventNama: string;
+  eventId: string; hp: string | null; eventNama: string;
   records: {
     id: string; clientId: string; nama: string; gender: string; usia: number;
     tanggalLahir: string | null;
@@ -264,7 +264,7 @@ export type ConflictGroup = {
 
 export type ServerParticipant = {
   id: string; clientId: string; nama: string; gender: 'P' | 'L'; usia: number;
-  tanggalLahir: string | null; tanggalLahirAsumsi: boolean; hp: string;
+  tanggalLahir: string | null; tanggalLahirAsumsi: boolean; hp: string | null;
   needsReview: boolean; eventId: string; eventNama: string; eventTanggal: string;
   eventStatus: string; imt: number | null; berminat: boolean; convStatus: ConvStatus;
   nilaiTransaksi: number; produk: string | null; createdAt: string;
@@ -290,7 +290,7 @@ export type ServerParticipant = {
 /** Rekap satu peserta — lengkap dengan nilai tiap parameter. */
 export type ParticipantDetail = {
   id: string; clientId: string; nama: string; gender: 'P' | 'L'; usia: number;
-  tanggalLahir: string | null; hp: string;
+  tanggalLahir: string | null; hp: string | null;
   needsReview: boolean; erasedAt: string | null; createdAt: string; deviceId: string | null;
   pelangganId: string | null;
   event: {
@@ -394,7 +394,7 @@ export const api = {
   pelanggan: (cari?: string) =>
     request<{ pelanggan: PelangganRingkas[] }>(`/pelanggan?${new URLSearchParams(cari ? { cari } : {})}`),
   pelangganDetail: (id: string) => request<PelangganDetail>(`/pelanggan/${id}`),
-  updatePelanggan: (id: string, body: Partial<{ nama: string; gender: 'P' | 'L'; usia: number | null; tanggalLahir: string | null; tanggalLahirAsumsi: boolean; hp: string; catatan: string | null }>) =>
+  updatePelanggan: (id: string, body: Partial<{ nama: string; gender: 'P' | 'L'; usia: number | null; tanggalLahir: string | null; tanggalLahirAsumsi: boolean; hp: string | null; catatan: string | null }>) =>
     patch<unknown>(`/pelanggan/${id}`, body),
 
   pengukuran: (pelangganId: string) =>

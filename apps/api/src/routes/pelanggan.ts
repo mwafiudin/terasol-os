@@ -130,7 +130,13 @@ export default async function pelangganRoutes(app: FastifyInstance) {
         .refine((s) => s <= new Date().toISOString().slice(0, 10), 'Tanggal lahir di masa depan')
         .nullish(),
       tanggalLahirAsumsi: z.boolean().optional(),
-      hp: z.string().min(3).max(32).optional(),
+    /**
+     * `nullable` DAN `optional`, dan keduanya berbeda artinya di sini:
+     * tidak dikirim berarti "jangan diubah", null berarti "orang ini tidak
+     * punya nomor". Tanpa pembedaan itu, satu-satunya cara menghapus nomor
+     * yang salah adalah mengetik nomor lain yang juga salah.
+     */
+      hp: z.string().min(3).max(32).nullable().optional(),
       catatan: z.string().max(1000).nullish(),
     }).safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'bad_request', detail: parsed.error.flatten() });
@@ -141,7 +147,8 @@ export default async function pelangganRoutes(app: FastifyInstance) {
       const { rows } = await tx.query(
         `update pelanggan
             set nama = coalesce($2::text, nama), gender = coalesce($3::gender, gender),
-                usia = coalesce($4::smallint, usia), hp = coalesce($5::text, hp),
+                usia = coalesce($4::smallint, usia),
+                hp = case when $9::boolean then $5::text else coalesce($5::text, hp) end,
                 catatan = coalesce($6::text, catatan),
                 -- Koordinator MENYUNTING dengan sengaja, jadi di sini yang
                 -- dikirim selalu menang — termasuk taksiran yang menggantikan
@@ -157,7 +164,7 @@ export default async function pelangganRoutes(app: FastifyInstance) {
                     to_char(tanggal_lahir,'YYYY-MM-DD') as "tanggalLahir",
                     tanggal_lahir_asumsi as "tanggalLahirAsumsi", hp, catatan`,
         [id, d.nama ?? null, d.gender ?? null, d.usia ?? null, d.hp ?? null, d.catatan ?? null,
-         d.tanggalLahir ?? null, d.tanggalLahirAsumsi ?? null],
+         d.tanggalLahir ?? null, d.tanggalLahirAsumsi ?? null, 'hp' in d],
       );
       if (!rows[0]) return reply.code(404).send({ error: 'not_found' });
       await audit(tx, ctx, 'pelanggan.update', 'pelanggan', id, d);

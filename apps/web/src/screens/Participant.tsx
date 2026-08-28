@@ -38,18 +38,24 @@ export function Register({ go }: { go: Nav }) {
   };
   const adaIsiLahir = draft.tanggalLahirAsumsi ? !!draft.usia : !!draft.tanggalLahir;
   const salahLahir = adaIsiLahir ? periksaLahir(lahir) : null;
-  const salahHp = draft.hp ? periksaHp(draft.hp) : null;
+  const salahHp = draft.tanpaHp ? null : draft.hp ? periksaHp(draft.hp) : null;
 
   async function lanjut() {
     if (!draft || !key) return;
     setSentuh({ lahir: true, hp: true });
-    if (!draft.nama || !draft.gender || !draft.tanggalLahir || !draft.hp) {
+    if (!draft.nama || !draft.gender || !draft.tanggalLahir || (!draft.hp && !draft.tanpaHp)) {
       say('Lengkapi nama, jenis kelamin, umur, dan nomor HP.');
       return;
     }
+    if (periksaLahir(lahir)) return;
+
+    // Peserta tanpa nomor melewati pembakuan dan dedup seluruhnya: tidak ada
+    // yang bisa dibakukan, dan tidak ada yang bisa dibandingkan.
+    if (draft.tanpaHp) { go('consent'); return; }
+
     // Nomor yang salah bentuk tidak bisa dihubungi saat tindak lanjut, dan
     // memecah orang yang sama menjadi dua record karena dedup HP tidak cocok.
-    if (periksaLahir(lahir) || periksaHp(draft.hp)) return;
+    if (periksaHp(draft.hp)) return;
 
     // Disimpan dalam bentuk baku supaya "0812…", "+62812…", dan "62812…"
     // menjadi satu nomor yang sama bagi pencarian maupun dedup.
@@ -92,7 +98,7 @@ export function Register({ go }: { go: Nav }) {
 
       <Field label="Nomor HP" htmlFor="p-hp">
           <input id="p-hp" className={`input${sentuh.hp && salahHp ? ' salah' : ''}`}
-            inputMode="tel" value={draft.hp}
+            inputMode="tel" value={draft.hp} disabled={draft.tanpaHp}
             aria-invalid={!!(sentuh.hp && salahHp)}
             onChange={(e) => {
               setDedupWarn(false); setDedupOk(false);
@@ -109,6 +115,25 @@ export function Register({ go }: { go: Nav }) {
             }}
             placeholder="0812…" />
         {sentuh.hp && salahHp && <small className="field-salah">{salahHp}</small>}
+
+        {/* Pilihan yang harus DIKETUK, bukan kolom yang boleh dilewati.
+
+            Nomor wajib membuat petugas mengarang: di lapangan tujuh orang
+            berbeda tercatat dengan 0812345678, saling menandai "nomor kembar",
+            dan sebagian tergabung menjadi satu pelanggan. Kolom yang menolak
+            kosong tidak menghasilkan data yang lebih lengkap — ia menghasilkan
+            data yang salah, dan yang salah itu diam. */}
+        <label className="tanpa-hp">
+          <input type="checkbox" checked={draft.tanpaHp}
+            onChange={(e) => {
+              setDedupWarn(false); setDedupOk(false);
+              set({ tanpaHp: e.target.checked, ...(e.target.checked ? { hp: '' } : {}) });
+            }} />
+          <span>
+            Peserta tidak punya nomor HP
+            <em>Tidak bisa dihubungi untuk tindak lanjut, dan hasilnya tidak bisa dikirim lewat WhatsApp.</em>
+          </span>
+        </label>
       </Field>
 
       {dedupWarn && (

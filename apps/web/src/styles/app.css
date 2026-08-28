@@ -2438,3 +2438,14 @@ button { cursor: pointer; font-family: inherit; }
   flex: 1; min-width: 0; font-size: 11.5px; color: var(--teal-800);
   overflow-wrap: anywhere; line-height: 1.5;
 }
+
+/* Pilihan "tidak punya HP": diketuk, bukan kolom yang dilewati. Ia duduk di
+   bawah kolomnya sendiri supaya jelas ia MENGGANTIKAN isian itu, bukan
+   pertanyaan terpisah. */
+.tanpa-hp {
+  display: flex; align-items: flex-start; gap: 8px;
+  margin-top: 8px; cursor: pointer;
+}
+.tanpa-hp input { width: 18px; height: 18px; flex: none; margin-top: 1px; accent-color: var(--teal-700); }
+.tanpa-hp > span { display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: var(--text-body); }
+.tanpa-hp em { font-style: normal; font-size: 11.5px; line-height: 1.5; color: var(--text-subtle); }

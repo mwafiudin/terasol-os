@@ -131,7 +131,9 @@ async function buildParticipantPayload(
     usia: Number(s.usia) || 0,
     tanggalLahir: s.tanggalLahir ?? null,
     tanggalLahirAsumsi: s.tanggalLahirAsumsi ?? false,
-    hp: s.hp,
+    // null, bukan string kosong: hanya null yang membuat dedup dan pencocokan
+    // pelanggan berhenti dengan sendirinya di basis data.
+    hp: s.tanpaHp || !s.hp ? null : s.hp,
     updatedAt: row.updatedAt,
     consent: s.consent,
     screening: sc
