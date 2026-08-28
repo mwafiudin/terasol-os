@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Badge, Button, Icon, ICONS } from '../components/ui';
 import { api, type ServerParticipant } from '../lib/api';
 import { getMeta, setMeta } from '../lib/db';
-import { CONV_LABEL, fmtSejak, fmtTanggal, rp, statusTampil } from '../lib/domain';
+import { CONV_LABEL, fmtSejak, fmtTanggal, rp, statusTampil, usiaTampil } from '../lib/domain';
 import { activeEvent, countsFor, eventHariIni, pullEvents, type EventCounts } from '../lib/events';
 import { useInstall } from '../lib/install';
 import { useApp } from '../lib/store';
@@ -404,7 +404,7 @@ export function Home({ go, onFollowUp, onDaftar, reloadKey }: Props) {
                   {i > 0 && <div className="menu-sep" />}
                   <button className="list-item stacked" onClick={() => onFollowUp(p)}>
                     <span className="tx">
-                      <b>{p.nama}, {p.usia} th</b>
+                      <b>{p.nama}, {usiaTampil(p.tanggalLahir, p.usia)} th</b>
                       <span>{p.eventNama} · {fmtTanggal(p.eventTanggal, { day: 'numeric', month: 'long' })}</span>
                     </span>
                     <Badge tone={conv.tone}>{conv.label}</Badge>

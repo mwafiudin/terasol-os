@@ -26,7 +26,8 @@ export default async function participantRoutes(app: FastifyInstance) {
       args.push(limit);
 
       const { rows } = await tx.query<{ tenantId: string }>(
-        `select p.id, p.client_id as "clientId", p.nama, p.gender, p.usia, p.hp,
+        `select p.id, p.client_id as "clientId", p.nama, p.gender, p.usia,
+                to_char(p.tanggal_lahir,'YYYY-MM-DD') as "tanggalLahir", p.hp,
                 p.needs_review as "needsReview", p.erased_at as "erasedAt",
                 p.tenant_id as "tenantId",
                 -- Ikut dikirim supaya perangkat bisa menyalinnya: tanpa ini,
@@ -79,7 +80,8 @@ export default async function participantRoutes(app: FastifyInstance) {
 
     return withTenant(ctx, async (tx) => {
       const { rows } = await tx.query<{ tenantId: string }>(
-        `select p.id, p.client_id as "clientId", p.nama, p.gender, p.usia, p.hp,
+        `select p.id, p.client_id as "clientId", p.nama, p.gender, p.usia,
+                to_char(p.tanggal_lahir,'YYYY-MM-DD') as "tanggalLahir", p.hp,
                 p.needs_review as "needsReview", p.erased_at as "erasedAt",
                 p.created_at as "createdAt", p.device_id as "deviceId",
                 p.tenant_id as "tenantId", p.pelanggan_id as "pelangganId",
@@ -180,7 +182,8 @@ export default async function participantRoutes(app: FastifyInstance) {
          select f.event_id as "eventId", f.hp, e.nama as "eventNama", e.tenant_id as "tenantId",
                 json_agg(json_build_object(
                   'id', p.id, 'clientId', p.client_id, 'nama', p.nama, 'gender', p.gender,
-                  'usia', p.usia, 'needsReview', p.needs_review, 'deviceId', p.device_id,
+                  'usia', p.usia, 'tanggalLahir', to_char(p.tanggal_lahir,'YYYY-MM-DD'),
+                  'needsReview', p.needs_review, 'deviceId', p.device_id,
                   'createdAt', p.created_at,
                   'screening', case when s.id is null then null else json_build_object(
                     'tinggi', s.tinggi, 'berat', s.berat, 'imt', s.imt,

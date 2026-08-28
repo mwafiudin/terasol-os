@@ -166,14 +166,25 @@ export const RENTANG_ASAM_URAT: Record<Gender, { min: number; max: number }> = {
   P: { min: 2.4, max: 6.0 },
 };
 
+/**
+ * Batas asam urat ditulis dengan koma dan selalu satu desimal.
+ *
+ * `${6.0}` menghasilkan "6", sehingga rentang wanita tercetak "2.4–6" — dua
+ * sisi yang terbaca berbeda ketelitiannya, di lembar yang selebihnya memakai
+ * koma. Ditulis di sini, bukan diambil dari `dec()` di domain.ts, karena
+ * domain.ts sudah mengimpor berkas ini.
+ */
+const batas = (n: number) =>
+  n.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
 export function nilaiAsamUrat(mgdl: number, gender: Gender): Penilaian {
   const r = RENTANG_ASAM_URAT[gender];
-  const s = `${SUMBER.asamUrat} (${gender === 'L' ? 'pria' : 'wanita'} ${r.min}–${r.max})`;
+  const s = `${SUMBER.asamUrat} (${gender === 'L' ? 'pria' : 'wanita'} ${batas(r.min)}–${batas(r.max)})`;
   if (mgdl < r.min) {
-    return { label: `Di bawah rentang rujukan (<${r.min})`, singkat: 'Di bawah rujukan', nada: 'rendah', sumber: s };
+    return { label: `Di bawah rentang rujukan (<${batas(r.min)})`, singkat: 'Di bawah rujukan', nada: 'rendah', sumber: s };
   }
-  if (mgdl > r.max) return { label: `Di atas rentang rujukan (>${r.max})`, ...DI_ATAS, sumber: s };
-  return { label: `Dalam rentang rujukan (${r.min}–${r.max})`, ...DALAM, sumber: s };
+  if (mgdl > r.max) return { label: `Di atas rentang rujukan (>${batas(r.max)})`, ...DI_ATAS, sumber: s };
+  return { label: `Dalam rentang rujukan (${batas(r.min)}–${batas(r.max)})`, ...DALAM, sumber: s };
 }
 
 /* ============================ tekanan darah ============================ */

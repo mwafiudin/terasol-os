@@ -9,11 +9,13 @@ import {
 import { api, type ParticipantDetail } from '../lib/api';
 import { readParticipant } from '../lib/db';
 import {
-  CONV_LABEL, PARAM_LABEL, PARAMS, bisaTerimaPeserta,
-  dec, fmtTanggal, fmtWaktu, imtOf, normalisasiHp, num, periksaHp, periksaUsia, rp, statusTampil,
+  CONV_LABEL, PARAM_LABEL, PARAMS, batasTanggalLahir, bisaTerimaPeserta,
+  dec, fmtTanggal, fmtWaktu, imtOf, normalisasiHp, num, periksaHp,
+  periksaTanggalLahir, rp, statusTampil, usiaDari, usiaTampil,
 } from '../lib/domain';
 import { db } from '../lib/db';
 import { pesertaEvent, rekapSementara, type PesertaRingkas, type RekapSementara } from '../lib/pesertaEvent';
+import { RekapKondisiEvent } from './RekapKondisi';
 import { nilaiImt, type Gender } from '../lib/rujukan';
 import { useApp } from '../lib/store';
 import { isOnline } from '../lib/sync';
@@ -169,6 +171,14 @@ export function EventPeserta({ go, event, onBuka, onTambah, onUbahEvent, onHapus
         </span>
       </span>
 
+      {/* Kondisi peserta lebih dulu, angka operasional sesudahnya.
+          Yang membuka layar event ingin tahu keadaan orang-orang yang datang;
+          estimasi consumable adalah urusan penutupan hari, dan ia menempati
+          seluruh layar pertama hanya karena dulu ia satu-satunya yang ada. */}
+      {daftar && daftar.length > 0 && (
+        <RekapKondisiEvent daftar={daftar} onBuka={onBuka} />
+      )}
+
       {/* Rekap sementara — dihitung di perangkat supaya tetap tampil saat
           offline, termasuk peserta yang belum sempat terkirim. */}
       {rekap && (
@@ -308,11 +318,12 @@ export function EventPeserta({ go, event, onBuka, onTambah, onUbahEvent, onHapus
       {halaman.potong.map((p) => {
         const conv = CONV_LABEL[p.convStatus ?? 'baru']!;
         const temuan = [...temuanPeserta(p.nilai, p.gender)];
+        const usia = usiaTampil(p.tanggalLahir, num(p.usia));
         return (
           <button key={p.clientId} className="card peserta-card" onClick={() => onBuka(p)}>
             <div className="peserta-atas">
               <span className="peserta-nama">
-                {p.nama}{p.usia ? `, ${p.usia} th` : ''}
+                {p.nama}{usia == null ? '' : `, ${usia} th`}
               </span>
               {p.belumSync && <Badge tone="warning">Antre</Badge>}
               {p.needsReview && <Badge tone="danger">Ditinjau</Badge>}
@@ -346,7 +357,7 @@ export function EventPeserta({ go, event, onBuka, onTambah, onUbahEvent, onHapus
 /* ======================== Rekap satu peserta ======================== */
 
 type DetailLokal = {
-  nama: string; gender: 'P' | 'L'; usia: string; hp: string;
+  nama: string; gender: 'P' | 'L'; tanggalLahir: string | null; usia: string; hp: string;
   consent: { granted: boolean; versiTeks: string; ts: string } | null;
   nilai: Partial<Record<ParamKey, string>>;
   imt: { nilai: number; kategori: string } | null;
@@ -387,7 +398,8 @@ export function PesertaDetail({ go, peserta, onUbah, onAnalisis }: {
     if (!view.secret) { setError('Identitas sudah dibersihkan dari perangkat sesuai retensi.'); return; }
     const s = view.secret;
     setLokal({
-      nama: s.nama, gender: s.gender, usia: s.usia, hp: s.hp,
+      nama: s.nama, gender: s.gender, tanggalLahir: s.tanggalLahir ?? null,
+      usia: s.usia, hp: s.hp,
       consent: s.consent,
       nilai: s.screening?.values ?? {},
       imt: imtOf(s.screening?.values ?? {}),
@@ -413,7 +425,17 @@ export function PesertaDetail({ go, peserta, onUbah, onAnalisis }: {
   }
 
   const nama = server?.nama ?? lokal?.nama ?? peserta.nama;
-  const usia = server ? String(server.usia) : lokal?.usia ?? peserta.usia;
+  /**
+   * Tanggal lahir menang atas usia tersimpan, dari sumber mana pun ia datang.
+   *
+   * Usia tersimpan benar pada hari pendaftaran; peserta yang datang lagi tahun
+   * depan tidak boleh muncul dengan usia tahun lalu hanya karena baris itu yang
+   * tersimpan lebih dulu.
+   */
+  const tglLahir = server?.tanggalLahir ?? lokal?.tanggalLahir ?? peserta.tanggalLahir ?? null;
+  const usiaSimpan = server ? String(server.usia) : lokal?.usia ?? peserta.usia;
+  const usiaKini = usiaTampil(tglLahir, num(usiaSimpan));
+  const usia = usiaKini == null ? '' : String(usiaKini);
   const gender = server?.gender ?? lokal?.gender ?? peserta.gender;
   const hp = server?.hp ?? lokal?.hp ?? peserta.hp;
   const consent = server?.consent ?? lokal?.consent ?? null;
@@ -504,7 +526,7 @@ export function PesertaDetail({ go, peserta, onUbah, onAnalisis }: {
 
       {ubahDiri && pelangganId && (
         <FormDataDiri pelangganId={pelangganId}
-          nama={nama} gender={gender} usia={usia} hp={hp}
+          nama={nama} gender={gender} tanggalLahir={tglLahir} usia={usia} hp={hp}
           onTutup={() => setUbahDiri(false)}
           onTersimpan={() => { setUbahDiri(false); onUbah(); void muat(); }} />
       )}
@@ -660,34 +682,41 @@ export function PesertaDetail({ go, peserta, onUbah, onAnalisis }: {
  * menyatukan kunjungan seseorang, jadi satu digit yang keliru memecah
  * riwayatnya menjadi dua orang yang tidak pernah bertemu.
  */
-function FormDataDiri({ pelangganId, nama, gender, usia, hp, onTutup, onTersimpan }: {
+function FormDataDiri({ pelangganId, nama, gender, tanggalLahir, usia, hp, onTutup, onTersimpan }: {
   pelangganId: string;
   nama: string;
   gender: 'P' | 'L';
+  tanggalLahir: string | null;
+  /** Usia yang ditampilkan sekarang; jadi keterangan bila tanggal lahirnya belum ada. */
   usia: string;
   hp: string;
   onTutup: () => void;
   onTersimpan: () => void;
 }) {
   const { say } = useApp();
-  const [f, setF] = useState({ nama, gender, usia: usia || '', hp, catatan: '' });
+  const [f, setF] = useState({ nama, gender, tanggalLahir: tanggalLahir ?? '', hp, catatan: '' });
   const [busy, setBusy] = useState(false);
 
   // Pemeriksaan yang sama dengan form registrasi. Kalau hanya dipasang di
   // sana, layar ini menjadi pintu belakang yang menerima nomor tak berbentuk.
   const salahHp = f.hp ? periksaHp(f.hp) : null;
-  const salahUsia = f.usia ? periksaUsia(f.usia) : null;
+  const salahLahir = f.tanggalLahir ? periksaTanggalLahir(f.tanggalLahir) : null;
+  const usiaBaru = usiaDari(f.tanggalLahir);
+  const batas = batasTanggalLahir();
 
   async function simpan() {
     if (!f.nama.trim() || !f.hp.trim()) { say('Nama dan nomor HP tidak boleh kosong.'); return; }
     if (salahHp) { say(salahHp); return; }
-    if (salahUsia) { say(salahUsia); return; }
+    if (salahLahir) { say(salahLahir); return; }
     setBusy(true);
     try {
       await api.updatePelanggan(pelangganId, {
         nama: f.nama.trim(),
         gender: f.gender,
-        usia: f.usia ? Number(f.usia) : null,
+        tanggalLahir: f.tanggalLahir || null,
+        // Usia ikut disegarkan supaya baris lama tetap masuk akal bagi ekspor
+        // CSV dan laporan yang membacanya langsung, bukan lewat tanggal lahir.
+        usia: usiaBaru,
         hp: normalisasiHp(f.hp),
         catatan: f.catatan.trim() || null,
       });
@@ -713,11 +742,18 @@ function FormDataDiri({ pelangganId, nama, gender, usia, hp, onTutup, onTersimpa
         </div>
       </div>
       <div className="dua-kolom">
-        <Field label="Usia" htmlFor="i-usia">
-          <input id="i-usia" className={`input${salahUsia ? ' salah' : ''}`}
-            inputMode="numeric" value={f.usia} aria-invalid={!!salahUsia}
-            onChange={(e) => setF({ ...f, usia: e.target.value.replace(/\D/g, '').slice(0, 3) })} />
-          {salahUsia && <small className="field-salah">{salahUsia}</small>}
+        <Field label={`Tanggal lahir${usiaBaru == null ? '' : ` · ${usiaBaru} th`}`} htmlFor="i-lahir">
+          <input id="i-lahir" className={`input${salahLahir ? ' salah' : ''}`}
+            type="date" value={f.tanggalLahir} aria-invalid={!!salahLahir}
+            min={batas.min} max={batas.maks}
+            onChange={(e) => setF({ ...f, tanggalLahir: e.target.value })} />
+          {salahLahir && <small className="field-salah">{salahLahir}</small>}
+          {/* Orang yang terdaftar sebelum tanggal lahir ditanyakan hanya punya
+              angka usia. Ditampilkan apa adanya; mengisi tanggal lahir
+              menggantikannya dengan angka yang tidak akan basi. */}
+          {!f.tanggalLahir && usia && (
+            <small className="field-bantu">Tercatat {usia} th; isi tanggal lahir agar tidak basi.</small>
+          )}
         </Field>
         <Field label="Nomor HP" htmlFor="i-hp">
           <input id="i-hp" className={`input${salahHp ? ' salah' : ''}`}

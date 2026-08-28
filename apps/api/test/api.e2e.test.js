@@ -142,8 +142,9 @@ describe('Alur API end-to-end', () => {
   it('sync push menerima peserta dan menandai bentrok dedup', async () => {
     const now = new Date().toISOString();
     const mk = (clientId, nama) => ({
-      clientId, eventClientId, nama, gender: 'P', usia: 62, hp: HP, updatedAt: now,
-      consent: { granted: true, versiTeks: 'v1', ts: now },
+      clientId, eventClientId, nama, gender: 'P', usia: 62,
+      tanggalLahir: '1963-08-17', hp: HP, updatedAt: now,
+      consent: { granted: true, versiTeks: 'v2', ts: now },
       screening: {
         clientId: randomUUID(), tinggi: 156, berat: 61, sistolik: 128, diastolik: 84,
         gula: 112, kolesterol: null, asamUrat: null,
@@ -298,7 +299,9 @@ describe('Alur API end-to-end', () => {
     assert.match(res.headers.get('content-type') ?? '', /text\/csv/);
     const csv = await res.text();
     const lines = csv.trim().split('\r\n');
-    assert.match(lines[0], /nama;jenis_kelamin;usia;no_hp/);
+    assert.match(lines[0], /nama;jenis_kelamin;tanggal_lahir;usia;no_hp/);
+    // Kolom date dibaca lewat to_char; tanpa itu ia bergeser sehari di WIB.
+    assert.match(lines[1], /;1963-08-17;/, 'tanggal lahir tercetak apa adanya');
     assert.equal(lines.length, 2, 'header + 1 peserta aktif');
     assert.match(lines[1], /Paket herbal sendi/);
   });
@@ -306,8 +309,8 @@ describe('Alur API end-to-end', () => {
   it('teks consent aktif tersedia dengan versinya', async () => {
     const r = await call('/consent-text');
     assert.equal(r.status, 200);
-    assert.equal(r.body.versi, 'v1');
-    assert.match(r.body.isi, /nama, jenis kelamin, usia/);
+    assert.equal(r.body.versi, 'v2');
+    assert.match(r.body.isi, /nama, jenis kelamin, tanggal lahir/);
   });
 
   it('audit log mencatat tindakan koordinator', async () => {
@@ -331,7 +334,7 @@ describe('Alur API end-to-end', () => {
     assert.equal(d.event.id, eventId);
     assert.ok(d.consent, 'record persetujuan ikut');
     assert.equal(d.consent.granted, true);
-    assert.equal(d.consent.versiTeks, 'v1');
+    assert.equal(d.consent.versiTeks, 'v2');
 
     assert.ok(d.screening, 'hasil pengukuran ikut');
     assert.equal(Number(d.screening.tinggi), 156);

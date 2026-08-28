@@ -2128,7 +2128,13 @@ button { cursor: pointer; font-family: inherit; }
      pembacanya di rumah. Tanpa takaran, sesuai catatannya. */
   .saran-grid { grid-template-columns: repeat(2, 1fr); gap: 5pt; }
   .saran-grup + .saran-grup { margin-top: 6pt; }
-  .saran-untuk { font-size: 8.5pt; }
+  /* "Untuk temuan Tensi" tidak boleh tertinggal sendirian di kaki halaman:
+     label itu satu-satunya yang menghubungkan kartu-kartu di bawahnya dengan
+     temuannya, dan terpisah dari kartunya ia tidak mengatakan apa pun.
+     Grupnya sendiri tidak dikunci utuh — grup bertumpuk kartu bisa lebih
+     tinggi daripada satu halaman, dan `avoid` yang tak mungkin dipenuhi
+     mendorong seluruhnya ke halaman berikutnya dan meninggalkan lubang. */
+  .saran-untuk { font-size: 8.5pt; break-after: avoid; }
   .saran-kartu {
     padding: 5pt 7pt; border-radius: 0; break-inside: avoid;
     border-color: #ddd;
@@ -2140,3 +2146,147 @@ button { cursor: pointer; font-family: inherit; }
   .saran-kandungan > span { font-size: 6.5pt; }
   .saran-catatan { font-size: 7.5pt; }
 }
+
+/* Chip penilaian yang bisa dibuka. Tanda tanya kecil, bukan ikon terpisah:
+   ia harus terbaca sebagai bagian dari chip, bukan tombol kedua di sebelahnya. */
+.vonis-tanya {
+  display: inline-flex; align-items: center; gap: 5px;
+  border: none; cursor: pointer; font: inherit;
+}
+.vonis-tanya > span {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 13px; height: 13px; border-radius: 50%;
+  background: currentColor; color: var(--surface-card);
+  font-size: 9px; font-weight: var(--fw-semibold); line-height: 1;
+}
+.vonis-jelas {
+  margin: -2px 0 0; font-size: 12px; color: var(--text-body);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.vonis-jelas > span { font-size: 10.5px; color: var(--text-subtle); }
+
+@media print {
+  /* Di kertas chipnya tidak bisa diketuk, jadi tanda tanyanya menyesatkan dan
+     penjelasan yang kebetulan terbuka tidak boleh ikut tercetak sebagian —
+     artinya dikumpulkan utuh di kaki halaman. */
+  .vonis-tanya > span { display: none !important; }
+  .vonis-jelas { display: none !important; }
+
+  .lembar-arti {
+    display: grid; grid-template-columns: max-content 1fr;
+    gap: 1pt 8pt; margin: 0;
+  }
+  .lembar-arti dt { font-size: 7.5pt; font-weight: var(--fw-semibold); color: #333; }
+  .lembar-arti dd { margin: 0; font-size: 7.5pt; color: #444; }
+}
+@media print {
+  /* Bentuk pendeknya dimiringkan supaya terbaca sebagai KUTIPAN dari chip di
+     kartu, bukan sebagai kalimat baru yang berdiri sendiri. */
+  .lembar-arti dd i { font-style: italic; color: #222; }
+}
+
+/* ==================== Kondisi peserta satu event ==================== */
+
+.kondisi-kartu { display: flex; flex-direction: column; gap: 10px; }
+.kondisi-kartu > b { font-size: 15px; font-weight: var(--fw-semibold); color: var(--text-body); }
+.kondisi-sep { height: 1px; background: var(--border-hairline); margin: 2px 0; }
+.kondisi-judul {
+  font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--text-muted); font-weight: var(--fw-semibold);
+}
+.kondisi-catatan { font-size: 11.5px; color: var(--text-subtle); line-height: 1.5; }
+.kondisi-kaki {
+  font-size: 11px; color: var(--text-subtle); line-height: 1.55;
+  border-top: 1px solid var(--border-hairline); padding-top: 9px; margin-top: 2px;
+}
+
+/* Warna tingkat, dipakai batang maupun kolom. Didefinisikan sekali supaya
+   legenda dan grafiknya tidak bisa berbeda diam-diam. */
+.t-aman { background: var(--success-500); }
+.t-perhatian { background: var(--warning-500); }
+.t-luar { background: var(--danger-500); }
+.t-belum { background: var(--sage-200); }
+
+.kondisi-pita { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.kondisi-pita > div {
+  border-radius: var(--radius-field); padding: 10px 11px;
+  display: flex; flex-direction: column; gap: 1px;
+}
+.kondisi-pita b { font-size: 24px; font-weight: var(--fw-semibold); line-height: 1; }
+.kondisi-pita span { font-size: 11.5px; }
+.kondisi-pita .p-aman { background: var(--success-100); }
+.kondisi-pita .p-aman b, .kondisi-pita .p-aman span { color: var(--success-700); }
+.kondisi-pita .p-perhatian { background: var(--warning-100); }
+.kondisi-pita .p-perhatian b, .kondisi-pita .p-perhatian span { color: var(--warning-700); }
+.kondisi-pita .p-luar { background: var(--danger-100); }
+.kondisi-pita .p-luar b, .kondisi-pita .p-luar span { color: var(--danger-700); }
+
+.kondisi-kalimat { margin: 0; font-size: 13px; line-height: 1.55; color: var(--text-body); }
+.kondisi-kalimat b { font-weight: var(--fw-semibold); }
+
+.kondisi-baris {
+  display: grid; grid-template-columns: 92px 1fr 62px;
+  align-items: center; gap: 8px;
+}
+.kondisi-nama { font-size: 12.5px; color: var(--text-body); }
+.kondisi-bar {
+  display: flex; height: 15px; border-radius: 4px; overflow: hidden;
+  background: var(--sage-200);
+}
+.kondisi-bar > i { display: block; }
+.kondisi-n {
+  font-size: 11px; color: var(--text-subtle); text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.kondisi-legenda {
+  display: flex; flex-wrap: wrap; gap: 4px 12px;
+  font-size: 11px; color: var(--text-muted); margin-top: 2px;
+}
+.kondisi-legenda > span { display: flex; align-items: center; gap: 5px; }
+.kondisi-legenda i { width: 9px; height: 9px; border-radius: 2px; display: block; flex: none; }
+
+.sebar-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; align-items: end; }
+.sebar-grid > div { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.sebar-grid b {
+  font-size: 15px; font-weight: var(--fw-semibold);
+  color: var(--text-body); font-variant-numeric: tabular-nums;
+}
+.sebar-kol { width: 100%; border-radius: 4px 4px 0 0; }
+.sebar-grid > div > span { font-size: 11px; color: var(--text-muted); }
+
+.usia-baris { display: grid; grid-template-columns: 62px 1fr 48px; align-items: center; gap: 8px; }
+.usia-label { font-size: 12.5px; color: var(--text-body); font-variant-numeric: tabular-nums; }
+.usia-bar { height: 13px; border-radius: 4px; background: var(--sage-200); overflow: hidden; min-width: 3px; }
+.usia-bar > i { display: block; height: 100%; background: var(--danger-500); }
+.usia-n {
+  font-size: 11px; color: var(--text-subtle); text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.kondisi-buka {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  width: 100%; padding: 8px 0; background: none; border: none; cursor: pointer;
+  font-size: 13.5px; font-weight: var(--fw-semibold); color: var(--brand);
+}
+.kondisi-buka svg { transition: transform var(--motion-cepat, .15s) ease; flex: none; }
+.kondisi-buka[aria-expanded='true'] svg { transform: rotate(90deg); }
+
+.tindak-daftar { display: flex; flex-direction: column; }
+.tindak-baris {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 5px;
+  width: 100%; padding: 9px 0; background: none; border: none; cursor: pointer;
+  border-top: 1px solid var(--border-hairline); text-align: left;
+}
+.tindak-daftar > .tindak-baris:first-child { border-top: none; }
+.tindak-baris:hover { background: var(--brand-tint); }
+.tindak-nama { font-size: 13.5px; font-weight: var(--fw-medium); color: var(--text-body); }
+.tindak-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.tindak-chip { font-size: 10.5px; padding: 2px 7px; border-radius: 999px; }
+.tindak-chip.luar { background: var(--danger-100); color: var(--danger-700); }
+.tindak-chip.perhatian { background: var(--warning-100); color: var(--warning-700); }
+
+/* Rekap kondisi adalah gambaran layar, bukan isi lembar cetak peserta. */
+@media print { .kondisi-kartu { display: none !important; } }
+/* Jalur usia: lebar batang di dalamnya menyatakan besar kelompok, jadi jalurnya
+   yang menjadi acuan 100% — bukan batangnya sendiri. */
+.usia-jalur { display: flex; }

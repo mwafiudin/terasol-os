@@ -221,20 +221,36 @@ export const TEMUAN_LABEL: Record<KodeTemuan, string> = {
  * tentang orang yang sama, dan dua jawaban berbeda lebih membingungkan
  * daripada satu jawaban yang keterbatasannya diketahui.
  */
+export function penilaianPeserta(
+  n: NilaiRingkas, gender: Gender,
+): Partial<Record<KodeTemuan, Penilaian>> {
+  const p: Partial<Record<KodeTemuan, Penilaian>> = {};
+  if (n.gula != null) p.gula = nilaiGula(n.gula, n.konteksGula ?? 'sewaktu');
+  if (n.kolesterol != null) p.kolesterol = nilaiKolesterol(n.kolesterol);
+  if (n.asamUrat != null) p.asam_urat = nilaiAsamUrat(n.asamUrat, gender);
+  if (n.lingkarPerut != null) p.lingkar_perut = nilaiLingkarPerut(n.lingkarPerut, gender);
+  if (n.sistolik != null && n.diastolik != null) p.tensi = nilaiTensi(n.sistolik, n.diastolik);
+  if (n.imt != null) p.imt = nilaiImt(n.imt);
+  return p;
+}
+
+/** Di luar rentang rujukan, termasuk rentang perantara. */
+export const diLuarRujukan = (p: Penilaian | null | undefined): boolean =>
+  !!p && p.nada !== 'normal' && p.nada !== 'netral';
+
+/**
+ * Diturunkan dari `penilaianPeserta`, bukan menghitung sendiri.
+ *
+ * Kalau keduanya menilai dengan caranya masing-masing, cepat atau lambat daftar
+ * peserta dan rekap kondisi akan tidak sepakat tentang orang yang sama — dan
+ * dua jawaban berbeda di dua layar yang bersebelahan tidak punya cara untuk
+ * dijelaskan kepada petugas yang melihat keduanya.
+ */
 export function temuanPeserta(n: NilaiRingkas, gender: Gender): Set<KodeTemuan> {
-  const keluar = new Set<KodeTemuan>();
-  const diLuar = (p: Penilaian | null) =>
-    !!p && p.nada !== 'normal' && p.nada !== 'netral';
-
-  if (n.gula != null && diLuar(nilaiGula(n.gula, n.konteksGula ?? 'sewaktu'))) keluar.add('gula');
-  if (n.kolesterol != null && diLuar(nilaiKolesterol(n.kolesterol))) keluar.add('kolesterol');
-  if (n.asamUrat != null && diLuar(nilaiAsamUrat(n.asamUrat, gender))) keluar.add('asam_urat');
-  if (n.lingkarPerut != null && diLuar(nilaiLingkarPerut(n.lingkarPerut, gender))) keluar.add('lingkar_perut');
-  if (n.sistolik != null && n.diastolik != null
-    && diLuar(nilaiTensi(n.sistolik, n.diastolik))) keluar.add('tensi');
-  if (n.imt != null && diLuar(nilaiImt(n.imt))) keluar.add('imt');
-
-  return keluar;
+  const nilai = penilaianPeserta(n, gender);
+  return new Set(
+    (Object.keys(nilai) as KodeTemuan[]).filter((k) => diLuarRujukan(nilai[k])),
+  );
 }
 
 /** Ada angka yang bisa dinilai sama sekali. */

@@ -10,6 +10,16 @@ export type Draft = {
   eventClientId: string;
   nama: string;
   gender: 'P' | 'L' | '';
+  /**
+   * Tanggal lahir "YYYY-MM-DD"; `usia` adalah turunannya, dihitung ulang tiap
+   * kali kolom ini berubah.
+   *
+   * Keduanya disimpan, dan yang turunan tidak dibuang, karena draf yang sudah
+   * ada di perangkat sebelum kolom ini lahir hanya punya `usia`. Draf adalah
+   * pendaftaran yang sedang setengah jalan — membuangnya berarti petugas
+   * kehilangan ketikannya di tengah melayani orang.
+   */
+  tanggalLahir: string;
   usia: string;
   hp: string;
   consentGranted: boolean | null;
@@ -30,7 +40,7 @@ export function emptyDraft(eventClientId: string, consentVersi: string): Draft {
   return {
     clientId: crypto.randomUUID(),
     eventClientId,
-    nama: '', gender: '', usia: '', hp: '',
+    nama: '', gender: '', tanggalLahir: '', usia: '', hp: '',
     consentGranted: null, consentVersi,
     values: {}, konteksGula: null, berminat: false,
     startedAt: new Date().toISOString(),
@@ -79,7 +89,10 @@ export const useDraft = create<DraftState>((set, get) => ({
       const draft = await decryptJson<Draft>(key, {
         iv: new Uint8Array(raw.iv), ct: new Uint8Array(raw.ct).buffer,
       } as Envelope);
-      set({ draft });
+      // Draf yang tersimpan sebelum kolom tanggal lahir ada tidak memilikinya,
+      // dan JSON tidak mengeluh soal itu — `value={undefined}` pada input yang
+      // terkendali barulah yang meledak, jauh dari sini. Diisi di pintu masuk.
+      set({ draft: { ...draft, tanggalLahir: draft.tanggalLahir ?? '' } });
     } catch {
       await setMeta('draft', null);
     }
@@ -127,6 +140,7 @@ export function draftToRecord(draft: Draft): {
     secret: {
       nama: draft.nama,
       gender: (draft.gender || 'P') as 'P' | 'L',
+      tanggalLahir: draft.tanggalLahir || null,
       usia: draft.usia,
       hp: draft.hp,
       consent: {
