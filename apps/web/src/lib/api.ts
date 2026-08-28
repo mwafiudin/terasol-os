@@ -210,7 +210,8 @@ export type SyncParticipant = {
     clientId: string; tinggi: number | null; berat: number | null;
     lingkarPerut: number | null;
     sistolik: number | null; diastolik: number | null; nadi: number | null;
-    gula: number | null; kolesterol: number | null; asamUrat: number | null;
+    gula: number | null; kolesterol: number | null;
+    trigliserida: number | null; asamUrat: number | null;
     /** Jenis gula darah yang dipilih petugas; menentukan rentang rujukannya. */
     konteksGula: KonteksGula | null;
     paramsDiambil: string[]; outOfRange: boolean;
@@ -276,7 +277,8 @@ export type ServerParticipant = {
    * belum diukur — BUKAN nol.
    */
   sistolik: number | null; diastolik: number | null;
-  gula: number | null; kolesterol: number | null; asamUrat: number | null;
+  gula: number | null; kolesterol: number | null;
+    trigliserida: number | null; asamUrat: number | null;
   lingkarPerut: number | null;
   /** Null berarti tidak diketahui; jangan ditebak sebagai 'sewaktu'. */
   konteksGula: KonteksGula | null;
@@ -301,7 +303,7 @@ export type ParticipantDetail = {
     lingkarPerut: number | null; nadi: number | null;
     konteksGula: KonteksGula | null;
     sistolik: number | null; diastolik: number | null; gula: number | null;
-    kolesterol: number | null; asamUrat: number | null;
+    kolesterol: number | null; trigliserida: number | null; asamUrat: number | null;
     paramsDiambil: ParamKey[]; outOfRange: boolean; measuredAt: string;
   } | null;
   conversion: {

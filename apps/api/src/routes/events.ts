@@ -145,7 +145,8 @@ export default async function eventRoutes(app: FastifyInstance) {
                 to_char(p.tanggal_lahir,'YYYY-MM-DD') as tanggal_lahir,
                 p.tanggal_lahir_asumsi, p.hp, p.needs_review,
                 c.granted as consent_granted, c.versi_teks, c.ts as consent_ts,
-                s.tinggi, s.berat, s.imt, s.sistolik, s.diastolik, s.gula, s.kolesterol, s.asam_urat,
+                s.tinggi, s.berat, s.imt, s.sistolik, s.diastolik, s.gula, s.kolesterol,
+                s.trigliserida, s.asam_urat,
                 cv.berminat, cv.status as conv_status, cv.nilai_transaksi, cv.produk
            from participants p
            left join lateral (
@@ -163,7 +164,7 @@ export default async function eventRoutes(app: FastifyInstance) {
 
       const head = ['nama', 'jenis_kelamin', 'tanggal_lahir', 'tanggal_lahir_taksiran', 'usia', 'no_hp', 'perlu_ditinjau', 'consent', 'consent_versi',
         'consent_waktu', 'tinggi_cm', 'berat_kg', 'imt', 'sistolik', 'diastolik', 'gula_mgdl',
-        'kolesterol_mgdl', 'asam_urat_mgdl', 'berminat', 'status_konversi', 'nilai_transaksi', 'produk'];
+        'kolesterol_mgdl', 'trigliserida_mgdl', 'asam_urat_mgdl', 'berminat', 'status_konversi', 'nilai_transaksi', 'produk'];
       const cell = (v: unknown) => {
         const s = v === null || v === undefined ? '' : String(v);
         return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -178,7 +179,8 @@ export default async function eventRoutes(app: FastifyInstance) {
         r.needs_review ? 'ya' : 'tidak',
         r.consent_granted ? 'setuju' : 'tolak', r.versi_teks,
         r.consent_ts ? new Date(r.consent_ts).toISOString() : '',
-        r.tinggi, r.berat, r.imt, r.sistolik, r.diastolik, r.gula, r.kolesterol, r.asam_urat,
+        r.tinggi, r.berat, r.imt, r.sistolik, r.diastolik, r.gula, r.kolesterol,
+        r.trigliserida, r.asam_urat,
         r.berminat ? 'ya' : 'tidak', r.conv_status ?? '', r.nilai_transaksi ?? '', r.produk ?? '',
       ].map(cell).join(';'));
 

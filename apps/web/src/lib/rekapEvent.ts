@@ -71,7 +71,9 @@ const KELOMPOK: { label: string; min: number }[] = [
   { label: '65+ th', min: 65 },
 ];
 
-const URUT: KodeTemuan[] = ['tensi', 'gula', 'kolesterol', 'asam_urat', 'imt', 'lingkar_perut'];
+const URUT: KodeTemuan[] = [
+  'tensi', 'gula', 'kolesterol', 'trigliserida', 'asam_urat', 'imt', 'lingkar_perut',
+];
 
 /**
  * Peserta yang belum punya satu angka pun TIDAK dihitung sebagai "tanpa

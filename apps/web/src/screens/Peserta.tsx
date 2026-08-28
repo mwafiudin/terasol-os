@@ -452,7 +452,8 @@ export function PesertaDetail({ go, peserta, onUbah, onAnalisis }: {
       const peta: Record<ParamKey, number | null> = {
         tinggi: s.tinggi, berat: s.berat, lingkar_perut: s.lingkarPerut,
         sistolik: s.sistolik, diastolik: s.diastolik, nadi: s.nadi,
-        gula: s.gula, kolesterol: s.kolesterol, asam_urat: s.asamUrat,
+        gula: s.gula, kolesterol: s.kolesterol,
+        trigliserida: s.trigliserida ?? null, asam_urat: s.asamUrat,
       };
       v = peta[p.k] == null ? null : dec(peta[p.k]!);
     } else if (lokal) {

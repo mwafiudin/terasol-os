@@ -2365,3 +2365,10 @@ button { cursor: pointer; font-family: inherit; }
   background: var(--surface-card); color: var(--teal-800);
   font-weight: var(--fw-semibold); box-shadow: var(--shadow-xs, 0 1px 2px rgba(0,0,0,.06));
 }
+/* Ditolak, bukan sekadar tidak wajar: tidak ada tombol yang bisa diketuk untuk
+   melanjutkan, jadi warnanya harus berbeda dari peringatan yang bisa dilewati. */
+.range-tolak {
+  background: var(--danger-100) !important;
+  border-color: var(--danger-500) !important;
+  color: var(--danger-700) !important;
+}

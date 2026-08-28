@@ -86,6 +86,7 @@ export type ScreeningMasuk = {
   gula?: number | null;
   konteksGula?: string | null;
   kolesterol?: number | null;
+  trigliserida?: number | null;
   asamUrat?: number | null;
   /** Benar bila ADA satu saja parameter di luar rentang wajar. */
   outOfRange: boolean;
@@ -118,6 +119,7 @@ export async function cerminkanScreening(
     ['nadi', s.nadi, null],
     ['gula', s.gula, s.gula == null ? null : (s.konteksGula ?? 'sewaktu')],
     ['kolesterol', s.kolesterol, null],
+    ['trigliserida', s.trigliserida, null],
     ['asam_urat', s.asamUrat, null],
   ];
 

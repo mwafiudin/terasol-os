@@ -74,7 +74,7 @@ function toNumberValues(values: Partial<Record<ParamKey, string>>) {
     sistolik: num(values.sistolik), diastolik: num(values.diastolik),
     nadi: num(values.nadi),
     gula: num(values.gula), kolesterol: num(values.kolesterol),
-    asamUrat: num(values.asam_urat),
+    trigliserida: num(values.trigliserida), asamUrat: num(values.asam_urat),
   };
 }
 

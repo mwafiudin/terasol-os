@@ -15,6 +15,7 @@ export const PARAMS: { k: ParamKey; label: string; unit: string; min: number; ma
   { k: 'nadi', label: 'Nadi', unit: 'bpm', min: 40, max: 180 },
   { k: 'gula', label: 'Gula darah', unit: 'mg/dL', min: 50, max: 500 },
   { k: 'kolesterol', label: 'Kolesterol', unit: 'mg/dL', min: 100, max: 400 },
+  { k: 'trigliserida', label: 'Trigliserida', unit: 'mg/dL', min: 30, max: 800 },
   { k: 'asam_urat', label: 'Asam urat', unit: 'mg/dL', min: 2, max: 15, dec: true },
 ];
 
