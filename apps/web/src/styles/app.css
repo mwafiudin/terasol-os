@@ -2128,7 +2128,13 @@ button { cursor: pointer; font-family: inherit; }
      pembacanya di rumah. Tanpa takaran, sesuai catatannya. */
   .saran-grid { grid-template-columns: repeat(2, 1fr); gap: 5pt; }
   .saran-grup + .saran-grup { margin-top: 6pt; }
-  .saran-untuk { font-size: 8.5pt; }
+  /* "Untuk temuan Tensi" tidak boleh tertinggal sendirian di kaki halaman:
+     label itu satu-satunya yang menghubungkan kartu-kartu di bawahnya dengan
+     temuannya, dan terpisah dari kartunya ia tidak mengatakan apa pun.
+     Grupnya sendiri tidak dikunci utuh — grup bertumpuk kartu bisa lebih
+     tinggi daripada satu halaman, dan `avoid` yang tak mungkin dipenuhi
+     mendorong seluruhnya ke halaman berikutnya dan meninggalkan lubang. */
+  .saran-untuk { font-size: 8.5pt; break-after: avoid; }
   .saran-kartu {
     padding: 5pt 7pt; border-radius: 0; break-inside: avoid;
     border-color: #ddd;
