@@ -15,6 +15,7 @@ import {
 } from '../lib/domain';
 import { db } from '../lib/db';
 import { pesertaEvent, rekapSementara, type PesertaRingkas, type RekapSementara } from '../lib/pesertaEvent';
+import { RekapKondisiEvent } from './RekapKondisi';
 import { nilaiImt, type Gender } from '../lib/rujukan';
 import { useApp } from '../lib/store';
 import { isOnline } from '../lib/sync';
@@ -169,6 +170,14 @@ export function EventPeserta({ go, event, onBuka, onTambah, onUbahEvent, onHapus
           {event.tipe === 'berbayar' ? rp(event.hargaPaket) : 'Gratis'}
         </span>
       </span>
+
+      {/* Kondisi peserta lebih dulu, angka operasional sesudahnya.
+          Yang membuka layar event ingin tahu keadaan orang-orang yang datang;
+          estimasi consumable adalah urusan penutupan hari, dan ia menempati
+          seluruh layar pertama hanya karena dulu ia satu-satunya yang ada. */}
+      {daftar && daftar.length > 0 && (
+        <RekapKondisiEvent daftar={daftar} onBuka={onBuka} />
+      )}
 
       {/* Rekap sementara — dihitung di perangkat supaya tetap tampil saat
           offline, termasuk peserta yang belum sempat terkirim. */}

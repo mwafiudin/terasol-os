@@ -8,6 +8,8 @@ import {
   localEvents, muatRekan, pullEvents, rekanTersimpan, saveLocalEvent, ubahLocalEvent,
   type Rekan,
 } from '../lib/events';
+import { pesertaEvent, type PesertaRingkas } from '../lib/pesertaEvent';
+import { RekapKondisiEvent } from './RekapKondisi';
 import { useApp } from '../lib/store';
 import { isOnline, refreshPending, syncNow } from '../lib/sync';
 import type { EventRow } from '../lib/types';
@@ -226,9 +228,18 @@ export function EventForm({ go, onSaved, awal }: {
 export function Recap({ go, event, onArchived, onOpenPeserta }: {
   go: Nav; event: EventRow; onArchived: () => void; onOpenPeserta: () => void;
 }) {
-  const { say, user } = useApp();
+  const { key, say, user } = useApp();
   const [data, setData] = useState<RecapData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * Peserta dibaca dari perangkat, bukan dari rekap server.
+   *
+   * Rekap server butuh koneksi dan menolak tampil tanpanya; kondisi peserta
+   * dihitung dari data yang sudah ada di sini. Jadi layar ini tidak lagi
+   * sepenuhnya kosong saat Koordinator membukanya di lokasi tanpa sinyal —
+   * angka penjualannya yang hilang, bukan gambaran orang-orangnya.
+   */
+  const [peserta, setPeserta] = useState<PesertaRingkas[] | null>(null);
   const [konfirmArsip, setKonfirmArsip] = useState(false);
   const [busy, setBusy] = useState(false);
   const koordinator = user?.role === 'koordinator' || user?.role === 'admin_pusat';
@@ -248,6 +259,10 @@ export function Recap({ go, event, onArchived, onOpenPeserta }: {
       setKonfirmArsip(false);
     }
   }
+
+  useEffect(() => {
+    void pesertaEvent(key, event).then(setPeserta).catch(() => setPeserta([]));
+  }, [key, event]);
 
   useEffect(() => {
     if (!event.serverId) { setError('Event ini belum tersinkron ke server.'); return; }
@@ -282,6 +297,13 @@ export function Recap({ go, event, onArchived, onOpenPeserta }: {
           {event.petugas ? ` · ${event.petugas}` : ''}
         </span>
       </div>
+
+      {/* Mengetuk seorang peserta membuka daftar pesertanya, bukan langsung
+          orangnya: layar ini tidak memegang jalur ke rekap satu peserta, dan
+          daftarnya punya pencarian tepat untuk menemukannya. */}
+      {peserta && peserta.length > 0 && (
+        <RekapKondisiEvent daftar={peserta} onBuka={() => onOpenPeserta()} />
+      )}
 
       {error && <div className="range-warn">{error}</div>}
       {!data && !error && <div className="hint">Memuat rekap…</div>}
