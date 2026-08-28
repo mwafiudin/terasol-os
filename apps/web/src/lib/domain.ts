@@ -191,7 +191,14 @@ export function normalisasiHp(raw: string): string {
 const HP_MIN = 10;
 const HP_MAKS = 14;
 
-/** Mengembalikan pesan kesalahan, atau null bila nomornya masuk akal. */
+/**
+ * Mengembalikan pesan kesalahan, atau null bila nomornya masuk akal.
+ *
+ * Kolom kosong TETAP kesalahan. "Tidak punya HP" adalah pilihan yang harus
+ * diketuk, bukan kolom yang dilewati — kalau keduanya sama saja, tidak ada
+ * yang bisa membedakan peserta yang memang tak bernomor dari peserta yang
+ * nomornya lupa ditanyakan.
+ */
 export function periksaHp(raw: string): string | null {
   const d = normalisasiHp(raw);
   if (!d) return 'Nomor HP belum diisi.';

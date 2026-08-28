@@ -22,7 +22,7 @@ export function idTurunan(...bagian: string[]): string {
 type Orang = {
   nama: string; gender: 'P' | 'L';
   usia?: number | null; tanggalLahir?: string | null;
-  tanggalLahirAsumsi?: boolean; hp: string;
+  tanggalLahirAsumsi?: boolean; hp: string | null;
 };
 
 /**
@@ -37,12 +37,25 @@ type Orang = {
 export async function pelangganUntuk(
   tx: Tx, tenantId: string, o: Orang,
 ): Promise<string> {
-  const found = await tx.query<{ id: string }>(
-    `select id from pelanggan
-      where tenant_id = $1 and hp = $2 and lower(nama) = lower($3) and erased_at is null
-      order by created_at limit 1`,
-    [tenantId, o.hp, o.nama],
-  );
+  /**
+   * Tanpa nomor, TIDAK ada pencocokan sama sekali — selalu pelanggan baru.
+   *
+   * Godaannya adalah mencocokkan pada nama saja. Jangan: "Siti" yang datang ke
+   * dua event berbeda hampir pasti dua orang, dan menggabungkan riwayat
+   * kesehatan dua orang jadi satu grafik adalah kesalahan yang tidak
+   * meninggalkan jejak untuk ditemukan kembali. Memecah satu orang jadi dua
+   * record bisa digabungkan Koordinator kemudian; yang tertukar tidak ada yang
+   * tahu — alasan yang sama persis yang membuat pencocokan menuntut HP DAN
+   * nama, bukan HP saja.
+   */
+  const found = o.hp
+    ? await tx.query<{ id: string }>(
+      `select id from pelanggan
+        where tenant_id = $1 and hp = $2 and lower(nama) = lower($3) and erased_at is null
+        order by created_at limit 1`,
+      [tenantId, o.hp, o.nama],
+    )
+    : { rows: [] as { id: string }[] };
   if (found.rows[0]) {
     // Usia berubah tiap tahun; ambil yang terbaru supaya profil tidak basi.
     //

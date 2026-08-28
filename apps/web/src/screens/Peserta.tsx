@@ -738,7 +738,8 @@ function FormDataDiri({ pelangganId, nama, gender, tanggalLahir, usia, hp, onTut
   onTersimpan: () => void;
 }) {
   const { say } = useApp();
-  const [f, setF] = useState({ nama, gender, hp, catatan: '' });
+  const [f, setF] = useState({ nama, gender, hp: hp ?? '', catatan: '' });
+  const [tanpaHp, setTanpaHp] = useState(!hp);
   const [lahir, setLahir] = useState<NilaiLahir>({
     tanggalLahir: tanggalLahir ?? '', usia: tanggalLahir ? '' : usia, asumsi: false,
   });
@@ -746,13 +747,17 @@ function FormDataDiri({ pelangganId, nama, gender, tanggalLahir, usia, hp, onTut
 
   // Pemeriksaan yang sama dengan form registrasi. Kalau hanya dipasang di
   // sana, layar ini menjadi pintu belakang yang menerima nomor tak berbentuk.
-  const salahHp = f.hp ? periksaHp(f.hp) : null;
+  const salahHp = tanpaHp ? null : f.hp ? periksaHp(f.hp) : null;
   const adaIsiLahir = lahir.asumsi ? !!lahir.usia : !!lahir.tanggalLahir;
   const salahLahir = adaIsiLahir ? periksaLahir(lahir) : null;
   const usiaBaru = lahir.asumsi ? Number(lahir.usia) || null : usiaDari(lahir.tanggalLahir);
 
   async function simpan() {
-    if (!f.nama.trim() || !f.hp.trim()) { say('Nama dan nomor HP tidak boleh kosong.'); return; }
+    if (!f.nama.trim()) { say('Nama tidak boleh kosong.'); return; }
+    if (!tanpaHp && !f.hp.trim()) {
+      say('Isi nomor HP, atau tandai bahwa peserta tidak punya nomor.');
+      return;
+    }
     if (salahHp) { say(salahHp); return; }
     if (salahLahir) { say(salahLahir); return; }
     setBusy(true);
@@ -765,7 +770,9 @@ function FormDataDiri({ pelangganId, nama, gender, tanggalLahir, usia, hp, onTut
         // Usia ikut disegarkan supaya baris lama tetap masuk akal bagi ekspor
         // CSV dan laporan yang membacanya langsung, bukan lewat tanggal lahir.
         usia: usiaBaru,
-        hp: normalisasiHp(f.hp),
+        // null menghapus nomornya di server; string kosong tidak, dan
+        // membiarkannya berarti nomor lama yang salah tetap menempel.
+        hp: tanpaHp ? null : normalisasiHp(f.hp),
         catatan: f.catatan.trim() || null,
       });
       say('Data diri diperbarui.');
@@ -795,9 +802,18 @@ function FormDataDiri({ pelangganId, nama, gender, tanggalLahir, usia, hp, onTut
           onUbah={setLahir} />
         <Field label="Nomor HP" htmlFor="i-hp">
           <input id="i-hp" className={`input${salahHp ? ' salah' : ''}`}
-            inputMode="tel" value={f.hp} maxLength={16} aria-invalid={!!salahHp}
+            inputMode="tel" value={f.hp} maxLength={16} disabled={tanpaHp}
+            aria-invalid={!!salahHp}
             onChange={(e) => setF({ ...f, hp: e.target.value.replace(/[^\d+]/g, '') })} />
           {salahHp && <small className="field-salah">{salahHp}</small>}
+          <label className="tanpa-hp">
+            <input type="checkbox" checked={tanpaHp}
+              onChange={(e) => {
+                setTanpaHp(e.target.checked);
+                if (e.target.checked) setF({ ...f, hp: '' });
+              }} />
+            <span>Tidak punya nomor HP</span>
+          </label>
         </Field>
       </div>
       <div className="belum-note">

@@ -54,6 +54,8 @@ export type ParticipantSecret = {
   tanggalLahirAsumsi?: boolean;
   usia: string;
   hp: string;
+  /** Peserta menyatakan tidak punya nomor; `hp` kosong karenanya, bukan lupa. */
+  tanpaHp?: boolean;
   consent: { granted: boolean; versiTeks: string; ts: string };
   screening: {
     clientId: string;

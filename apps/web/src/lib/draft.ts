@@ -24,6 +24,8 @@ export type Draft = {
   tanggalLahirAsumsi: boolean;
   usia: string;
   hp: string;
+  /** Peserta menyatakan tidak punya nomor. Bukan sekadar kolom yang kosong. */
+  tanpaHp: boolean;
   consentGranted: boolean | null;
   consentVersi: string;
   values: Partial<Record<ParamKey, string>>;
@@ -42,7 +44,8 @@ export function emptyDraft(eventClientId: string, consentVersi: string): Draft {
   return {
     clientId: crypto.randomUUID(),
     eventClientId,
-    nama: '', gender: '', tanggalLahir: '', tanggalLahirAsumsi: false, usia: '', hp: '',
+    nama: '', gender: '', tanggalLahir: '', tanggalLahirAsumsi: false, usia: '',
+    hp: '', tanpaHp: false,
     consentGranted: null, consentVersi,
     values: {}, konteksGula: null, berminat: false,
     startedAt: new Date().toISOString(),
@@ -98,6 +101,7 @@ export const useDraft = create<DraftState>((set, get) => ({
         ...draft,
         tanggalLahir: draft.tanggalLahir ?? '',
         tanggalLahirAsumsi: draft.tanggalLahirAsumsi ?? false,
+        tanpaHp: draft.tanpaHp ?? false,
       } });
     } catch {
       await setMeta('draft', null);
@@ -149,7 +153,8 @@ export function draftToRecord(draft: Draft): {
       tanggalLahir: draft.tanggalLahir || null,
       tanggalLahirAsumsi: draft.tanggalLahirAsumsi,
       usia: draft.usia,
-      hp: draft.hp,
+      hp: draft.tanpaHp ? '' : draft.hp,
+      tanpaHp: draft.tanpaHp,
       consent: {
         granted: draft.consentGranted === true,
         versiTeks: draft.consentVersi,

@@ -287,7 +287,7 @@ function FollowUpSheet({ participant, onClose, onDone }: {
 
   return (
     <Sheet title={`${participant.nama}, ${usiaTampil(participant.tanggalLahir, participant.usia)} th`}
-      subtitle={participant.hp} onClose={onClose}>
+      subtitle={participant.hp ?? 'Tanpa nomor HP'} onClose={onClose}>
 
       {/* US-04 — jejak peserta: event asal → tanggal screening → status terkini. */}
       <ol className="jejak">

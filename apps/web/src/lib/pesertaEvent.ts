@@ -147,7 +147,7 @@ export async function pesertaEvent(
           gender: s.gender,
           tanggalLahir: s.tanggalLahir ?? null,
           usia: String(s.usia),
-          hp: s.hp,
+          hp: s.hp ?? '',
           imt: s.imt,
           paramsDiambil: (s.paramsDiambil ?? []) as ParamKey[],
           berminat: s.berminat,
@@ -186,7 +186,7 @@ export async function pesertaEvent(
             },
             secret: {
               nama: s.nama, gender: s.gender, tanggalLahir: s.tanggalLahir ?? null,
-              usia: String(s.usia), hp: s.hp,
+              usia: String(s.usia), hp: s.hp ?? '',
               imt: s.imt, paramsDiambil: (s.paramsDiambil ?? []) as ParamKey[],
               // Ikut disalin supaya penyaring temuan tetap bekerja offline.
               nilai: {

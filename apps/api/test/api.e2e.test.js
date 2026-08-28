@@ -172,6 +172,37 @@ describe('Alur API end-to-end', () => {
     assert.equal(r.body.conflicts[0].kind, 'dedup');
   });
 
+  it('peserta tanpa nomor HP diterima dan tidak pernah ditandai kembar', async () => {
+    const now = new Date().toISOString();
+    // DUA peserta tanpa nomor di event yang sama. Sebelum migrasi 016 keduanya
+    // akan saling menandai "nomor kembar" lewat string kosong yang sama —
+    // persis kesalahan yang membuat tujuh orang di lapangan mengaku duplikat.
+    const mk = (nama) => ({
+      clientId: randomUUID(), eventClientId, nama, gender: 'L', usia: 40,
+      hp: null, updatedAt: now,
+      consent: { granted: true, versiTeks: 'v3', ts: now },
+    });
+    const r = await call('/sync/push', {
+      method: 'POST',
+      body: JSON.stringify({
+        batchId: randomUUID(), events: [],
+        participants: [mk('__e2e Tanpa HP A'), mk('__e2e Tanpa HP B')],
+        anonTallies: [],
+      }),
+    });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(r.body.accepted.participants.length, 2, 'keduanya tersimpan');
+    assert.equal(r.body.conflicts.length, 0, 'tanpa nomor tidak pernah bentrok dedup');
+
+    const list = await call(`/participants?eventId=${eventId}`);
+    const tanpa = list.body.participants.filter((p) => p.nama.startsWith('__e2e Tanpa HP'));
+    assert.equal(tanpa.length, 2);
+    for (const p of tanpa) {
+      assert.equal(p.hp, null, 'nomornya null, bukan string kosong');
+      assert.equal(p.needsReview, false);
+    }
+  });
+
   it('IMT dihitung server, bukan dikirim perangkat', async () => {
     const r = await call(`/participants?eventId=${eventId}`);
     assert.equal(r.status, 200);
