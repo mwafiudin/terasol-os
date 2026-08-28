@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useState } from 'react';
 import {
-  Badge, Button, Field, Icon, ICONS, InputRupiah, PageHead, Paginasi, SegTabs, Sheet,
+  Badge, Button, Field, Icon, ICONS, InputRupiah, MenuAksi, PageHead, Paginasi, SegTabs, Sheet,
   usePaginasi,
 } from '../components/ui';
 import { api, ApiError, type CabangRow, type JenisTransaksi, type KatalogRow, type PenggunaRow } from '../lib/api';
@@ -268,34 +268,28 @@ function TabKatalog({ pusat }: { pusat: boolean }) {
                             </div>
                           ) : (
                             <div className="riwayat-aksi">
-                              {/* Hanya paket yang punya isi untuk disunting;
-                                  menawarkannya pada produk berarti membuka
-                                  layar yang tidak bisa diisi apa pun. */}
-                              {k.jenis === 'paket' && (
-                                <button className="ikon-btn" aria-label={`Isi paket ${k.nama}`}
-                                  title="Atur isi paket" onClick={() => setIsiPaket(k)}>
-                                  <Icon d={ICONS.cart} size={16} />
-                                </button>
-                              )}
-                              <button className="ikon-btn" aria-label={`Ubah ${k.nama}`}
-                                onClick={() => setForm({ awal: k })}>
-                                <Icon d={ICONS.pencil} size={16} />
-                              </button>
-                              <button className="ikon-btn"
-                                aria-label={`${k.aktif ? 'Nonaktifkan' : 'Aktifkan'} ${k.nama}`}
-                                title={k.aktif ? 'Nonaktifkan' : 'Aktifkan'}
-                                onClick={() => void setAktif(k, !k.aktif)}>
-                                <Icon d={k.aktif ? ICONS.x : ICONS.check} size={16} />
-                              </button>
-                              {/* Yang sudah menempel pada transaksi tidak ditawari
-                                  hapus sama sekali: menawarkan lalu menolak hanya
-                                  memindahkan penjelasan ke saat yang lebih buruk. */}
-                              {k.terpakai === 0 && (
-                                <button className="ikon-btn bahaya" aria-label={`Hapus ${k.nama}`}
-                                  onClick={() => setKonfirmHapus(k.id)}>
-                                  <Icon d={ICONS.trash} size={16} />
-                                </button>
-                              )}
+                              <MenuAksi label={`Aksi untuk ${k.nama}`} aksi={[
+                                // Hanya paket yang punya isi untuk disunting;
+                                // menawarkannya pada produk berarti membuka
+                                // layar yang tidak bisa diisi apa pun.
+                                ...(k.jenis === 'paket' ? [{
+                                  label: 'Atur isi paket', ikon: ICONS.cart,
+                                  onPilih: () => setIsiPaket(k),
+                                }] : []),
+                                { label: 'Ubah', ikon: ICONS.pencil, onPilih: () => setForm({ awal: k }) },
+                                {
+                                  label: k.aktif ? 'Nonaktifkan' : 'Aktifkan',
+                                  ikon: k.aktif ? ICONS.x : ICONS.check,
+                                  onPilih: () => void setAktif(k, !k.aktif),
+                                },
+                                // Yang sudah menempel pada transaksi tidak ditawari
+                                // hapus sama sekali: menawarkan lalu menolak hanya
+                                // memindahkan penjelasan ke saat yang lebih buruk.
+                                ...(k.terpakai === 0 ? [{
+                                  label: 'Hapus', ikon: ICONS.trash, bahaya: true,
+                                  onPilih: () => setKonfirmHapus(k.id),
+                                }] : []),
+                              ]} />
                             </div>
                           )}
                         </td>
@@ -1012,22 +1006,21 @@ function TabCabang({ tenantSaya }: { tenantSaya: string | null }) {
                     </div>
                   ) : (
                     <div className="riwayat-aksi">
-                      <button className="ikon-btn" aria-label={`Ubah nama ${c.nama}`}
-                        onClick={() => setUbah({ id: c.id, nama: c.nama })}>
-                        <Icon d={ICONS.pencil} size={16} />
-                      </button>
-                      {/* Cabang sendiri tidak ditawari nonaktif: server menolaknya,
-                          dan menawarkan lalu menolak hanya memindahkan penjelasan. */}
-                      {c.id !== tenantSaya && (
-                        <button className="ikon-btn"
-                          aria-label={`${c.status === 'active' ? 'Nonaktifkan' : 'Aktifkan'} ${c.nama}`}
-                          title={c.status === 'active' ? 'Nonaktifkan' : 'Aktifkan'}
-                          onClick={() => void api.updateCabang(c.id, { status: c.status === 'active' ? 'inactive' : 'active' })
+                      <MenuAksi label={`Aksi untuk ${c.nama}`} aksi={[
+                        {
+                          label: 'Ubah nama', ikon: ICONS.pencil,
+                          onPilih: () => setUbah({ id: c.id, nama: c.nama }),
+                        },
+                        // Cabang sendiri tidak ditawari nonaktif: server menolaknya,
+                        // dan menawarkan lalu menolak hanya memindahkan penjelasan.
+                        ...(c.id !== tenantSaya ? [{
+                          label: c.status === 'active' ? 'Nonaktifkan' : 'Aktifkan',
+                          ikon: c.status === 'active' ? ICONS.x : ICONS.check,
+                          onPilih: () => void api.updateCabang(c.id, { status: c.status === 'active' ? 'inactive' : 'active' })
                             .then(() => { say('Status cabang diperbarui.'); return muat(); })
-                            .catch(() => say('Gagal menyimpan.'))}>
-                          <Icon d={c.status === 'active' ? ICONS.x : ICONS.check} size={16} />
-                        </button>
-                      )}
+                            .catch(() => say('Gagal menyimpan.')),
+                        }] : []),
+                      ]} />
                     </div>
                   )}
                 </td>

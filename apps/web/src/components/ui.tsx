@@ -44,6 +44,7 @@ export const ICONS = {
   chat: ['M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-6.4A8 8 0 1 1 21 12Z'],
   bagikan: [[6, 12, 2.6] as [number, number, number], [17.5, 6, 2.6] as [number, number, number], [17.5, 18, 2.6] as [number, number, number], 'm8.3 10.8 6.9-3.6', 'm8.3 13.2 6.9 3.6'],
   salin: ['M9 9h10v12H9z', 'M5 15H3V3h12v2'],
+  lainnya: [[5, 12, 1.5] as [number, number, number], [12, 12, 1.5] as [number, number, number], [19, 12, 1.5] as [number, number, number]],
   trash: ['M4 7h16', 'M9 7V4h6v3', 'M6 7l1 13h10l1-13', 'M10 11v6', 'M14 11v6'],
   pencil: ['M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17v3Z', 'm14.5 6.5 3 3'],
   cart: ['M3 4h2l2.4 11h9.7L20 7H6', [9, 20, 1.4] as [number, number, number], [17, 20, 1.4] as [number, number, number]],
@@ -205,6 +206,90 @@ export function Toast({ message }: { message: string }) {
         <span>{message}</span>
       </div>
     </div>
+  );
+}
+
+/* ============================== menu aksi ============================== */
+
+export type AksiMenu = {
+  label: string;
+  ikon: (string | [number, number, number])[];
+  onPilih: () => void;
+  /** Ditandai merah dan dipisah garis: menghapus tidak boleh sejajar menyunting. */
+  bahaya?: boolean;
+};
+
+/**
+ * Satu tombol yang membuka daftar aksi, menggantikan deretan ikon telanjang.
+ *
+ * Tiga ikon berjajar di ujung baris menuntut orang menebak arti tanda silang:
+ * menonaktifkan? menghapus? menutup? Di dalam menu setiap aksi punya NAMA, dan
+ * yang berbahaya bisa dipisahkan alih-alih berdiri sebahu dengan yang tidak.
+ *
+ * Menunya `position: fixed` dan dihitung dari letak tombolnya, bukan absolut
+ * di dalam barisnya — `.panel` memakai `overflow: hidden`, dan menu absolut
+ * di dalamnya akan terpotong tepat pada baris terakhir tabel, yaitu baris yang
+ * paling sering perlu dihapus.
+ */
+export function MenuAksi({ label, aksi }: { label: string; aksi: AksiMenu[] }) {
+  const [buka, setBuka] = useState(false);
+  const [pos, setPos] = useState<{ atas: number; kanan: number } | null>(null);
+  const tombol = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (!buka || !tombol.current) return;
+    const r = tombol.current.getBoundingClientRect();
+    setPos({ atas: r.bottom + 6, kanan: window.innerWidth - r.right });
+  }, [buka]);
+
+  useEffect(() => {
+    if (!buka) return;
+    const tutup = () => setBuka(false);
+    const padaTombol = (e: MouseEvent) =>
+      menu.current?.contains(e.target as Node) || tombol.current?.contains(e.target as Node);
+    const klik = (e: MouseEvent) => { if (!padaTombol(e)) setBuka(false); };
+    const tuts = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setBuka(false); tombol.current?.focus(); }
+    };
+    // Menggulir menutup menunya: letaknya dihitung sekali, dan menu yang
+    // bertahan di tempatnya sementara barisnya bergerak menunjuk baris yang
+    // salah — persis saat orang menekan Hapus.
+    window.addEventListener('mousedown', klik);
+    window.addEventListener('keydown', tuts);
+    window.addEventListener('resize', tutup);
+    document.addEventListener('scroll', tutup, true);
+    return () => {
+      window.removeEventListener('mousedown', klik);
+      window.removeEventListener('keydown', tuts);
+      window.removeEventListener('resize', tutup);
+      document.removeEventListener('scroll', tutup, true);
+    };
+  }, [buka]);
+
+  return (
+    <>
+      <button ref={tombol} className={`ikon-btn${buka ? ' on' : ''}`}
+        aria-label={label} aria-haspopup="menu" aria-expanded={buka}
+        onClick={() => setBuka((v) => !v)}>
+        <Icon d={ICONS.lainnya} size={18} />
+      </button>
+
+      {buka && pos && (
+        <div ref={menu} className="menu-aksi" role="menu" aria-label={label}
+          style={{ top: pos.atas, right: pos.kanan }}>
+          {aksi.map((a, i) => (
+            <button key={a.label} role="menuitem"
+              className={`menu-aksi-item${a.bahaya ? ' bahaya' : ''}`}
+              autoFocus={i === 0}
+              onClick={() => { setBuka(false); a.onPilih(); }}>
+              <Icon d={a.ikon} size={16} />
+              <span>{a.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </>
   );
 }
 
