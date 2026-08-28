@@ -726,7 +726,9 @@ function FormTransaksi({ awal, onTutup, onSimpan }: {
 
   const j = Number(jumlah) || 0;
   const h = Number(harga) || 0;
-  const siap = nama.trim() !== '' && j > 0 && harga !== '';
+  // Pada catatan BARU, tanpa pilihan katalog tidak ada yang bisa disimpan;
+  // pada catatan lama, namanya sudah melekat dan tidak lagi dipilih.
+  const siap = (awal ? nama.trim() !== '' : katalogId !== null) && j > 0 && harga !== '';
 
   return (
     <Sheet title={awal ? 'Ubah catatan belanja' : 'Catat pembelian'}
@@ -739,26 +741,48 @@ function FormTransaksi({ awal, onTutup, onSimpan }: {
         </select>
       </Field>
 
-      {!awal && pilihan.length > 0 && (
-        <Field label="Pilih dari katalog" htmlFor="t-katalog">
+{/* Dipilih dari katalog, TIDAK diketik.
+
+          Sebelumnya kolom nama bebas diisi, dan setiap ejaan baru melahirkan
+          baris katalog baru: "Paket terapi 4 sesi" dan "paket terapi 4sesi"
+          menjadi dua barang berbeda yang tidak pernah diputuskan siapa pun.
+          Laporan per produk lalu memecah barang yang sama, dan tidak ada cara
+          menyatukannya kembali selain menebak.
+
+          Barang yang belum ada di katalog ditambahkan di Master data lebih
+          dulu — sekali, dengan sengaja, oleh orang yang memang mengurusnya. */}
+      {!awal && (
+        <Field label="Produk atau layanan" htmlFor="t-katalog">
           <select id="t-katalog" className="input" value={katalogId ?? ''}
-            onChange={(e) => pilihKatalog(e.target.value)}>
-            <option value="">— ketik sendiri —</option>
+            onChange={(e) => pilihKatalog(e.target.value)} autoFocus>
+            <option value="">— pilih dari katalog —</option>
             {pilihan.map((k) => (
-              <option key={k.id} value={k.id}>{k.nama} · {rp(Number(k.harga))}</option>
+              <option key={k.id} value={k.id}>
+                {k.nama} · {rp(Number(k.harga))}
+                {k.jenis === 'paket' && k.isi.length > 0
+                  ? ` (${k.isi.map((x) => `${x.jumlah}× ${x.nama}`).join(' + ')})`
+                  : ''}
+              </option>
             ))}
           </select>
-          <small className="field-bantu">
-            Memilih dari katalog membuat riwayat belanja bisa dilaporkan per
-            produk. Barang di luar katalog tetap boleh diketik sendiri.
-          </small>
+          {pilihan.length === 0 && (
+            <small className="field-bantu">
+              Belum ada {JENIS_TRX.find((x) => x.k === jenis)?.label.toLowerCase()} di
+              katalog cabang ini. Tambahkan lewat Master data → Produk &amp; layanan,
+              atau impor daftar KK di sana.
+            </small>
+          )}
         </Field>
       )}
 
-      <Field label="Nama produk atau terapi" htmlFor="t-nama">
-        <input id="t-nama" className="input" value={nama} maxLength={120}
-          onChange={(e) => setNama(e.target.value)} placeholder="cth. Paket herbal sendi" autoFocus />
-      </Field>
+      {awal && (
+        <Field label="Produk atau layanan" htmlFor="t-nama">
+          {/* Transaksi lama tetap menampilkan namanya apa adanya: ia mungkin
+              menunjuk barang yang sudah tidak ada di katalog, dan nota yang
+              sudah terjadi tidak boleh berubah karena katalognya berubah. */}
+          <input id="t-nama" className="input" value={nama} disabled />
+        </Field>
+      )}
 
       <div className="dua-kolom">
         <Field label="Jumlah" htmlFor="t-jumlah">
@@ -794,8 +818,7 @@ function FormTransaksi({ awal, onTutup, onSimpan }: {
             tanggal, catatan: catatan.trim() || null,
             // Hanya ikut bila namanya masih sama dengan yang dipilih; begitu
             // diketik ulang jadi barang lain, tautannya berhenti benar.
-            katalogId: katalog.find((k) => k.id === katalogId)?.nama === nama.trim()
-              ? katalogId : null,
+            katalogId,
           }).finally(() => setBusy(false));
         }}>
         {awal ? 'Simpan perubahan' : 'Simpan pembelian'}

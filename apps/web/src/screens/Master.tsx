@@ -5,6 +5,7 @@ import {
 } from '../components/ui';
 import { api, ApiError, type CabangRow, type JenisTransaksi, type KatalogRow, type PenggunaRow } from '../lib/api';
 import { ROLE_LABEL, fmtTanggal, rp } from '../lib/domain';
+import { PRODUK } from '../lib/produk';
 import { useApp } from '../lib/store';
 import type { Role } from '../lib/types';
 
@@ -77,12 +78,35 @@ function TabKatalog({ pusat }: { pusat: boolean }) {
   const [form, setForm] = useState<{ awal: KatalogRow | null } | null>(null);
   const [konfirmHapus, setKonfirmHapus] = useState<string | null>(null);
   const [gagal, setGagal] = useState<string | null>(null);
+  const [impor, setImpor] = useState(false);
+  /** Paket yang sedang disunting isinya; null berarti tidak ada. */
+  const [isiPaket, setIsiPaket] = useState<KatalogRow | null>(null);
 
   const muat = useCallback(async () => {
     setGagal(null);
     try { setRows((await api.katalog({ semua })).katalog); }
     catch { setGagal('Gagal memuat katalog. Periksa koneksi.'); setRows([]); }
   }, [semua]);
+
+  async function imporKk() {
+    setImpor(true);
+    try {
+      const hasil = await api.imporKatalog(PRODUK.map((p) => ({
+        kode: p.id,
+        nama: p.nama,
+        jenis: 'produk' as const,
+        // Produk yang harganya belum tercatat di toko resmi masuk dengan 0 —
+        // "belum diatur" lebih jujur daripada menebak, dan Koordinator bisa
+        // mengisinya sendiri.
+        harga: p.harga ?? 0,
+      })));
+      say(hasil.baru > 0
+        ? `${hasil.baru} produk ditambahkan, ${hasil.diperbarui} diperbarui.`
+        : `${hasil.diperbarui} produk diperbarui.`);
+      await muat();
+    } catch { say('Gagal mengimpor. Periksa koneksi.'); }
+    finally { setImpor(false); }
+  }
 
   useEffect(() => { void muat(); }, [muat]);
   useEffect(() => {
@@ -111,6 +135,8 @@ function TabKatalog({ pusat }: { pusat: boolean }) {
   }
 
   if (rows === null) return <span className="hint">Memuat katalog…</span>;
+
+  const jumlahKk = rows.filter((k) => k.sumber === 'kk').length;
 
   // Dikelompokkan per jenis; pada pandangan lintas cabang, per cabang dulu.
   const kunciGrup = (k: KatalogRow) => (semua ? k.tenantNama : '');
@@ -143,6 +169,27 @@ function TabKatalog({ pusat }: { pusat: boolean }) {
             Tambah
           </Button>
         </div>
+
+        {/* Impor daftar KK.
+            Daftarnya hidup di aplikasi ini (`lib/produk.ts`), lengkap dengan
+            kandungan dan aturan pakainya; yang dikirim ke katalog cabang hanya
+            kode, nama, jenis, dan harganya. Idempoten — menekannya dua kali
+            memperbarui, bukan menggandakan. */}
+        {!semua && (
+          <div className="impor-kk">
+            <span>
+              <b>{jumlahKk} dari {PRODUK.length} produk KK ada di katalog cabang ini</b>
+              <em>
+                Impor menambah yang belum ada dan memperbarui nama serta harganya.
+                Barang yang sudah dinonaktifkan tetap nonaktif.
+              </em>
+            </span>
+            <Button size="sm" variant="secondary" icon={ICONS.download}
+              disabled={impor} onClick={() => void imporKk()}>
+              {impor ? 'Mengimpor…' : jumlahKk === 0 ? 'Impor daftar KK' : 'Perbarui dari KK'}
+            </Button>
+          </div>
+        )}
 
         {/* Keadaan kosong hanya sah bila pemuatannya berhasil. Menampilkan
             "gagal memuat" dan "masih kosong" bersamaan mengatakan dua hal yang
@@ -191,6 +238,13 @@ function TabKatalog({ pusat }: { pusat: boolean }) {
                       <tr className={k.aktif ? '' : 'nonaktif'}>
                         <td data-label="Nama" className="kol-nama">
                           <b>{k.nama}</b>
+                          {k.jenis === 'paket' && (
+                            <em>
+                              {k.isi.length === 0
+                                ? 'Isinya belum diatur'
+                                : k.isi.map((x) => `${x.jumlah}× ${x.nama}`).join(' + ')}
+                            </em>
+                          )}
                           {k.catatan && <em>{k.catatan}</em>}
                         </td>
                         <td data-label="Jenis" className="kol-sempit ringkas">{j.label}</td>
@@ -214,6 +268,15 @@ function TabKatalog({ pusat }: { pusat: boolean }) {
                             </div>
                           ) : (
                             <div className="riwayat-aksi">
+                              {/* Hanya paket yang punya isi untuk disunting;
+                                  menawarkannya pada produk berarti membuka
+                                  layar yang tidak bisa diisi apa pun. */}
+                              {k.jenis === 'paket' && (
+                                <button className="ikon-btn" aria-label={`Isi paket ${k.nama}`}
+                                  title="Atur isi paket" onClick={() => setIsiPaket(k)}>
+                                  <Icon d={ICONS.cart} size={16} />
+                                </button>
+                              )}
                               <button className="ikon-btn" aria-label={`Ubah ${k.nama}`}
                                 onClick={() => setForm({ awal: k })}>
                                 <Icon d={ICONS.pencil} size={16} />
@@ -251,6 +314,12 @@ function TabKatalog({ pusat }: { pusat: boolean }) {
           Barang yang sudah pernah dipakai tidak bisa dihapus — nonaktifkan saja,
           supaya riwayat belanja tetap menyebut namanya.
         </small>
+      )}
+
+      {isiPaket && (
+        <FormIsiPaket paket={isiPaket} katalog={rows}
+          onTutup={() => setIsiPaket(null)}
+          onSelesai={() => { setIsiPaket(null); void muat(); }} />
       )}
 
       {form && (
@@ -738,6 +807,113 @@ function SheetAkun({ akun, sendiri, peran, onTutup, onBerubah }: {
 }
 
 /* ============================= Cabang ============================= */
+
+/**
+ * Menyusun isi sebuah paket dari katalog yang sudah ada.
+ *
+ * Isinya DIPILIH, tidak diketik. Itu inti perubahannya: sebuah paket yang
+ * anggotanya diketik hanya menghasilkan nama panjang yang tidak bisa
+ * dilaporkan per barang, dan tidak ada yang tahu isinya benar-benar ada di
+ * katalog atau tidak.
+ */
+function FormIsiPaket({ paket, katalog, onTutup, onSelesai }: {
+  paket: KatalogRow;
+  katalog: KatalogRow[];
+  onTutup: () => void;
+  onSelesai: () => void;
+}) {
+  const { say } = useApp();
+  const [isi, setIsi] = useState(paket.isi.map((x) => ({ katalogId: x.katalogId, jumlah: x.jumlah })));
+  const [busy, setBusy] = useState(false);
+
+  // Paket tidak boleh memuat paket. Ditahan juga di server; di sini supaya
+  // pilihannya memang tidak pernah muncul, bukan muncul lalu ditolak.
+  const bisa = katalog.filter((k) => k.jenis !== 'paket' && k.aktif && k.tenantId === paket.tenantId);
+  const belumDipakai = bisa.filter((k) => !isi.some((x) => x.katalogId === k.id));
+  const namaDari = (id: string) => bisa.find((k) => k.id === id)?.nama ?? '(sudah tidak ada)';
+  const hargaDari = (id: string) => Number(bisa.find((k) => k.id === id)?.harga ?? 0);
+  const totalIsi = isi.reduce((t, x) => t + hargaDari(x.katalogId) * x.jumlah, 0);
+  const hargaPaket = Number(paket.harga);
+
+  async function simpan() {
+    setBusy(true);
+    try {
+      await api.setIsiPaket(paket.id, isi);
+      say(`Isi "${paket.nama}" tersimpan.`);
+      onSelesai();
+    } catch { say('Gagal menyimpan isi paket. Periksa koneksi.'); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <Sheet title="Isi paket" subtitle={paket.nama} onClose={onTutup}>
+      {isi.length === 0 && (
+        <p className="bagikan-jelas">
+          Paket ini belum berisi apa pun. Tambahkan produk atau terapi dari
+          katalog di bawah.
+        </p>
+      )}
+
+      {isi.map((x) => (
+        <div className="isi-baris" key={x.katalogId}>
+          <span className="isi-nama">{namaDari(x.katalogId)}</span>
+          <input className="input isi-jumlah" inputMode="numeric" value={String(x.jumlah)}
+            aria-label={`Jumlah ${namaDari(x.katalogId)}`}
+            onChange={(e) => {
+              const n = Number(e.target.value.replace(/D/g, '')) || 1;
+              setIsi(isi.map((y) => (y.katalogId === x.katalogId ? { ...y, jumlah: n } : y)));
+            }} />
+          <button className="ikon-btn" aria-label={`Keluarkan ${namaDari(x.katalogId)}`}
+            onClick={() => setIsi(isi.filter((y) => y.katalogId !== x.katalogId))}>
+            <Icon d={ICONS.x} size={16} />
+          </button>
+        </div>
+      ))}
+
+      {belumDipakai.length > 0 && (
+        <Field label="Tambahkan dari katalog" htmlFor="p-tambah">
+          <select id="p-tambah" className="input" value=""
+            onChange={(e) => {
+              if (!e.target.value) return;
+              setIsi([...isi, { katalogId: e.target.value, jumlah: 1 }]);
+            }}>
+            <option value="">— pilih produk atau terapi —</option>
+            {belumDipakai.map((k) => (
+              <option key={k.id} value={k.id}>{k.nama} · {rp(Number(k.harga))}</option>
+            ))}
+          </select>
+        </Field>
+      )}
+
+      {isi.length > 0 && (
+        <>
+          <div className="consumable-total">
+            <span>Bila dibeli satuan</span><span>{rp(totalIsi)}</span>
+          </div>
+          <div className="consumable-total">
+            <span>Harga paket</span><span>{rp(hargaPaket)}</span>
+          </div>
+          {/* Selisihnya disebut apa adanya, termasuk bila paketnya lebih mahal.
+              Angka yang hanya ditampilkan saat menguntungkan berhenti menjadi
+              angka dan mulai menjadi pemasaran. */}
+          <small className="field-bantu">
+            {hargaPaket < totalIsi
+              ? `Pembeli hemat ${rp(totalIsi - hargaPaket)} dibanding membeli satuan.`
+              : hargaPaket > totalIsi
+                ? `Paket ini ${rp(hargaPaket - totalIsi)} lebih mahal daripada membeli satuan — periksa harganya.`
+                : 'Harga paket sama dengan jumlah harga satuannya.'}
+          </small>
+        </>
+      )}
+
+      <Button full size="lg" icon={ICONS.check} disabled={busy}
+        onClick={() => void simpan()}>
+        Simpan isi paket
+      </Button>
+      <button className="link-btn" onClick={onTutup}>Batal</button>
+    </Sheet>
+  );
+}
 
 function TabCabang({ tenantSaya }: { tenantSaya: string | null }) {
   const { say } = useApp();

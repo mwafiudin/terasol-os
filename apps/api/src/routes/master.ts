@@ -44,8 +44,20 @@ export default async function masterRoutes(app: FastifyInstance) {
       const { rows } = await tx.query(
         `select k.id, k.tenant_id as "tenantId", t.nama as "tenantNama",
                 k.jenis, k.nama, k.harga, k.catatan, k.aktif,
+                k.kode, k.sumber,
                 (select count(*) from transaksi x
-                  where x.katalog_id = k.id and x.deleted_at is null)::int as terpakai
+                  where x.katalog_id = k.id and x.deleted_at is null)::int as terpakai,
+                -- Isi paket ikut di daftar, bukan lewat panggilan terpisah per
+                -- baris: paket tanpa isinya adalah nama tanpa arti, dan layar
+                -- yang menampilkannya selalu butuh keduanya sekaligus.
+                coalesce((
+                  select json_agg(json_build_object(
+                    'katalogId', pi.katalog_id, 'nama', a.nama,
+                    'jenis', a.jenis, 'harga', a.harga, 'jumlah', pi.jumlah
+                  ) order by a.jenis, a.nama)
+                    from paket_isi pi join katalog a on a.id = pi.katalog_id
+                   where pi.paket_id = k.id
+                ), '[]'::json) as isi
            from katalog k
            join tenants t on t.id = k.tenant_id
            ${where}
@@ -90,6 +102,115 @@ export default async function masterRoutes(app: FastifyInstance) {
       throw err;
     }
   });
+
+/**
+   * Mengimpor daftar produk KK ke katalog cabang.
+   *
+   * Daftarnya dikirim perangkat, bukan disimpan di server. Ia hidup sebagai
+   * data di aplikasi web (`lib/produk.ts`) lengkap dengan kandungan, aturan
+   * pakai, dan peringatan — dan menyalin seribu baris itu ke sini hanya untuk
+   * mengambil nama dan harganya akan melahirkan salinan kedua yang harus
+   * dijaga tetap sama, yaitu persis masalah yang sedang dibereskan.
+   *
+   * Idempoten pada `(tenant_id, kode)`: impor kesepuluh menghasilkan katalog
+   * yang sama dengan impor pertama. Harga dan nama DIPERBARUI, karena daftar
+   * resminya memang berubah dari waktu ke waktu — tetapi `aktif` tidak
+   * disentuh: barang yang sengaja dinonaktifkan cabang tidak boleh hidup lagi
+   * hanya karena seseorang menekan Impor.
+   */
+  app.post('/katalog/impor', { preHandler: requireRole('koordinator', 'admin_pusat') },
+    async (req, reply) => {
+      const parsed = z.object({
+        items: z.array(z.object({
+          kode: z.string().min(1).max(80),
+          nama: z.string().min(1).max(200),
+          jenis: z.enum(JENIS).default('produk'),
+          harga: z.number().int().min(0).default(0),
+        })).min(1).max(500),
+      }).safeParse(req.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: 'bad_request', detail: parsed.error.flatten() });
+      }
+      const ctx = ctxOf(req);
+
+      return withTenant(ctx, async (tx) => {
+        let baru = 0;
+        let diperbarui = 0;
+        for (const it of parsed.data.items) {
+          const { rows } = await tx.query<{ baru: boolean }>(
+            `insert into katalog (tenant_id, kode, sumber, jenis, nama, harga)
+             values ($1,$2,'kk',$3::jenis_transaksi,$4,$5)
+             on conflict (tenant_id, kode) where kode is not null
+             do update set nama = excluded.nama, harga = excluded.harga,
+                           jenis = excluded.jenis, updated_at = now()
+             returning (xmax = 0) as baru`,
+            [ctx.tenantId, it.kode, it.jenis, it.nama.trim(), it.harga],
+          );
+          if (rows[0]?.baru) baru++; else diperbarui++;
+        }
+        await audit(tx, ctx, 'katalog.impor', 'tenant', ctx.tenantId, { baru, diperbarui });
+        return { baru, diperbarui };
+      });
+    });
+
+  /**
+   * Menetapkan isi sebuah paket. Menggantikan seluruhnya, bukan menambah:
+   * layar penyuntingnya menampilkan daftar utuh, dan menyimpan yang terlihat
+   * di layar adalah satu-satunya perilaku yang tidak mengejutkan.
+   */
+  app.put('/katalog/:id/isi', { preHandler: requireRole('koordinator', 'admin_pusat') },
+    async (req, reply) => {
+      const { id } = req.params as { id: string };
+      const parsed = z.object({
+        isi: z.array(z.object({
+          katalogId: z.string().uuid(),
+          jumlah: z.number().int().min(1).max(999).default(1),
+        })).max(50),
+      }).safeParse(req.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: 'bad_request', detail: parsed.error.flatten() });
+      }
+      const ctx = ctxOf(req);
+
+      return withTenant(ctx, async (tx) => {
+        const paket = await tx.query<{ jenis: string }>(
+          'select jenis from katalog where id = $1', [id],
+        );
+        if (!paket.rowCount) return reply.code(404).send({ error: 'not_found' });
+        if (paket.rows[0]!.jenis !== 'paket') {
+          return reply.code(400).send({
+            error: 'bad_request',
+            message: 'Hanya baris berjenis paket yang bisa memuat isi.',
+          });
+        }
+        // Paket di dalam paket ditolak. CHECK di basis data hanya menahan
+        // paket yang memuat dirinya sendiri; lingkaran yang lebih panjang
+        // tidak bisa ditelusuri dari sana, dan cara termurah menutupnya
+        // adalah tidak mengizinkan paket menjadi isi sama sekali.
+        for (const x of parsed.data.isi) {
+          const a = await tx.query<{ jenis: string }>(
+            'select jenis from katalog where id = $1', [x.katalogId],
+          );
+          if (!a.rowCount) return reply.code(400).send({ error: 'bad_request', message: 'Isi paket tidak ditemukan.' });
+          if (a.rows[0]!.jenis === 'paket') {
+            return reply.code(400).send({
+              error: 'bad_request',
+              message: 'Paket tidak bisa memuat paket lain.',
+            });
+          }
+        }
+
+        await tx.query('delete from paket_isi where paket_id = $1', [id]);
+        for (const x of parsed.data.isi) {
+          await tx.query(
+            'insert into paket_isi (paket_id, katalog_id, jumlah) values ($1,$2,$3)',
+            [id, x.katalogId, x.jumlah],
+          );
+        }
+        await audit(tx, ctx, 'katalog.isi_paket', 'katalog', id, { jumlahIsi: parsed.data.isi.length });
+        return { ok: true, jumlahIsi: parsed.data.isi.length };
+      });
+    });
 
   app.patch('/katalog/:id', { preHandler: requireRole('koordinator', 'admin_pusat') }, async (req, reply) => {
     const { id } = req.params as { id: string };

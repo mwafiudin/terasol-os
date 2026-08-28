@@ -2478,3 +2478,24 @@ button { cursor: pointer; font-family: inherit; }
   display: block; margin-top: 8px; font-size: 12px; line-height: 1.55;
   color: var(--ivory-200);
 }
+
+/* ==================== Transisi antar-halaman ==================== */
+
+/* Hanya transform dan opacity — keduanya ditangani compositor, jadi tidak
+   memicu layout ulang. Geserannya 6px: cukup untuk memberi arah, terlalu kecil
+   untuk terasa sebagai perjalanan. Halaman yang butuh dibaca cepat oleh
+   petugas di depan antrean tidak boleh membuat orang menunggu animasinya. */
+@keyframes layar-masuk {
+  from { opacity: 0; transform: translate3d(0, 6px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+.screen { animation: layar-masuk var(--dur-base) var(--ease-out) both; }
+
+/* Saat mencetak, animasi yang belum selesai bisa membekukan halaman pada
+   keadaan setengah transparan — dan yang tercetak adalah keadaan itu. */
+@media print { .screen { animation: none !important; } }
+
+/* Token durasinya sudah menjadi 0ms pada prefers-reduced-motion, tapi animasi
+   dengan durasi nol tetap menjalankan `both` fill-nya. Dimatikan sekalian
+   supaya tidak ada satu frame pun yang bergeser. */
+@media (prefers-reduced-motion: reduce) { .screen { animation: none; } }
