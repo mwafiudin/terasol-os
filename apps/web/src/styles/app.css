@@ -2530,3 +2530,59 @@ button { cursor: pointer; font-family: inherit; }
 .isi-baris:first-of-type { border-top: none; }
 .isi-nama { font-size: 13.5px; color: var(--text-body); }
 .isi-jumlah { text-align: center; padding-left: 6px; padding-right: 6px; }
+
+/* ==================== Menu aksi baris ==================== */
+
+/* `position: fixed`, letaknya dihitung dari tombolnya. `.panel` memakai
+   `overflow: hidden`, dan menu absolut di dalamnya akan terpotong tepat pada
+   baris terakhir tabel — baris yang justru paling sering perlu dihapus. */
+.menu-aksi {
+  position: fixed; z-index: 40; min-width: 176px;
+  display: flex; flex-direction: column; padding: 4px;
+  background: var(--surface-card); border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-card); box-shadow: var(--shadow-md, 0 8px 24px rgba(0,0,0,.12));
+  animation: menu-masuk var(--dur-fast) var(--ease-out) both;
+}
+@keyframes menu-masuk {
+  from { opacity: 0; transform: translate3d(0, -4px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) { .menu-aksi { animation: none; } }
+
+.menu-aksi-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border: none; background: none; cursor: pointer;
+  border-radius: var(--radius-sm); text-align: left;
+  font-size: 13.5px; color: var(--text-body);
+}
+.menu-aksi-item:hover, .menu-aksi-item:focus-visible { background: var(--brand-tint); }
+.menu-aksi-item svg { flex: none; color: var(--text-muted); }
+/* Yang merusak dipisah garis dan diberi warnanya sendiri: menghapus tidak
+   boleh berdiri sebahu dengan menyunting hanya karena keduanya sama-sama aksi. */
+.menu-aksi-item.bahaya {
+  color: var(--danger-700); margin-top: 4px; padding-top: 11px;
+  border-top: 1px solid var(--border-hairline); border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+}
+.menu-aksi-item.bahaya svg { color: var(--danger-500); }
+.menu-aksi-item.bahaya:hover, .menu-aksi-item.bahaya:focus-visible { background: var(--danger-100); }
+.ikon-btn.on { background: var(--brand-soft); color: var(--teal-800); }
+
+/* ==================== Kepala panel tetap satu baris ==================== */
+
+/* Sebelumnya `flex-wrap: wrap` melempar tombolnya ke baris kedua begitu chip
+   penyaringnya sedikit lebih panjang — dan tombol yang sendirian di baris
+   bawah, rata kanan, terbaca seperti tersasar. Baris chipnya memang sudah bisa
+   digulir mendatar; itu yang dipakai, bukan pembungkusan. */
+.panel-head { flex-wrap: nowrap; }
+.panel-head > .chip-baris { padding-left: 0; padding-right: 0; }
+
+/* Di bawah 560px keduanya tidak muat berdampingan: yang terjadi bukan chip
+   yang menyusut rapi, melainkan chip kedua terpotong di tengah kata oleh
+   tombol di sebelahnya. Jadi di sana mereka menumpuk, dan tombolnya melebar
+   penuh — bentuk yang terbaca sebagai disengaja, bukan sebagai tersasar. */
+@media (max-width: 559px) {
+  .panel-head { flex-wrap: wrap; }
+  .panel-head > .chip-baris { flex: 1 0 100%; }
+  .panel-head > .btn { flex: 1 0 100%; margin-left: 0; justify-content: center; }
+}
+.toolbar-judul { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
