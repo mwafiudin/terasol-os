@@ -378,7 +378,7 @@ export function Recap({ go, event, onArchived, onOpenPeserta }: {
 
             <small>
               Persetujuan: {data.consentSetuju} setuju · {data.tallyAnonim} tally anonim
-              {data.perluDitinjau > 0 && ` · ${data.perluDitinjau} record menunggu peninjauan`}
+              {data.perluDitinjau > 0 && ` · ${data.perluDitinjau} record bernomor kembar`}
             </small>
           </div>
 

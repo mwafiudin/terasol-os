@@ -57,7 +57,16 @@ const FILTER: { k: FilterKey; label: string; cocok: (p: PesertaRingkas) => boole
     cocok: (p) => adaYangDinilai(p.nilai) && temuanPeserta(p.nilai, p.gender).size === 0,
   },
   { k: 'antre', label: 'Antre', cocok: (p) => p.belumSync },
-  { k: 'ditinjau', label: 'Perlu ditinjau', cocok: (p) => p.needsReview },
+  /**
+   * Bukan "perlu ditinjau", melainkan alasan sebenarnya.
+   *
+   * `needs_review` hanya punya SATU penyebab di seluruh sistem: nomor HP yang
+   * sama sudah ada di event ini (`routes/sync.ts`). Menamainya "perlu
+   * ditinjau" membuat penandanya berdiri di sebelah chip temuan kesehatan
+   * tanpa mengatakan tinjauan apa — dan yang membacanya menyimpulkan ada yang
+   * tidak beres dengan angkanya, padahal yang kembar nomornya.
+   */
+  { k: 'ditinjau', label: 'Nomor kembar', cocok: (p) => p.needsReview },
 ];
 
 /** Nomor HP dicocokkan tanpa spasi/tanda supaya "0812 3456" tetap ketemu. */
@@ -213,8 +222,9 @@ export function EventPeserta({ go, event, onBuka, onTambah, onUbahEvent, onHapus
 
           {rekap.perluDitinjau > 0 && (
             <div className="belum-note">
-              {rekap.perluDitinjau} record menunggu peninjauan dan belum ikut
-              dihitung. Selesaikan dari Beranda → record perlu ditinjau.
+              {rekap.perluDitinjau} record memakai nomor HP yang sudah dipakai
+              peserta lain di event ini, jadi belum ikut dihitung. Selesaikan
+              dari Beranda → record perlu ditinjau.
             </div>
           )}
           <small>
@@ -328,7 +338,11 @@ export function EventPeserta({ go, event, onBuka, onTambah, onUbahEvent, onHapus
                 {p.nama}{usia == null ? '' : `, ${usia} th`}
               </span>
               {p.belumSync && <Badge tone="warning">Antre</Badge>}
-              {p.needsReview && <Badge tone="danger">Ditinjau</Badge>}
+              {/* Nada peringatan, bukan bahaya. Merah di sebelah chip temuan
+                  yang juga merah adalah persis yang membuatnya terbaca sebagai
+                  vonis kesehatan; ini keraguan atas pencatatan, bukan atas
+                  orangnya. */}
+              {p.needsReview && <Badge tone="warning">Nomor kembar</Badge>}
             </div>
             <span className="peserta-meta">
               {p.imt != null ? `IMT ${dec(p.imt)}` : 'IMT belum ada'}
@@ -524,6 +538,17 @@ export function PesertaDetail({ go, peserta, onUbah, onAnalisis }: {
       {/* Identitas dinyatakan sekali saja, di sini. Kartu "Data diri" dulu
           mengulang baris ini kata demi kata — nama, usia, jenis kelamin, dan
           nomor HP yang sama, dua sentimeter di bawahnya. */}
+      {/* Alasannya disebut di layar orangnya, bukan hanya di daftar.
+          Koordinator yang membuka record ini untuk mencari tahu kenapa ia
+          ditandai tidak punya tempat lain untuk bertanya. */}
+      {peserta.needsReview && (
+        <div className="range-warn">
+          Nomor HP ini sudah dipakai peserta lain di event yang sama. Periksa
+          apakah orangnya sama — bila iya, gabungkan dari Beranda → record perlu
+          ditinjau. Angka pemeriksaannya sendiri tidak dipersoalkan.
+        </div>
+      )}
+
       <div className="identitas-baris">
         <span>
           {usia ? `${usia} th · ` : ''}{gender === 'P' ? 'Perempuan' : 'Laki-laki'}
