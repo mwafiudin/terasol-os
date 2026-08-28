@@ -188,7 +188,17 @@ export default function App() {
   // Koordinator, dan Koordinator yang membuka dari HP tetap butuh layout ponsel.
   return (
     <div className="app">
-      <main className="screen">
+      {/* `key` pada elemen layarnya, bukan pada tiap halaman.
+
+          React membuang lalu memasang ulang isi `main` setiap kali kuncinya
+          berubah, dan animasinya berjalan pada elemen yang baru dipasang —
+          tanpa pustaka transisi, tanpa menahan halaman lama di DOM, dan tanpa
+          satu pun render tambahan.
+
+          Yang dianimasikan hanya `transform` dan `opacity`: keduanya ditangani
+          compositor, jadi tidak memicu layout ulang pada ponsel yang sedang
+          sibuk menghitung IMT sambil menyinkronkan antrean. */}
+      <main className="screen" key={screen}>
         {screen === 'home' && (
           <Home go={go} onFollowUp={setFollowUp} reloadKey={reloadKey}
             onDaftar={(ev) => void mulaiRegistrasi('home', ev)} />

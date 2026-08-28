@@ -170,10 +170,20 @@ export type DaftarTerhapus = {
   }[];
 };
 
+/** Satu baris isi paket, seperti dikirim server bersama barisnya. */
+export type IsiPaket = {
+  katalogId: string; nama: string; jenis: JenisTransaksi; harga: string; jumlah: number;
+};
+
 export type KatalogRow = {
-  id: string; tenantId: string; tenantNama: string; modeSync?: 'online' | 'offline';
+  id: string; tenantId: string; tenantNama: string;
   jenis: JenisTransaksi; nama: string; harga: string;
   catatan: string | null; aktif: boolean; terpakai: number;
+  /** SKU daftar KK; null untuk layanan yang hanya ada di cabang itu. */
+  kode: string | null;
+  sumber: 'kk' | 'cabang';
+  /** Isi paket. Kosong untuk baris yang bukan paket. */
+  isi: IsiPaket[];
 };
 
 export type CabangRow = {
@@ -435,6 +445,11 @@ export const api = {
   pusatRingkasan: () => request<PusatRingkasan>('/pusat/ringkasan'),
 
   /* ----------------------------- master data ----------------------------- */
+
+  imporKatalog: (items: { kode: string; nama: string; jenis: JenisTransaksi; harga: number }[]) =>
+    post<{ baru: number; diperbarui: number }>('/katalog/impor', { items }),
+  setIsiPaket: (id: string, isi: { katalogId: string; jumlah: number }[]) =>
+    put<{ ok: true; jumlahIsi: number }>(`/katalog/${id}/isi`, { isi }),
 
   katalog: (opsi: { semua?: boolean; aktif?: boolean } = {}) => {
     const s = new URLSearchParams();
