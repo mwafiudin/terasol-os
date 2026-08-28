@@ -397,7 +397,7 @@ export function Pusat({ go }: { go: Nav }) {
         </div>
         {data.total.perluDitinjau > 0 && (
           <div className="belum-note">
-            {data.total.perluDitinjau} record di seluruh cabang menunggu peninjauan
+            {data.total.perluDitinjau} record di seluruh cabang bernomor kembar dan menunggu peninjauan
             dan belum ikut dihitung.
           </div>
         )}
@@ -419,7 +419,7 @@ export function Pusat({ go }: { go: Nav }) {
           <div className="cabang-atas">
             <span className="cabang-nama">{c.nama}</span>
             {c.eventAktif > 0 && <Badge tone="success" dot>{c.eventAktif} aktif</Badge>}
-            {c.perluDitinjau > 0 && <Badge tone="danger">{c.perluDitinjau} ditinjau</Badge>}
+            {c.perluDitinjau > 0 && <Badge tone="warning">{c.perluDitinjau} nomor kembar</Badge>}
           </div>
           <div className="cabang-nilai"><b>{rp(Number(c.totalBelanja))}</b><span>{c.transaksi} transaksi</span></div>
           {/* Batang perbandingan relatif terhadap cabang tertinggi — bukan
