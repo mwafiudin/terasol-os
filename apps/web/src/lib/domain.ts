@@ -211,6 +211,38 @@ export function periksaHp(raw: string): string | null {
 export const USIA_MIN = 1;
 export const USIA_MAKS = 120;
 
+export function periksaUsia(raw: string): string | null {
+  if (!raw.trim()) return 'Usia belum diisi.';
+  const n = Number(raw);
+  if (!Number.isFinite(n) || !Number.isInteger(n)) return 'Usia diisi angka tahun.';
+  if (n < USIA_MIN || n > USIA_MAKS) {
+    return `Usia di luar rentang wajar (${USIA_MIN}–${USIA_MAKS} tahun).`;
+  }
+  return null;
+}
+
+/**
+ * Taksiran tanggal lahir dari usia: hari ini dikurangi usianya.
+ *
+ * Bukan 1 Januari, dan bukan pertengahan tahun. Orang yang HARI INI berusia 62
+ * pasti lahir antara (hari ini − 63 tahun + 1 hari) dan (hari ini − 62 tahun);
+ * memilih ujung terakhir rentang itu membuat usianya benar hari ini — angka
+ * yang baru saja diketik petugas harus muncul apa adanya di layar — dan benar
+ * lagi pada setiap ulang tahun tanggal pencatatan sesudahnya. Di antara
+ * keduanya ia meleset paling banyak satu tahun, dan tidak ada asumsi yang bisa
+ * lebih baik dari data yang hanya berisi satu angka usia.
+ *
+ * Yang dihasilkan WAJIB disimpan bersama penanda `asumsi`. Tanpa penanda itu,
+ * tanggal ini tidak bisa dibedakan dari tanggal lahir sungguhan oleh siapa pun
+ * yang membacanya kemudian.
+ */
+export function tanggalLahirDariUsia(usia: string | number): string | null {
+  const n = Number(usia);
+  if (!Number.isFinite(n) || !Number.isInteger(n) || n < USIA_MIN || n > USIA_MAKS) return null;
+  const k = new Date();
+  return lokalIso(new Date(k.getFullYear() - n, k.getMonth(), k.getDate()));
+}
+
 /**
  * Batas kolom tanggal lahir, dinyatakan sebagai tanggal supaya pemilih tanggal
  * bawaan peramban ikut menegakkannya sebelum petugas sempat salah.

@@ -2342,3 +2342,26 @@ button { cursor: pointer; font-family: inherit; }
   }
   .kondisi-kolom { column-gap: 0; }
 }
+
+/* ==================== Isian umur: tanggal lahir atau usia ==================== */
+
+.lahir-kepala {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin-bottom: 6px;
+}
+.lahir-kepala > label { margin: 0; }
+/* Penukar kecil di baris label, bukan tab selebar layar: ia mengganti isi SATU
+   kolom, dan kontrol sebesar kolomnya sendiri akan terbaca sebagai dua kolom. */
+.lahir-mode {
+  display: flex; gap: 2px; padding: 2px; flex: none;
+  background: var(--brand-tint); border-radius: 999px;
+}
+.lahir-mode > button {
+  border: none; background: none; cursor: pointer;
+  padding: 3px 10px; border-radius: 999px;
+  font-size: 11.5px; font-weight: var(--fw-medium); color: var(--text-muted);
+}
+.lahir-mode > button.on {
+  background: var(--surface-card); color: var(--teal-800);
+  font-weight: var(--fw-semibold); box-shadow: var(--shadow-xs, 0 1px 2px rgba(0,0,0,.06));
+}

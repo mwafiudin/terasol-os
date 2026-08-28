@@ -20,6 +20,8 @@ export type Draft = {
    * kehilangan ketikannya di tengah melayani orang.
    */
   tanggalLahir: string;
+  /** Tanggal lahirnya ditaksir dari usia yang diketik, bukan ditanyakan. */
+  tanggalLahirAsumsi: boolean;
   usia: string;
   hp: string;
   consentGranted: boolean | null;
@@ -40,7 +42,7 @@ export function emptyDraft(eventClientId: string, consentVersi: string): Draft {
   return {
     clientId: crypto.randomUUID(),
     eventClientId,
-    nama: '', gender: '', tanggalLahir: '', usia: '', hp: '',
+    nama: '', gender: '', tanggalLahir: '', tanggalLahirAsumsi: false, usia: '', hp: '',
     consentGranted: null, consentVersi,
     values: {}, konteksGula: null, berminat: false,
     startedAt: new Date().toISOString(),
@@ -92,7 +94,11 @@ export const useDraft = create<DraftState>((set, get) => ({
       // Draf yang tersimpan sebelum kolom tanggal lahir ada tidak memilikinya,
       // dan JSON tidak mengeluh soal itu — `value={undefined}` pada input yang
       // terkendali barulah yang meledak, jauh dari sini. Diisi di pintu masuk.
-      set({ draft: { ...draft, tanggalLahir: draft.tanggalLahir ?? '' } });
+      set({ draft: {
+        ...draft,
+        tanggalLahir: draft.tanggalLahir ?? '',
+        tanggalLahirAsumsi: draft.tanggalLahirAsumsi ?? false,
+      } });
     } catch {
       await setMeta('draft', null);
     }
@@ -141,6 +147,7 @@ export function draftToRecord(draft: Draft): {
       nama: draft.nama,
       gender: (draft.gender || 'P') as 'P' | 'L',
       tanggalLahir: draft.tanggalLahir || null,
+      tanggalLahirAsumsi: draft.tanggalLahirAsumsi,
       usia: draft.usia,
       hp: draft.hp,
       consent: {

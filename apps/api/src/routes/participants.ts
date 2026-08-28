@@ -27,7 +27,8 @@ export default async function participantRoutes(app: FastifyInstance) {
 
       const { rows } = await tx.query<{ tenantId: string }>(
         `select p.id, p.client_id as "clientId", p.nama, p.gender, p.usia,
-                to_char(p.tanggal_lahir,'YYYY-MM-DD') as "tanggalLahir", p.hp,
+                to_char(p.tanggal_lahir,'YYYY-MM-DD') as "tanggalLahir",
+                p.tanggal_lahir_asumsi as "tanggalLahirAsumsi", p.hp,
                 p.needs_review as "needsReview", p.erased_at as "erasedAt",
                 p.tenant_id as "tenantId",
                 -- Ikut dikirim supaya perangkat bisa menyalinnya: tanpa ini,
@@ -81,7 +82,8 @@ export default async function participantRoutes(app: FastifyInstance) {
     return withTenant(ctx, async (tx) => {
       const { rows } = await tx.query<{ tenantId: string }>(
         `select p.id, p.client_id as "clientId", p.nama, p.gender, p.usia,
-                to_char(p.tanggal_lahir,'YYYY-MM-DD') as "tanggalLahir", p.hp,
+                to_char(p.tanggal_lahir,'YYYY-MM-DD') as "tanggalLahir",
+                p.tanggal_lahir_asumsi as "tanggalLahirAsumsi", p.hp,
                 p.needs_review as "needsReview", p.erased_at as "erasedAt",
                 p.created_at as "createdAt", p.device_id as "deviceId",
                 p.tenant_id as "tenantId", p.pelanggan_id as "pelangganId",
