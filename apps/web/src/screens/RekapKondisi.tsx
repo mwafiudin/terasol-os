@@ -221,6 +221,13 @@ export function RekapKondisiEvent({ daftar, onBuka }: {
         </>
       )}
 
+      {/* Garisnya elemen tersendiri, bukan border milik teksnya.
+
+          Teks kaki dibatasi 520px supaya barisnya nyaman dibaca; garis
+          pemisah sebaliknya menandai lebar KARTU. Digabung, keduanya saling
+          memaksa — dan yang menang selama ini teksnya, jadi garisnya berhenti
+          di tengah kartu seperti pekerjaan yang ditinggalkan separuh. */}
+      <div className="kondisi-sep" />
       <small className="kondisi-kaki">
         Hasil skrining satu hari dengan alat lapangan pada orang yang datang
         sendiri ke event ini — bukan angka prevalensi, bukan sampel acak, dan
