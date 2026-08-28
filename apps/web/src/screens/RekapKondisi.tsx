@@ -120,54 +120,64 @@ export function RekapKondisiEvent({ daftar, onBuka }: {
         )}
       </p>
 
-      <div className="kondisi-sep" />
+      {/* Ketiga grafik dibungkus menjadi blok, bukan dibiarkan mendatar
+          sebagai deretan anak kartu.
 
-      <span className="kondisi-judul">Temuan per parameter</span>
-      {r.perParam.map((b) => <Batang key={b.kode} b={b} total={r.dinilai} />)}
-      <div className="kondisi-legenda">
-        <span><i className="t-aman" />Dalam rujukan</span>
-        <span><i className="t-perhatian" />Rentang perantara</span>
-        <span><i className="t-luar" />Di luar rujukan</span>
-        <span><i className="t-belum" />Tidak diperiksa</span>
-      </div>
+          Di ponsel bungkusnya tidak mengubah apa pun — satu kolom, dipisah
+          garis. Di layar lebar ia yang membuat lebarnya terpakai: batang
+          parameter di kiri, sebaran dan kelompok usia menumpuk di kanan.
+          Tanpa itu, kartu selebar 1040px hanya berisi batang 340px dan
+          setengahnya kosong. */}
+      <div className="kondisi-kolom">
+        <div className="kondisi-blok kb-param">
+          <span className="kondisi-judul">Temuan per parameter</span>
+          {r.perParam.map((b) => <Batang key={b.kode} b={b} total={r.dinilai} />)}
+          <div className="kondisi-legenda">
+            <span><i className="t-aman" />Dalam rujukan</span>
+            <span><i className="t-perhatian" />Rentang perantara</span>
+            <span><i className="t-luar" />Di luar rujukan</span>
+            <span><i className="t-belum" />Tidak diperiksa</span>
+          </div>
+        </div>
 
-      <div className="kondisi-sep" />
-
-      <span className="kondisi-judul">Berapa temuan per orang</span>
-      <Sebaran r={r} />
-      <small className="kondisi-catatan">
-        Satu orang dengan tiga temuan bukan hal yang sama dengan tiga orang yang
-        masing-masing satu, dan batang di atas tidak bisa membedakannya.
-      </small>
-
-      {r.usia.length > 1 && (
-        <>
-          <div className="kondisi-sep" />
-          <span className="kondisi-judul">Menurut kelompok usia</span>
-          {/* Dua hal sekaligus: PANJANG batang adalah besar kelompoknya, ISI
-              berwarna adalah yang punya temuan.
-
-              Kalau panjangnya selalu penuh dan hanya isinya yang berubah,
-              event yang semua pesertanya punya temuan menghasilkan tiga batang
-              penuh yang identik — tidak mengatakan apa pun, padahal kelompok
-              yang satu berisi sembilan orang dan yang lain dua puluh. */}
-          {r.usia.map((k) => (
-            <div className="usia-baris" key={k.label}>
-              <span className="usia-label">{k.label}</span>
-              <div className="usia-jalur">
-                <div className="usia-bar" style={{ width: `${(k.total / terbesar) * 100}%` }}>
-                  <i style={{ width: `${(k.denganTemuan / k.total) * 100}%` }} />
-                </div>
-              </div>
-              <span className="usia-n">{k.denganTemuan}/{k.total}</span>
-            </div>
-          ))}
+        <div className="kondisi-blok">
+          <span className="kondisi-judul">Berapa temuan per orang</span>
+          <Sebaran r={r} />
           <small className="kondisi-catatan">
-            Panjang batang menunjukkan besar kelompoknya; bagian merah adalah
-            peserta dengan sedikitnya satu temuan.
+            Satu orang dengan tiga temuan bukan hal yang sama dengan tiga orang
+            yang masing-masing satu, dan batang di atas tidak bisa membedakannya.
           </small>
-        </>
-      )}
+        </div>
+
+        {r.usia.length > 1 && (
+          <div className="kondisi-blok">
+            <span className="kondisi-judul">Menurut kelompok usia</span>
+            {/* Dua hal sekaligus: PANJANG batang adalah besar kelompoknya, ISI
+                berwarna adalah yang punya temuan.
+
+                Kalau panjangnya selalu penuh dan hanya isinya yang berubah,
+                event yang semua pesertanya punya temuan menghasilkan tiga
+                batang penuh yang identik — tidak mengatakan apa pun, padahal
+                kelompok yang satu berisi sembilan orang dan yang lain dua
+                puluh. */}
+            {r.usia.map((k) => (
+              <div className="usia-baris" key={k.label}>
+                <span className="usia-label">{k.label}</span>
+                <div className="usia-jalur">
+                  <div className="usia-bar" style={{ width: `${(k.total / terbesar) * 100}%` }}>
+                    <i style={{ width: `${(k.denganTemuan / k.total) * 100}%` }} />
+                  </div>
+                </div>
+                <span className="usia-n">{k.denganTemuan}/{k.total}</span>
+              </div>
+            ))}
+            <small className="kondisi-catatan">
+              Panjang batang menunjukkan besar kelompoknya; bagian merah adalah
+              peserta dengan sedikitnya satu temuan.
+            </small>
+          </div>
+        )}
+      </div>
 
       {r.perluTindak.length > 0 && (
         <>
