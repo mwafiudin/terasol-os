@@ -14,6 +14,7 @@ import { Badge, Button, ICONS, PageHead, Rujukan } from '../components/ui';
 import { api, type PengukuranRow } from '../lib/api';
 import { analisa, labelArah, type Analisis, type Penanda } from '../lib/analisis';
 import { angka, bangunDeret, type Deret } from '../lib/deret';
+import { produkUntukPenanda, type Produk } from '../lib/produk';
 import { dec, fmtTanggal } from '../lib/domain';
 import {
   DISCLAIMER, UKUR, rentangSasaran, SASARAN_IMT,
@@ -209,6 +210,7 @@ export function Analisis({ go, pelangganId, nama, gender, usia, hp }: {
         ) : (
           <>
             <Sorotan hasil={hasil!} />
+            <SaranProduk sorotan={hasil!.sorotan} />
             {hasil!.imt && <KartuImt imt={hasil!.imt} />}
 
             <section className="lembar-bagian">
@@ -253,6 +255,129 @@ export function Analisis({ go, pelangganId, nama, gender, usia, hp }: {
         </footer>
       </div>
     </div>
+  );
+}
+
+/* --------------------------- saran produk --------------------------- */
+
+/**
+ * Penanda pemeriksaan → tanda yang dipakai katalog produk.
+ *
+ * Deret tensi memuat sistolik dan diastolik sebagai satu baris, sedangkan
+ * katalog menandai produknya dengan `sistolik`.
+ */
+function tandaProduk(p: Penanda): JenisUkur | null {
+  if (p.deret.kunci === 'tensi') return 'sistolik';
+  return p.deret.jenis;
+}
+
+/**
+ * Produk yang dikaitkan produsen dengan temuan seseorang.
+ *
+ * Varian ukuran disaring menjadi satu. "Supergreen 50 / 150 / 600 tabs" adalah
+ * tiga SKU di rak — perbedaan yang penting saat menjual — tetapi di lembar
+ * saran ketiganya mengatakan hal yang sama tiga kali dan mendorong produk lain
+ * keluar dari pandangan.
+ */
+/** Membuang keterangan ukuran dari nama, mis. "Supergreen 150 tabs". */
+const tanpaUkuran = (nama: string) =>
+  nama.replace(/\s+\d+\s*(tabs?|kapsul|kaplet|softgels?|gr|ml|pcs|sachets?)\b.*$/i, '').trim();
+
+type Saran = { produk: Produk; nama: string };
+
+function saranUntuk(sorotan: Penanda[]): { temuan: string; produk: Saran[] }[] {
+  const keluar: { temuan: string; produk: Saran[] }[] = [];
+  const sudah = new Set<string>();
+
+  for (const p of sorotan) {
+    const tanda = tandaProduk(p);
+    if (!tanda) continue;
+
+    /**
+     * Yang paling SPESIFIK untuk temuan ini lebih dulu.
+     *
+     * Produk yang produsennya kaitkan dengan satu penanda saja dibuat untuk
+     * keperluan itu; yang dikaitkan dengan banyak penanda adalah suplemen
+     * serba guna. Bagi orang yang gula darahnya tinggi, "suplemen kromium
+     * untuk penderita diabetes" lebih menjawab daripada nutrisi umum, dan
+     * urutan katalog tidak tahu itu.
+     */
+    const semua = [...produkUntukPenanda(tanda)]
+      .sort((a, b) => a.penanda.length - b.penanda.length);
+
+    const unik: Saran[] = [];
+    const kelompok = new Map<string, Produk[]>();
+    for (const pr of semua) {
+      if (sudah.has(pr.id)) continue;
+      // Varian ukuran berbagi seri dan kalimat ringkas yang sama persis.
+      const kunci = `${pr.seri}|${pr.ringkas}`;
+      if (!kelompok.has(kunci)) kelompok.set(kunci, []);
+      kelompok.get(kunci)!.push(pr);
+    }
+    for (const varian of kelompok.values()) {
+      const utama = varian[0]!;
+      // Nama dipendekkan HANYA bila memang ada beberapa ukuran yang digabung.
+      // "Milchrom (60 Caps)" adalah satu-satunya kemasannya, dan menyebut
+      // ukurannya di situ justru membantu.
+      unik.push({ produk: utama, nama: varian.length > 1 ? tanpaUkuran(utama.nama) : utama.nama });
+      varian.forEach((v) => sudah.add(v.id));
+    }
+
+    if (!unik.length) continue;
+    keluar.push({
+      temuan: `${p.deret.nama}${p.deret.kode ? ` (${p.deret.kode})` : ''}`,
+      produk: unik,
+    });
+  }
+  return keluar;
+}
+
+function SaranProduk({ sorotan }: { sorotan: Penanda[] }) {
+  const saran = saranUntuk(sorotan);
+  if (!saran.length) return null;
+
+  return (
+    <section className="lembar-bagian">
+      <h2>Produk yang bisa dibicarakan</h2>
+
+      {saran.map((s) => (
+        <div className="saran-grup" key={s.temuan}>
+          <p className="saran-untuk">Untuk temuan <b>{s.temuan}</b></p>
+          <div className="saran-grid">
+            {s.produk.map(({ produk: p, nama }) => (
+              <article className="saran-kartu" key={p.id}>
+                <header>
+                  <b>{nama}</b>
+                  <span className="saran-seri">{p.seri}</span>
+                </header>
+                <p className="saran-ringkas">{p.ringkas}</p>
+                {p.komposisi.length > 0 && (
+                  <p className="saran-kandungan">
+                    <span>Kandungan</span>
+                    {/* Tiga teratas saja: kartu yang memuat dua belas baris
+                        kandungan berhenti bisa dipindai sekilas, dan rincian
+                        lengkapnya memang ada di halaman Produk. */}
+                    {p.komposisi.slice(0, 3).join(' · ')}
+                    {p.komposisi.length > 3 ? ` · +${p.komposisi.length - 3} lagi` : ''}
+                  </p>
+                )}
+              </article>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {/* Takaran sengaja TIDAK dicantumkan di sini.
+          Angka takaran di lembar yang dibawa pulang terbaca sebagai resep, dan
+          ini bukan resep — sebagian produk pun membawa peringatan produsennya
+          sendiri untuk penderita hipertensi atau diabetes. Yang tepat adalah
+          dibicarakan dengan orangnya, bukan dicetak. */}
+      <p className="saran-catatan">
+        Takaran dan lama pemakaian dibicarakan langsung dengan petugas. Isi,
+        kandungan, dan manfaat di atas adalah keterangan produsen, bukan hasil
+        pemeriksaan Anda.
+      </p>
+    </section>
   );
 }
 
