@@ -9,19 +9,26 @@ export default async function metaRoutes(app: FastifyInstance) {
    * Health check sekaligus penanda revisi. Sejak deploy berjalan otomatis dari
    * GitHub, pertanyaan "commit mana yang sekarang live?" harus bisa dijawab
    * tanpa menebak dari waktu deploy — Railway menyuntikkan RAILWAY_GIT_* saat
-   * service tersambung ke repo.
+   * service tersambung ke repo. Di luar Railway (image Docker), nilainya dari
+   * GIT_COMMIT_SHA, GIT_BRANCH, dan APP_ENV. `||`, bukan `??`: build arg yang
+   * tidak diisi tetap tertanam sebagai string kosong.
+   *
+   * Endpoint ini publik, jadi galat basis data tidak dikirim ke klien: pesan
+   * Postgres bisa memuat nama host, port, atau nama role. Detailnya ke log.
    */
-  app.get('/health', async (_req, reply) => {
+  app.get('/health', async (req, reply) => {
+    const commit = process.env.RAILWAY_GIT_COMMIT_SHA || process.env.GIT_COMMIT_SHA;
     const revisi = {
-      commit: process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 7) ?? null,
-      branch: process.env.RAILWAY_GIT_BRANCH ?? null,
-      lingkungan: process.env.RAILWAY_ENVIRONMENT_NAME ?? 'lokal',
+      commit: commit?.slice(0, 7) || null,
+      branch: process.env.RAILWAY_GIT_BRANCH || process.env.GIT_BRANCH || null,
+      lingkungan: process.env.RAILWAY_ENVIRONMENT_NAME || process.env.APP_ENV || 'lokal',
     };
     try {
       await adminPool.query('select 1');
       return { ok: true, db: 'up', revisi };
     } catch (err) {
-      return reply.code(503).send({ ok: false, db: 'down', revisi, message: (err as Error).message });
+      req.log.error({ err }, 'health: basis data tidak terjangkau');
+      return reply.code(503).send({ ok: false, db: 'down', revisi });
     }
   });
 

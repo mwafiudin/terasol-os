@@ -1,0 +1,12 @@
+# .env.local memuat VITE_DEMO_LOGINS (kata sandi akun demo). Kalau ikut ke
+# konteks build, Vite membacanya dan isinya bisa sampai ke layer image.
+node_modules
+dist
+.env
+.env.*
+!.env.example
+*.local
+*.log
+Dockerfile*
+.dockerignore
+.railwayignore

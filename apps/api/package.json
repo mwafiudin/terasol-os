@@ -11,7 +11,7 @@
     "migrate": "node --env-file-if-exists=.env dist/cli-migrate.js",
     "seed": "node --env-file-if-exists=.env dist/cli-seed.js",
     "purge": "node --env-file-if-exists=.env dist/cli-purge.js",
-    "test": "npm run build && node --env-file-if-exists=.env --test test/password.test.js test/security.test.js",
+    "test": "npm run build && node --env-file-if-exists=.env --test test/password.test.js test/health.test.js test/security.test.js test/pool.test.js test/migrate-pemilik.test.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

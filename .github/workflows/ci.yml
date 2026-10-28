@@ -75,8 +75,17 @@ jobs:
       - name: Uji hashing kata sandi
         run: node --test test/password.test.js
 
+      - name: Uji /health tidak membocorkan galat basis data
+        run: node --test test/health.test.js
+
       - name: Uji Row Level Security dan aturan basis data
         run: node --test test/security.test.js
+
+      - name: Uji API tetap hidup saat koneksi basis data diputus
+        run: node --test test/pool.test.js
+
+      - name: Uji migrasi oleh pemilik non-superuser
+        run: node --test test/migrate-pemilik.test.js
 
       - name: Jalankan server
         run: |

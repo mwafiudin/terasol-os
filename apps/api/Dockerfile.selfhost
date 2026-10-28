@@ -1,0 +1,53 @@
+# syntax=docker/dockerfile:1
+# Image API untuk self-host (VPS, di belakang reverse proxy). Namanya sengaja
+# bukan `Dockerfile`: Railway otomatis memakai berkas bernama itu di root
+# service, dan build produksi di Railway tidak boleh ikut berubah.
+# Cara pakai, env, dan migrasi: docs/self-host.md.
+#
+# Base dipaku ke digest indeks multi-arch, bukan cuma tag: `22-bookworm-slim`
+# digeser tiap rilis Node/Debian, jadi build yang sama bisa menarik isi berbeda
+# tanpa ada yang berubah di repo. Menaikkan versi = ganti ketiga baris FROM
+# sekaligus dengan hasil `docker buildx imagetools inspect node:22-bookworm-slim`.
+
+FROM node:22-bookworm-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY tsconfig.json ./
+COPY src ./src
+RUN npm run build
+
+# node_modules produksi dipasang terpisah supaya tsx/typescript tidak ikut.
+FROM node:22-bookworm-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da AS deps
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --no-audit --no-fund
+
+FROM node:22-bookworm-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da AS jalan
+WORKDIR /app
+# Penanda revisi untuk /health (padanan RAILWAY_GIT_* di luar Railway):
+#   docker build --build-arg GIT_COMMIT_SHA=$(git rev-parse HEAD) ...
+ARG GIT_COMMIT_SHA=""
+ARG GIT_BRANCH=""
+ENV NODE_ENV=production \
+    PORT=3000 \
+    GIT_COMMIT_SHA=$GIT_COMMIT_SHA \
+    GIT_BRANCH=$GIT_BRANCH
+# Berkas dimiliki root dan hanya bisa dibaca user `node` (uid 1000): proses
+# yang dibobol tidak bisa menimpa kodenya sendiri. migrate.ts membaca
+# ../migrations relatif terhadap dist/, jadi foldernya ikut.
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
+COPY package.json ./
+COPY migrations ./migrations
+USER node
+EXPOSE 3000
+# fetch bawaan Node 22, karena image slim tidak membawa curl/wget. /health
+# membalas 503 saat basis data tidak terjangkau, jadi container ikut unhealthy.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD ["node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+# Bentuk exec: node jadi PID 1 dan menerima SIGTERM langsung, sehingga
+# handler di server.ts sempat menutup server dan pool sebelum keluar.
+# Server menjalankan migrasi sendiri saat boot (dengan advisory lock); untuk
+# menjalankannya terpisah: `docker run --rm --env-file api.env <image> node dist/cli-migrate.js`.
+CMD ["node", "dist/server.js"]
