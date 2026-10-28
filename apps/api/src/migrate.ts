@@ -59,12 +59,32 @@ async function ensureAppRole(client: import('pg').PoolClient, log: (m: string) =
   const exists = await client.query('select 1 from pg_roles where rolname = $1', [user]);
   // DDL tidak menerima parameter, jadi SQL-nya dirangkai server-side dengan
   // format() agar identifier dan literal ter-escape dengan benar.
+  //
+  // Atribut hanya ditulis saat create. Postgres menolak ALTER yang menyebut
+  // NOSUPERUSER/NOCREATEDB/NOBYPASSRLS dari role non-superuser walau nilainya
+  // tidak berubah, padahal pemilik self-host cukup ber-CREATEROLE. Jaminannya
+  // dipindah ke pemeriksaan pg_roles di bawah.
   const verb = exists.rowCount ? 'alter' : 'create';
+  const atribut = verb === 'create' ? ' nosuperuser nocreatedb nocreaterole noinherit nobypassrls' : '';
   const { rows } = await client.query<{ sql: string }>(
-    `select format('${verb} role %I with login password %L nosuperuser nocreatedb nocreaterole noinherit nobypassrls', $1::text, $2::text) as sql`,
+    `select format('${verb} role %I with login password %L${atribut}', $1::text, $2::text) as sql`,
     [user, pass],
   );
   await client.query(rows[0]!.sql);
+
+  // Role yang bisa melewati RLS membuat isolasi tenant cuma janji. Lebih baik
+  // migrasi (dan boot server) gagal daripada jalan diam-diam.
+  const { rows: [hak] } = await client.query<Record<string, boolean>>(
+    'select rolsuper, rolbypassrls, rolcreaterole, rolcreatedb from pg_roles where rolname = $1',
+    [user],
+  );
+  const bocor = Object.entries(hak ?? {}).filter(([, v]) => v).map(([k]) => k);
+  if (!hak || bocor.length) {
+    throw new Error(
+      `Role aplikasi '${user}' punya hak yang melewati RLS (${bocor.join(', ') || 'tidak ditemukan'}). ` +
+      'Cabut dulu sebagai superuser, mis. ALTER ROLE ... NOSUPERUSER NOBYPASSRLS NOCREATEROLE NOCREATEDB.',
+    );
+  }
 
   const { rows: grants } = await client.query<{ sql: string }>(
     `select unnest(array[

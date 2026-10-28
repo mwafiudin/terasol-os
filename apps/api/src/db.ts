@@ -38,6 +38,16 @@ export const appPool = new Pool({
   idleTimeoutMillis: 30_000,
 });
 
+// Koneksi idle yang diputus Postgres (restart, failover) memancarkan 'error'
+// pada Pool. Tanpa listener, Node menjatuhkan seluruh proses. Pool sudah
+// membuang klien yang rusak sendiri; cukup dicatat, query berikutnya membuka
+// koneksi baru. Uji: test/pool.test.js.
+for (const [nama, pool] of [['admin', adminPool], ['app', appPool]] as const) {
+  pool.on('error', (err) => {
+    console.error(`pool ${nama}: koneksi idle terputus: ${err.message}`);
+  });
+}
+
 export type RequestContext = {
   tenantId: string;
   userId: string;
