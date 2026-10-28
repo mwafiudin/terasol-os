@@ -1,0 +1,14 @@
+# Konteks build hanya butuh package*.json, tsconfig, src, dan migrations.
+# .env wajib di sini: tanpa ini kredensial lokal ikut terkirim ke daemon dan
+# bisa tertinggal di layer image.
+node_modules
+dist
+test
+.env
+.env.*
+!.env.example
+*.local.mjs
+*.log
+Dockerfile*
+.dockerignore
+.railwayignore

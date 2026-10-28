@@ -93,7 +93,7 @@ panelnya. Sourcemap juga tidak diterbitkan.
 cd apps/api && npm test
 ```
 
-34 uji, semuanya menembak Postgres sungguhan — bukan mock:
+Semuanya menembak Postgres sungguhan — bukan mock:
 
 - **`test/security.test.js`** — membuktikan Row Level Security benar-benar mengunci:
   tenant lain tidak terlihat walau id-nya diketahui, tulis lintas tenant ditolak
@@ -104,6 +104,12 @@ cd apps/api && npm test
   dengan bentrok dedup → rekap → resolusi konflik → konversi → ekspor CSV →
   replay batch. Perlu server jalan (`npm start` di terminal lain).
 - **`test/password.test.js`** — hashing scrypt.
+- **`test/health.test.js`** — `/health` saat basis data mati membalas 503 tanpa
+  pesan galat Postgres (host, role), detailnya hanya di log. Tidak butuh Postgres.
+- **`test/pool.test.js`** — koneksi idle yang diputus Postgres tidak menjatuhkan
+  proses API.
+- **`test/migrate-pemilik.test.js`** — migrasi oleh pemilik non-superuser
+  ber-CREATEROLE lolos berulang, dan gagal keras bila role aplikasi punya BYPASSRLS.
 
 Semuanya jalan otomatis di GitHub Actions ([`ci.yml`](.github/workflows/ci.yml))
 pada tiap push dan pull request, memakai Postgres service container — bukan mock,
@@ -249,6 +255,8 @@ Cek commit mana yang sedang live:
 ```bash
 curl -s https://api-production-21af.up.railway.app/health
 ```
+
+Self-host dengan Docker (VPS, di luar Railway): [docs/self-host.md](docs/self-host.md).
 
 Deploy manual masih bisa dipakai untuk keadaan darurat, dan **melewati CI**:
 
