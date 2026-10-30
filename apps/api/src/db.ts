@@ -1,5 +1,6 @@
 import pg from 'pg';
 import { env } from './env.js';
+import { opsiPool } from './tls.js';
 
 const { Pool } = pg;
 
@@ -8,12 +9,6 @@ const { Pool } = pg;
 pg.types.setTypeParser(1700, (v) => (v === null ? null : Number(v)));
 // int8 (bigint) — nilai transaksi rupiah, jauh di bawah MAX_SAFE_INTEGER.
 pg.types.setTypeParser(20, (v) => (v === null ? null : Number(v)));
-
-function sslFor(url: string) {
-  const host = new URL(url).hostname;
-  const isLocal = host === 'localhost' || host === '127.0.0.1' || host.endsWith('.railway.internal');
-  return isLocal ? undefined : { rejectUnauthorized: false };
-}
 
 /** Ganti kredensial pada DATABASE_URL menjadi role aplikasi (non-superuser). */
 function appUrl(): string {
@@ -25,15 +20,13 @@ function appUrl(): string {
 
 /** Superuser — hanya untuk migrasi dan pembuatan role. Jangan dipakai request. */
 export const adminPool = new Pool({
-  connectionString: env.databaseUrl,
-  ssl: sslFor(env.databaseUrl),
+  ...opsiPool(env.databaseUrl),
   max: 2,
 });
 
 /** Role aplikasi — semua request lewat sini, sehingga RLS selalu berlaku. */
 export const appPool = new Pool({
-  connectionString: appUrl(),
-  ssl: sslFor(env.databaseUrl),
+  ...opsiPool(appUrl()),
   max: 10,
   idleTimeoutMillis: 30_000,
 });
