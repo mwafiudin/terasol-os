@@ -43,6 +43,8 @@ Sumbernya `apps/api/src/env.ts`; contoh lengkap di `apps/api/.env.example`.
 | `BOOTSTRAP_TENANT`, `BOOTSTRAP_EMAIL`, `BOOTSTRAP_PASSWORD`, `BOOTSTRAP_NAMA` | tidak | Tenant + admin pertama, hanya bila tabel `users` kosong. |
 | `APP_ENV` | tidak | Nama lingkungan di `/health` (padanan `RAILWAY_ENVIRONMENT_NAME`). |
 | `RETENTION_DAYS` | untuk `purge` | Sengaja tanpa bawaan (keputusan D5). |
+| `DATABASE_CA_CERT` | tidak | CA sendiri (teks PEM) untuk Postgres di host publik yang sertifikatnya tidak ditandatangani CA publik. |
+| `DATABASE_TLS_TANPA_VERIFIKASI` | tidak | `1` mematikan verifikasi sertifikat dan mencetak peringatan. Hanya untuk laptop lewat proxy publik Railway (self-signed), jangan di server. |
 
 `GIT_COMMIT_SHA` dan `GIT_BRANCH` adalah build arg di atas. Di Railway nilainya
 tetap dari `RAILWAY_GIT_*`, yang didahulukan bila ada.
@@ -80,11 +82,11 @@ pemilik tabel toh bisa mematikan FORCE RLS di tabelnya sendiri. Yang tidak
 boleh punya hak itu adalah role aplikasi. `test/migrate-pemilik.test.js`
 menguji susunan ini.
 
-**Postgres di jaringan Docker yang sama tanpa TLS** wajib memakai
-`?sslmode=disable` di `DATABASE_URL`. Kalau tidak, `sslFor()` di `src/db.ts`
-memaksa SSL untuk host selain `localhost`/`*.railway.internal`, dan koneksi
-gagal dengan `The server does not support SSL connections`. Parameter di URL
-menimpa opsi itu, dan ikut ke URL role aplikasi.
+**TLS ke Postgres** diatur `opsiPool()` di `src/tls.ts`. Postgres di jaringan
+Docker yang sama (service bernama satu kata seperti `postgres`), `localhost`,
+dan `*.railway.internal` disambung tanpa TLS. Host lain memakai TLS yang
+memverifikasi sertifikat; nama host lengkap seperti `db.contoh.com` tanpa TLS
+butuh `?sslmode=disable` di `DATABASE_URL`, yang ikut ke URL role aplikasi.
 
 ### Migrasi
 
