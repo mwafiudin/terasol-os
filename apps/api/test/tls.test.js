@@ -21,6 +21,7 @@ describe('TLS ke Postgres', () => {
       'postgres://u:p@127.0.0.1:5432/x',
       'postgres://u:p@[::1]:5432/x',
       'postgres://u:p@postgres:5432/terasol',
+      'postgres://postgres:uji@uji-pg:5432/db',
     ]) {
       assert.deepEqual(opsiPool(url, NYALA), { connectionString: url, ssl: false }, url);
     }
